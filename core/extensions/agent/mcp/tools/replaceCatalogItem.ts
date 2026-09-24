@@ -1,8 +1,7 @@
-import Path from "@core/FileProvider/Path/Path";
 import type { Article } from "@core/FileStructue/Article/Article";
 import type { Category } from "@core/FileStructue/Category/Category";
-import { ItemType } from "@core/FileStructue/Item/ItemType";
 import type ParseError from "@ext/markdown/core/Parser/Error/ParseError";
+import AgentResourcesProvider from "../../core/agentResourcesProvider";
 import { AgentArticleParser } from "../parser";
 import { fail, ok, type ToolExecutionContext, type ToolExecutionResult } from "../tool";
 import { updateCatalogItem, updateCatalogItemInUi } from "../utils/catalogItem";
@@ -18,21 +17,22 @@ type ReplaceCatalogItemInput = {
 
 export async function runReplaceCatalogItem(context: ToolExecutionContext): Promise<ToolExecutionResult> {
 	const { catalogName, itemPath, oldContent, newContent, replaceAll } = context.input as ReplaceCatalogItemInput;
+	if (AgentResourcesProvider.isSystemCatalog(catalogName)) {
+		return fail("System catalog is read-only");
+	}
 	if (!oldContent) {
 		return fail("oldContent must be non-empty.");
 	}
 
 	const { app, ctx, commands, openCatalogName, openItemPath } = context;
 	const catalog = await app.wm.current().getCatalog(catalogName, ctx);
-	const item = catalog.findItemByItemPath(new Path(Path.join(catalogName, itemPath))) as Article | Category;
-	if (!item) {
+	const resolved = await CatalogItemLookup.resolve(catalog, catalogName, itemPath);
+	if (!resolved) {
 		return fail("Item not found");
 	}
-	if (item.type !== ItemType.article && item.type !== ItemType.category) {
-		return fail(`Only article and category are supported, current type=${item.type}`);
-	}
+	const { item, lookup } = resolved;
 
-	const parser = await AgentArticleParser.open(app, ctx, commands, catalog, item);
+	const parser = await AgentArticleParser.open(app, ctx, commands, catalog, item as Article | Category);
 	const source = await parser.getMarkdownForAgent();
 	const parts = source.split(oldContent);
 	const occurrences = parts.length - 1;
@@ -49,7 +49,6 @@ export async function runReplaceCatalogItem(context: ToolExecutionContext): Prom
 	const content = parts.join(newContent);
 	try {
 		const parsedContent = await updateCatalogItem(app, ctx, catalog, item, parser, content);
-		const lookup = await CatalogItemLookup.fromCatalogItem(catalog, item);
 		if (openCatalogName === lookup.catalogName && openItemPath === lookup.itemPath) {
 			await updateCatalogItemInUi(item, parsedContent, ctx, commands, catalog);
 		}
@@ -63,9 +62,12 @@ export async function runReplaceCatalogItem(context: ToolExecutionContext): Prom
 		return fail(msg);
 	}
 
-	return ok({
-		...(await CatalogItemLookup.fromCatalogItem(catalog, item)).asJSON(),
-		replacedCount: replaceAll ? occurrences : 1,
-		replaceAll,
-	});
+	return ok(
+		{
+			...lookup.asAgentJSON(),
+			replacedCount: replaceAll ? occurrences : 1,
+			replaceAll,
+		},
+		{ navChanged: true },
+	);
 }

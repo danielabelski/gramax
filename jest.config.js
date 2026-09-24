@@ -9,8 +9,11 @@ module.exports = {
 		"^.+\\.(ts)x?$": ["ts-jest", { diagnostics: true, babelConfig: true }],
 	},
 	testMatch: ["<rootDir>/**/*.test.ts"],
+	modulePathIgnorePatterns: ["<rootDir>/.cargo", "<rootDir>/target"],
 	testPathIgnorePatterns: [
 		"<rootDir>/node_modules",
+		"<rootDir>/.cargo",
+		"<rootDir>/target",
 		"<rootDir>/core/extensions/markdown/core/render/logic/Markdoc",
 		"<rootDir>/.next",
 		"<rootDir>/public",

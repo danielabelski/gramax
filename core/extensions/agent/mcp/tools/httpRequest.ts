@@ -1,95 +1,89 @@
-import resolveModule from "@app/resolveModule/frontend";
+import { agentConfig } from "../../core/agentConfig";
+import { AgentAttachmentStore } from "../../core/attachmentStore";
+import { LinkAdapter } from "../parser/adapters/linkAdapter";
 import { fail, ok, type ToolExecutionContext, type ToolExecutionResult } from "../tool";
+import { HttpRequest } from "../utils/httpRequest";
 
-export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
-type HttpMethod = (typeof HTTP_METHODS)[number];
+export const HTTP_METHODS = HttpRequest.METHODS;
 
 type HttpRequestInput = {
 	url: string;
 	method?: string;
 	headers?: Record<string, string>;
 	body?: string;
+	auth?: { username: string; password: string };
 };
 
-type HttpRequestResult = {
-	status: number;
-	statusText: string;
-	ok: boolean;
-	body: string;
-};
-
-async function requestInTauri(
-	url: string,
-	method: string,
-	headers?: Record<string, string>,
-	body?: string,
-): Promise<HttpRequestResult | null> {
-	const res = await resolveModule("httpFetch")({
-		url,
-		method,
-		headers,
-		body: method !== "GET" && body !== undefined ? body : undefined,
-	});
-	if (!res) return null;
-
-	return {
-		status: res.status,
-		statusText: res.statusText ?? "",
-		ok: res.status >= 200 && res.status < 300,
-		body: res.body?.type === "text" ? res.body.data : "",
-	};
-}
-
-async function requestInBrowser(
-	url: string,
-	method: string,
-	headers?: Record<string, string>,
-	body?: string,
-): Promise<HttpRequestResult> {
-	const res = await fetch(url, {
-		method,
-		headers,
-		body: method !== "GET" && body !== undefined ? body : undefined,
-	});
-	return {
-		status: res.status,
-		statusText: res.statusText,
-		ok: res.ok,
-		body: await res.text(),
-	};
-}
-
-export async function runHttpRequest({ input }: ToolExecutionContext): Promise<ToolExecutionResult> {
-	const { url, method: rawMethod, headers, body } = input as HttpRequestInput;
+export async function runHttpRequest({
+	app,
+	ctx,
+	input,
+	sessionId,
+}: ToolExecutionContext): Promise<ToolExecutionResult> {
+	const { url, method: rawMethod, headers, body, auth } = input as HttpRequestInput;
 
 	if (!url?.trim()) {
 		return fail("url is required");
 	}
 
-	let parsedUrl: URL;
+	let method: (typeof HTTP_METHODS)[number];
 	try {
-		parsedUrl = new URL(url);
-	} catch {
-		return fail(`Invalid url: ${url}`);
+		HttpRequest.normalizeUrl(url);
+		method = HttpRequest.normalizeMethod(rawMethod);
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : String(e);
+		return fail(msg);
 	}
 
-	if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-		return fail(`Only http and https URLs are supported, got: ${parsedUrl.protocol}`);
-	}
-
-	const method = (rawMethod ?? "GET").toUpperCase();
-	if (!HTTP_METHODS.includes(method as HttpMethod)) {
-		return fail(`Unsupported method: ${rawMethod ?? method}. Allowed: ${HTTP_METHODS.join(", ")}`);
-	}
-
-	const requestUrl = parsedUrl.toString();
-	const requestBody = method !== "GET" && body !== undefined ? body : undefined;
+	const requestHeaders = auth
+		? {
+				...headers,
+				Authorization: `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString("base64")}`,
+			}
+		: headers;
+	const requestBody =
+		method !== "GET" && body !== undefined ? await LinkAdapter.toExternal(body, app.wm, ctx.domain) : undefined;
 
 	try {
-		const result =
-			(await requestInTauri(requestUrl, method, headers, requestBody)) ??
-			(await requestInBrowser(requestUrl, method, headers, requestBody));
-		return ok(result);
+		const result = await HttpRequest.request({
+			url,
+			method,
+			headers: requestHeaders,
+			body: requestBody !== undefined ? { type: "text", data: requestBody } : undefined,
+		});
+
+		if (!HttpRequest.isTextContentType(result.contentType) && result.bytes) {
+			if (!sessionId) return fail("Session is required to store a binary HTTP response");
+			if (result.bytes.byteLength > agentConfig.maxAttachmentBytes) {
+				return fail(`Attachment exceeds max size: ${result.bytes.byteLength}`);
+			}
+			AgentAttachmentStore.assertAttachmentExtension(result.filename);
+			const [saved] = await app.agentManager.attachments.put(sessionId, [
+				{
+					name: result.filename,
+					mime: result.contentType ?? "application/octet-stream",
+					size: result.bytes.byteLength,
+					content: Buffer.from(result.bytes).toString("base64"),
+					contentEncoding: "base64",
+				},
+			]);
+			if (!saved) return fail("Failed to store binary HTTP response");
+			return ok({
+				status: result.status,
+				statusText: result.statusText,
+				ok: result.ok,
+				attachmentItemPath: LinkAdapter.toAgentAttachmentItemPath(saved.originalFilename),
+				mime: saved.mime,
+				size: saved.size,
+			});
+		}
+
+		return ok({
+			status: result.status,
+			statusText: result.statusText,
+			ok: result.ok,
+			body: result.body,
+		});
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);
 		return fail(`HTTP request failed: ${msg}`);

@@ -4,7 +4,7 @@ import type { MouseEvent } from "react";
 import { tv } from "tailwind-variants";
 
 const actionStyles = tv({
-	base: "p-0 h-3.5 !w-0 opacity-0 transition-all duration-150 ease-in-out text-[var(--color-nav-item)] hover:text-[var(--color-nav-item-selected)]! group-hover:pl-[var(--distance-i-span)] group-hover:!w-[1.5em] group-hover:opacity-100",
+	base: "p-0 h-3.5 !w-0 opacity-0 transition-[width,padding-left,opacity,color] duration-150 ease-in-out text-[var(--color-nav-item)] hover:text-[var(--color-nav-item-selected)]! group-hover:pl-[var(--distance-i-span)] group-hover:!w-[1.5em] group-hover:opacity-100",
 });
 
 interface DiffEntryActionProps {

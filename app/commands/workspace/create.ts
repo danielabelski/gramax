@@ -16,7 +16,7 @@ const create: Command<{ config: ClientWorkspaceConfig }, void> = Command.create(
 		const { path, ...init } = config;
 		const id = await wm.addWorkspace(path, init, true);
 		await wm.setWorkspace(id);
-		applyWorkspaceServices(await wm.current().config());
+		applyWorkspaceServices(this._app.settings, wm.current());
 	},
 
 	params(_ctx, _q, body) {

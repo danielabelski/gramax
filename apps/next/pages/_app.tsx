@@ -8,6 +8,7 @@ import OpenGraph from "@components/OpenGraph/OpenGraph";
 import type { PageProps } from "@components/Pages/models/Pages";
 import getPageTitle from "@core-ui/getPageTitle";
 import { defaultRefreshPage } from "@core-ui/utils/initGlobalFuncs";
+import useSessionExpirationToast from "@ext/enterprise/components/SingInOut/hooks/useSessionExpirationToast";
 import { NotificationsInit } from "@ext/enterprise/notifications/NotificationsInit";
 import ErrorBoundary from "@ext/errorHandlers/client/components/ErrorBoundary";
 import { useApplyTheme } from "@ext/Theme/utils";
@@ -35,6 +36,8 @@ export default function App({
 	useEffect(() => {
 		if (pageProps.context?.features) setFeatureList(pageProps.context.features);
 	}, [pageProps.context?.features]);
+
+	useSessionExpirationToast(pageProps.context?.user?.sessionExpired);
 
 	const router = useRouter();
 

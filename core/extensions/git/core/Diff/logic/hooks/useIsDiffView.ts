@@ -15,6 +15,6 @@ export const useIsDiffView = () => {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	return useMemo(
 		() => resourceDiffEnabled || (diffEnabled && !isReadOnly),
-		[resourceDiffEnabled, router.query.diff, articleView, isReadOnly],
+		[resourceDiffEnabled, router?.query?.diff, articleView, isReadOnly],
 	);
 };

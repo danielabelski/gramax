@@ -40,7 +40,13 @@ export async function runSearchFiles({ app, ctx, input }: ToolExecutionContext):
 					continue;
 				}
 				if (item.type !== "file") continue;
-				if (FileConverter.isBinaryAttachment(item.path.nameWithExtension)) continue;
+				const fileName = item.path.nameWithExtension;
+				if (
+					FileConverter.isBinaryAttachment(fileName) ||
+					FileConverter.isImage(fileName) ||
+					FileConverter.isConvertible(fileName)
+				)
+					continue;
 
 				const snippets = collectSnippetsFromContent(await wmFp.read(item.path), queryText);
 				if (snippets.length > 0) {

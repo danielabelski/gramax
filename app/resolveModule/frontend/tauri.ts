@@ -1,6 +1,5 @@
 import LazyDiffFileInputTauri from "@components/Atoms/FileInput/DiffFileInput/LazyDiffFileInput";
 import LazyFileInputTauri from "@components/Atoms/FileInput/LazyFileInput";
-import { postUpdateAcceptance, UpdateAcceptance } from "../../../apps/tauri/src/update/updateEvents";
 import * as tauriCommands from "../../../apps/tauri/src/window/commands";
 import enterpriseLogin from "../../../apps/tauri/src/window/enterpriseLogin";
 import TauriLink from "../../../apps/web/src/components/Atoms/Link";
@@ -9,6 +8,7 @@ import getWebFetchService from "../../../apps/web/src/logic/Api/getWebFetchServi
 import TauriRouter from "../../../apps/web/src/logic/Api/WebRouter";
 import { getPdfjs } from "../../../apps/web/src/pdfjs/getPdfjs";
 import gesCloudLogin from "../../../core/extensions/enterprise-cloud/desktop/gesCloudLogin";
+import gesCloudPaymentMethodBinding from "../../../core/extensions/enterprise-cloud/desktop/gesCloudPaymentMethodBinding";
 import type { DynamicModules } from "..";
 
 export const getTauriModules = (): DynamicModules => {
@@ -20,10 +20,12 @@ export const getTauriModules = (): DynamicModules => {
 		openChildWindow: tauriCommands.openChildWindow,
 		enterpriseLogin,
 		gesCloudLogin,
+		gesCloudPaymentMethodBinding,
 		FileInput: LazyFileInputTauri,
 		DiffFileInput: LazyDiffFileInputTauri,
 		openDirectory: tauriCommands.openDirectory,
 		httpFetch: tauriCommands.httpFetch,
+		mailFetch: tauriCommands.mailFetch,
 		setBadge: tauriCommands.setBadge,
 		openInExplorer: tauriCommands.openInExplorer,
 		openWindowWithUrl: tauriCommands.openWindowWithUrl,
@@ -31,7 +33,6 @@ export const getTauriModules = (): DynamicModules => {
 		getPdfjs,
 		updateCheck: tauriCommands.updateCheck,
 		updateInstallFromCache: tauriCommands.updateInstallByPath,
-		updateAccept: () => postUpdateAcceptance(UpdateAcceptance.Accepted),
 	};
 };
 

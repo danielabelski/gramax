@@ -1,0 +1,1 @@
+export const CLIENT_CLOSED_STATUS_CODE = 499;

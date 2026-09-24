@@ -5,6 +5,7 @@ import type Context from "@core/Context/Context";
 import Path from "@core/FileProvider/Path/Path";
 import type { Article } from "@core/FileStructue/Article/Article";
 import parseContent from "@core/FileStructue/Article/parseContent";
+import { ensureLfsPatternForResource } from "@core/GitLfs/logic/ensureLfsPatternForResource";
 import HashResourceManager from "@core/Hash/HashItems/HashResourceManager";
 import createImage from "@ext/markdown/elements/copyMsO/createImage";
 import { Command } from "../../../types/Command";
@@ -32,8 +33,10 @@ const createFromPath: Command<
 		await parseContent(article, catalog, ctx, parser, parserContextFactory);
 
 		await article.parsedContent.write(async (p) => {
-			const hashItem = new HashResourceManager(newName, p.parsedContext.getResourceManager(), ctx);
-			await p.parsedContext.getResourceManager()?.setContent(newName, data);
+			const resourceManager = p.parsedContext.getResourceManager();
+			await ensureLfsPatternForResource(workspace, catalog, resourceManager.getAbsolutePath(newName));
+			const hashItem = new HashResourceManager(newName, resourceManager, ctx);
+			await resourceManager.setContent(newName, data);
 			hashes.deleteHash(hashItem);
 
 			return p;

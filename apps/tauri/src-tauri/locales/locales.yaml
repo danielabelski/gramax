@@ -49,6 +49,10 @@ menu:
       ru: 'Вставить'
       en: 'Paste'
 
+    paste-and-match-style:
+      ru: 'Вставить без форматирования'
+      en: 'Paste and Match Style'
+
     select-all:
       ru: 'Выделить всё'
       en: 'Select All'
@@ -263,6 +267,16 @@ etc:
         Не удалось открыть окно
       en: |
         Failed to open window
+
+    settings-file-read:
+      ru: |
+        Не удалось прочитать файл настроек
+        %{path}
+        Файл перемещён в settings.json.bak и создан заново.
+      en: |
+        Failed to read settings file
+        %{path}
+        The file was moved to settings.json.bak and recreated.
 
   ok:
     ru: 'Понятно'

@@ -9,13 +9,13 @@ const get: Command<{ catalogName: string; userMail: string; ctx: Context }, Inbo
 	kind: ResponseKind.json,
 
 	async do({ catalogName, ctx, userMail }) {
-		const { wm } = this._app;
+		const { wm, parser, parserContextFactory } = this._app;
 		const workspace = wm.current();
 
 		const catalog = await workspace.getCatalog(catalogName, ctx);
 		const inbox = catalog.customProviders.inboxProvider;
 
-		return await inbox.getItems(true, userMail);
+		return await inbox.getInboxItems(userMail, parser, parserContextFactory, ctx);
 	},
 
 	params(ctx, q) {

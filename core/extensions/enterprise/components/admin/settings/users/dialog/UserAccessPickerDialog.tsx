@@ -15,10 +15,12 @@ type UserAccessPickerDialogProps = UseUserAccessPickerDialogArgs &
 	Pick<UseUserAccessPickerDialogContentArgs, "aggregate" | "preselected" | "repoId"> & {
 		open: boolean;
 		onClose: () => void;
+		showEnterpriseElements: boolean;
 	};
 
 export const UserAccessPickerDialog = (props: UserAccessPickerDialogProps) => {
 	const { rowsMap, setRowsMap, selection, setSelection, selectedIds, picked } = useUserAccessPickerDialog(props);
+	const { showEnterpriseElements } = props;
 	return (
 		<PickerDialog
 			count={selectedIds.length}
@@ -36,6 +38,7 @@ export const UserAccessPickerDialog = (props: UserAccessPickerDialogProps) => {
 				selection={selection}
 				setRowsMap={setRowsMap}
 				setSelection={setSelection}
+				showEnterpriseElements={showEnterpriseElements}
 			/>
 		</PickerDialog>
 	);
@@ -43,6 +46,7 @@ export const UserAccessPickerDialog = (props: UserAccessPickerDialogProps) => {
 
 type UserAccessPickerDialogContentProps = UseUserAccessPickerDialogContentArgs & {
 	selection: RowSelectionState;
+	showEnterpriseElements: boolean;
 };
 
 const UserAccessPickerDialogContent = (props: UserAccessPickerDialogContentProps) => {

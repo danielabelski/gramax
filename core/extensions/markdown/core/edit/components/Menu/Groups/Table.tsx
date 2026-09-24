@@ -1,7 +1,7 @@
 import t from "@ext/localization/locale/translate";
 import { hasActiveSort } from "@ext/markdown/elements/table/edit/logic/sortAndFilter/hasActiveSort";
 import type { Editor } from "@tiptap/core";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarGroup, GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 import { useCallback } from "react";
 
 export interface TableMenuGroupButtons {
@@ -45,46 +45,35 @@ const TableMenuGroup = ({ editor, onClick, buttons }: TableMenuGroupProps) => {
 		onClick();
 	}, [editor, onClick]);
 
+	if (!canMergeCells && !canSplitCells && !canDeleteRow && !canDeleteColumn) return null;
+
 	return (
-		<>
+		<GlassToolbarGroup>
 			{canMergeCells && (
-				<ToolbarToggleButton
-					className="text-inverse-primary-fg"
+				<GlassToolbarToggleButton
 					disabled={isSorted}
 					onClick={onMergeCells}
 					tooltipText={t(`editor.table.join-cells.${isSorted ? "sorted" : "action"}`)}
 				>
-					<ToolbarIcon icon="merge-cells" />
-				</ToolbarToggleButton>
+					<GlassToolbarIcon icon="merge-cells" />
+				</GlassToolbarToggleButton>
 			)}
 			{canSplitCells && (
-				<ToolbarToggleButton
-					className="text-inverse-primary-fg"
-					onClick={onSplitCells}
-					tooltipText={t("editor.table.split-cells")}
-				>
-					<ToolbarIcon icon="split-cells" />
-				</ToolbarToggleButton>
+				<GlassToolbarToggleButton onClick={onSplitCells} tooltipText={t("editor.table.split-cells")}>
+					<GlassToolbarIcon icon="split-cells" />
+				</GlassToolbarToggleButton>
 			)}
 			{canDeleteRow && (
-				<ToolbarToggleButton
-					className="text-inverse-primary-fg"
-					onClick={onDeleteRow}
-					tooltipText={t("editor.table.row.delete")}
-				>
-					<ToolbarIcon icon="delete-row" />
-				</ToolbarToggleButton>
+				<GlassToolbarToggleButton onClick={onDeleteRow} tooltipText={t("editor.table.row.delete")}>
+					<GlassToolbarIcon icon="delete-row" />
+				</GlassToolbarToggleButton>
 			)}
 			{canDeleteColumn && (
-				<ToolbarToggleButton
-					className="text-inverse-primary-fg"
-					onClick={onDeleteColumn}
-					tooltipText={t("editor.table.column.delete")}
-				>
-					<ToolbarIcon icon="delete-column" />
-				</ToolbarToggleButton>
+				<GlassToolbarToggleButton onClick={onDeleteColumn} tooltipText={t("editor.table.column.delete")}>
+					<GlassToolbarIcon icon="delete-column" />
+				</GlassToolbarToggleButton>
 			)}
-		</>
+		</GlassToolbarGroup>
 	);
 };
 

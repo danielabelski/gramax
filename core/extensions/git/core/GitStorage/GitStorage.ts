@@ -2,6 +2,8 @@ import { getHttpsRepositoryUrl } from "@components/libs/utils";
 import { createEventEmitter } from "@core/Event/EventEmitter";
 import type FileStructure from "@core/FileStructue/FileStructure";
 import type DefaultError from "@ext/errorHandlers/logic/DefaultError";
+import gitMergeConverter from "@ext/git/actions/MergeConflictHandler/logic/GitMergeConverter";
+import type GitMergeResult from "@ext/git/actions/MergeConflictHandler/model/GitMergeResult";
 import type GitSourceApi from "@ext/git/actions/Source/GitSourceApi";
 import { makeSourceApi } from "@ext/git/actions/Source/makeSourceApi";
 import type { CancelToken } from "@ext/git/core/GitCommands/model/GitCommandsModel";
@@ -210,17 +212,19 @@ export default class GitStorage implements Storage {
 		return this._gitRepository.getRemoteName();
 	}
 
-	async pull(source: GitSourceData) {
+	async pull(source: GitSourceData): Promise<GitMergeResult[]> {
+		let conflicts: GitMergeResult[] = [];
 		const remoteName = (await this._gitRepository.getCurrentBranch()).getData().remoteName;
 		if (remoteName) {
 			try {
-				await this._gitRepository.pull(source);
+				conflicts = gitMergeConverter(await this._gitRepository.pull(source));
 			} catch (e) {
 				await (source as ProxiedSourceDataCtx<GitSourceData>)?.assertValid?.(e);
 				throw e;
 			}
 		}
-		await this.update();
+		if (!conflicts.length) await this.update();
+		return conflicts;
 	}
 
 	async getFileLink(path: Path, branch?: Branch): Promise<string> {

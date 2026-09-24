@@ -6,7 +6,7 @@ interface GroupHeaderProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const groupHeaderStyles = tv({
-	base: "group-header w-full -mb-1 cursor-pointer hover:text-[var(--color-primary)]",
+	base: "group-header text-xs font-medium text-muted w-full h-8 pl-2.5 shrink-0",
 });
 
 export const GroupHeader = ({ children, className, ...props }: GroupHeaderProps) => (

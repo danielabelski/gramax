@@ -1,5 +1,16 @@
 .rules:
+  # Only `e2e-temp-cleanup` runs on a schedule, and only MR stand jobs run in a Draft MR pipeline.
+  # Every other job hangs off one of the fragments below and starts here, so these lightweight
+  # pipelines stop at the first matching rule. Without the schedule guard, `rules:changes` always
+  # evaluates to true in a scheduled pipeline and drags the whole develop pipeline along.
+  default-pipeline-guards:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $DRAFT_MR == "true"
+      when: never
+
   if-ci-changed:
+    - !reference [.rules, default-pipeline-guards]
     - if: '$CI_COMMIT_BRANCH =~ /^(develop|release\/.*)$/'
       changes:
         - '.ci/**/*'
@@ -12,10 +23,12 @@
 
   tests:
     base:
+      - !reference [.rules, default-pipeline-guards]
       - !reference [.rules, never-if-skip-tests]
       - if: $CI_COMMIT_TITLE =~ /!?\[?all.?tests?\]?/
       - !reference [.rules, if-ci-changed]
     rust:
+      - !reference [.rules, default-pipeline-guards]
       - if: $CI_COMMIT_TITLE =~ /!?\[?all.?tests?\]?/
       - if: '$CI_COMMIT_BRANCH =~ /^(develop|release\/.*)$/ || $CI_PIPELINE_SOURCE == "merge_request_event"'
         changes:
@@ -26,6 +39,7 @@
           - 'crates/**/*'
 
   core:
+    - !reference [.rules, default-pipeline-guards]
     - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_COMMIT_TITLE =~ /!?\[?all.?tests?\]?/
@@ -38,16 +52,22 @@
 
   build:
     if-prod:
+      - !reference [.rules, default-pipeline-guards]
       - if: '$CI_COMMIT_BRANCH == $PROD_BRANCH'
     if-release:
+      - !reference [.rules, default-pipeline-guards]
       - if: '$CI_COMMIT_BRANCH =~ /^(release\/.*)$/'
     if-develop:
+      - !reference [.rules, default-pipeline-guards]
       - if: '$CI_COMMIT_BRANCH == develop'
     merge_request:
+      - !reference [.rules, default-pipeline-guards]
       - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     base:
+      - !reference [.rules, default-pipeline-guards]
       - if: '$CI_COMMIT_BRANCH =~ /^(develop|release\/.*)$/'
     service:
+      - !reference [.rules, default-pipeline-guards]
       - !reference [.rules, if-ci-changed]
       - if: '$CI_COMMIT_BRANCH =~ /^(develop|release\/.*)$/'
         changes:
@@ -56,10 +76,12 @@
           - services/package-lock.json
           - services/target/$IMAGE_NAME/**/*
     rust:
+      - !reference [.rules, default-pipeline-guards]
       - if: '$CI_COMMIT_BRANCH =~ /^(develop|release\/.*)$/'
         changes:
           - crates/**/*
     image:
+      - !reference [.rules, default-pipeline-guards]
       - if: '$BUILD_IMAGES == "true" && $CI_COMMIT_BRANCH =~ /^(develop|release\/.*)$/'
         changes:
           - .ci/images/*.dockerfile
@@ -69,6 +91,15 @@
 .ci-job-duration-metrics:
   after_script:
     - bash ./.ci/metrics/push-ci-job-duration-metrics.sh || true
+
+.cargo-cache:
+  cache:
+    - key:
+        files:
+          - Cargo.lock
+      paths:
+        - .cargo/registry/
+        - .cargo/git/
 
 .template.docker:
   before_script:
@@ -111,7 +142,7 @@
   variables:
     GIT_DEPTH: 600
   tags:
-    - kubernetes01-gramax
+    - kubernetes01-gramax-5ghz
   artifacts:
     when: always
     expire_in: '7 days'

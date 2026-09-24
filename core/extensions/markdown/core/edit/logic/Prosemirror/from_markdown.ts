@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: expected */
+/** biome-ignore-all lint/suspicious/noAssignInExpressions: expected */
 import { type Attrs, Mark, type MarkType, type Node, type NodeType, type Schema } from "prosemirror-model";
 
 // import markdownit from "markdown-it";
@@ -45,7 +47,7 @@ class MarkdownParseState {
 			nodes = top.content,
 			last = nodes[nodes.length - 1];
 		const node = this.schema.text(text, top.marks);
-		let merged;
+		let merged: Node;
 		if (last && (merged = maybeMerge(last, node))) nodes[nodes.length - 1] = merged;
 		else nodes.push(node);
 	}
@@ -66,8 +68,9 @@ class MarkdownParseState {
 		for (let i = 0; i < toks.length; i++) {
 			const tok = toks[i];
 			const handler: Handler = this.tokenHandlers[tok.type];
-			if (!handler) throw new Error("Token type `" + tok.type + "` not supported by Markdown parser");
-			await handler(this, tok, toks, i);
+			if (!handler) throw new Error(`Token type \`${tok.type}\` not supported by Markdown parser`);
+			const result = handler(this, tok, toks, i);
+			if (result) await result;
 		}
 	}
 
@@ -108,7 +111,7 @@ function noCloseToken(spec: ParseSpec, type: string) {
 }
 
 function withoutTrailingNewline(str: string) {
-	return str[str.length - 1] == "\n" ? str.slice(0, str.length - 1) : str;
+	return str[str.length - 1] === "\n" ? str.slice(0, str.length - 1) : str;
 }
 
 function noOp() {
@@ -120,46 +123,63 @@ function tokenHandlers(schema: Schema, tokens: { [token: string]: ParseSpec }) {
 
 	for (const type in tokens) {
 		const spec = tokens[type];
+		const hasDynamicAttrs = !!spec.getAttrs || spec.attrs instanceof Function;
 		if (spec.block) {
 			const nodeType = (schema as any).nodeType(spec.block);
 			if (noCloseToken(spec, type)) {
-				handlers[type] = async (state, tok, tokens, i) => {
-					state.openNode(nodeType, await attrs(spec, tok, tokens, i));
-					state.addText(withoutTrailingNewline(tok.content));
-					state.closeNode();
-				};
+				handlers[type] = hasDynamicAttrs
+					? async (state, tok, tokens, i) => {
+							state.openNode(nodeType, await attrs(spec, tok, tokens, i));
+							state.addText(withoutTrailingNewline(tok.content));
+							state.closeNode();
+						}
+					: (state, tok) => {
+							state.openNode(nodeType, { ...spec.attrs });
+							state.addText(withoutTrailingNewline(tok.content));
+							state.closeNode();
+						};
 			} else {
-				handlers[type + "_open"] = async (state, tok, tokens, i) =>
-					state.openNode(nodeType, await attrs(spec, tok, tokens, i));
+				handlers[`${type}_open`] = hasDynamicAttrs
+					? async (state, tok, tokens, i) => state.openNode(nodeType, await attrs(spec, tok, tokens, i))
+					: (state) => state.openNode(nodeType, { ...spec.attrs });
 
-				handlers[type + "_close"] = (state) => state.closeNode();
+				handlers[`${type}_close`] = (state) => state.closeNode();
 			}
 		} else if (spec.node) {
 			const nodeType = (schema as any).nodeType(spec.node);
-			handlers[type] = async (state, tok, tokens, i) =>
-				state.addNode(nodeType, await attrs(spec, tok, tokens, i));
+			handlers[type] = hasDynamicAttrs
+				? async (state, tok, tokens, i) => state.addNode(nodeType, await attrs(spec, tok, tokens, i))
+				: (state) => state.addNode(nodeType, { ...spec.attrs });
 		} else if (spec.mark) {
 			const markType = schema.marks[spec.mark];
 			if (noCloseToken(spec, type)) {
-				handlers[type] = async (state, tok, tokens, i) => {
-					state.openMark(markType.create(await attrs(spec, tok, tokens, i)));
-					state.addText(withoutTrailingNewline(tok.content));
-					state.closeMark(markType);
-				};
+				handlers[type] = hasDynamicAttrs
+					? async (state, tok, tokens, i) => {
+							state.openMark(markType.create(await attrs(spec, tok, tokens, i)));
+							state.addText(withoutTrailingNewline(tok.content));
+							state.closeMark(markType);
+						}
+					: (state, tok) => {
+							state.openMark(markType.create({ ...spec.attrs }));
+							state.addText(withoutTrailingNewline(tok.content));
+							state.closeMark(markType);
+						};
 			} else {
-				handlers[type + "_open"] = async (state, tok, tokens, i) =>
-					state.openMark(markType.create(await attrs(spec, tok, tokens, i)));
-				handlers[type + "_close"] = (state) => state.closeMark(markType);
+				handlers[`${type}_open`] = hasDynamicAttrs
+					? async (state, tok, tokens, i) =>
+							state.openMark(markType.create(await attrs(spec, tok, tokens, i)))
+					: (state) => state.openMark(markType.create({ ...spec.attrs }));
+				handlers[`${type}_close`] = (state) => state.closeMark(markType);
 			}
 		} else if (spec.ignore) {
 			if (noCloseToken(spec, type)) {
 				handlers[type] = noOp;
 			} else {
-				handlers[type + "_open"] = noOp;
-				handlers[type + "_close"] = noOp;
+				handlers[`${type}_open`] = noOp;
+				handlers[`${type}_close`] = noOp;
 			}
 		} else {
-			throw new RangeError("Unrecognized parsing spec " + JSON.stringify(spec));
+			throw new RangeError(`Unrecognized parsing spec ${JSON.stringify(spec)}`);
 		}
 	}
 
@@ -242,8 +262,8 @@ export class MarkdownParser {
 	/// rules.
 	async parse(content: string | Token[]) {
 		const state = new MarkdownParseState(this.schema, this.tokenHandlers);
-		let doc;
-		await state.parseTokens(typeof content == "string" ? this.tokenizer.parse(content, {}) : content);
+		let doc: Node;
+		await state.parseTokens(typeof content === "string" ? this.tokenizer.parse(content, {}) : content);
 		do {
 			doc = state.closeNode();
 		} while (state.stack.length);

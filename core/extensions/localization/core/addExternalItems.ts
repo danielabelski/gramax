@@ -29,6 +29,14 @@ const saveAll = async (category: Category) => {
 	}
 };
 
+// An alias is a claim on exactly one URL. The stub lives at another one — the owner's language
+// prefix away — so cloning `aliases` would make two items claim the owner's old path, which the
+// alias index reports as a duplicate and resolves to whichever of them wins the comparison.
+const stubProps = (ownerItem: Item) => {
+	const { aliases: _aliases, ...props } = ownerItem.props;
+	return { ...props, title: null, external: ownerItem.props.title };
+};
+
 const getTargetPath = (fromBase: Path, toBase: Path, ownerItem: Item): Path => {
 	const ownerPath = ownerItem.ref.path;
 	return toBase.join(fromBase.subDirectory(ownerPath));
@@ -97,7 +105,7 @@ const addExternalItemsInternal = async (
 				ref: fp.getItemRef(targetPath),
 				parent: toRoot,
 				content: "",
-				props: { ...ownerItem.props, title: null, external: ownerItem.props.title },
+				props: stubProps(ownerItem),
 				logicPath: targetLogicPath,
 				directory: targetPath,
 				items: [],
@@ -122,7 +130,7 @@ const addExternalItemsInternal = async (
 			const newArticle = new Article({
 				ref: fp.getItemRef(targetPath),
 				parent: toRoot,
-				props: { ...ownerItem.props, title: null, external: ownerItem.props.title },
+				props: stubProps(ownerItem),
 				content: "",
 				logicPath: targetLogicPath,
 				fs: fs,

@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { PluginProps } from "@gramax/sdk";
 import type { PluginManager } from "@plugins/core/PluginManager";
-import { initPluginsCore } from "@plugins/store/PluginStore";
+import { initPluginsCore, type PluginLoadResult } from "@plugins/store/PluginStore";
 import type { PluginConfig } from "@plugins/types";
 
 export interface ServerPluginState {
@@ -26,12 +26,17 @@ export const serverClearAllPlugins = (): void => {
 	state.pluginsReady = false;
 };
 
-export const serverLoadPlugins = async (plugins: PluginConfig[], props?: PluginProps, app?: unknown): Promise<void> => {
+export const serverLoadPlugins = async (
+	plugins: PluginConfig[],
+	props?: PluginProps,
+	app?: unknown,
+): Promise<PluginLoadResult> => {
 	const state = getServerStore();
-	if (!state) return;
-	const { manager } = await initPluginsCore(plugins, props, app);
+	if (!state) return { issues: [] };
+	const { manager, issues } = await initPluginsCore(plugins, props, app);
 	state.manager = manager ?? null;
 	state.pluginsReady = true;
+	return { issues };
 };
 
 export const serverMakePluginReady = (): void => {

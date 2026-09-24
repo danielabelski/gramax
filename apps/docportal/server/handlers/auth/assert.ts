@@ -8,7 +8,7 @@ const assert = async (serverContext: ServerContext) => {
 	if (path.pathname !== "/api/auth/assert") return;
 
 	const ctx = await app.contextFactory.fromNode({ req, res });
-	await app.am.assert(req, res, ctx.cookie, async (user: User) => {
+	await app.amp.current().assert(req, res, ctx.cookie, async (user: User) => {
 		await initEnterpriseDocportalSource(user, app.em.getConfig(), (data: SourceData) => {
 			commands.storage.sourceData.setSourceData.do({ ctx, ...data });
 		});

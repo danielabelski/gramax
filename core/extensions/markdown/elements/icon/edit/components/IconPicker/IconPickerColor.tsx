@@ -2,7 +2,7 @@ import { cn } from "@core-ui/utils/cn";
 import { HIGHLIGHT_COLOR_NAMES } from "@ext/markdown/elements/highlight/edit/model/consts";
 import type { IconPickerColor as IconPickerColorType } from "@ext/markdown/elements/icon/edit/components/IconPicker/IconPicker";
 import { ColorTile } from "@ui-kit/ColorTile";
-import { useComponentVariant } from "@ui-kit/hooks/useComponentVariant";
+import { narrowVariant, useComponentVariant } from "@ui-kit/hooks/useComponentVariant";
 import { Icon } from "@ui-kit/Icon";
 import { Popover, PopoverContent, PopoverTriggerButton } from "@ui-kit/Popover";
 import { ComponentVariantProvider } from "@ui-kit/Providers";
@@ -59,7 +59,9 @@ const popoverContentStyles = tv({
 });
 
 export const IconPickerColor = ({ iconColor, setIconColor }: IconPickerColorProps) => {
-	const { variant: theme } = useComponentVariant();
+	const { variant } = useComponentVariant();
+	const componentVariant = narrowVariant(variant, ["inverse"]);
+	const theme = componentVariant ?? "default";
 
 	const onClickHandler = useCallback(
 		(color: IconPickerColorType) => {
@@ -74,7 +76,7 @@ export const IconPickerColor = ({ iconColor, setIconColor }: IconPickerColorProp
 	);
 
 	return (
-		<ComponentVariantProvider variant={theme}>
+		<ComponentVariantProvider variant={componentVariant}>
 			<Popover>
 				<PopoverTriggerButton
 					className={cn("shrink-0 justify-center w-7 h-7 p-0 font-normal", theme !== "inverse" && "dark")}

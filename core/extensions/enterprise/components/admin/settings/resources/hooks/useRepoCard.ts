@@ -1,8 +1,8 @@
-import { useEditorSheet } from "@ext/enterprise/components/admin/settings/members/hooks/useEditorSheet";
 import type { AccessChange } from "@ext/enterprise/components/admin/settings/members/model/AccessChange";
 import type { GesRepo, MemberAggregate } from "@ext/enterprise/components/admin/settings/members/model/Member";
 import { useRepoFormState } from "@ext/enterprise/components/admin/settings/resources/hooks/useRepoFormState";
 import { buildRepoChanges } from "@ext/enterprise/components/admin/settings/resources/model/buildRepoChanges";
+import { useEditorSheet } from "@ext/enterpriseCommon/hooks/useEditorSheet";
 import { useCallback } from "react";
 
 interface UseRepoCardArgs {

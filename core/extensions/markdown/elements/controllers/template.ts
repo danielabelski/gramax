@@ -19,11 +19,11 @@ function template(this: Extension) {
 	return new Plugin({
 		key: new PluginKey("$template-controller"),
 		view: (view) => {
+			if (this.options.editable) {
+				view.dom.setAttribute("is-template", "true");
+			}
+
 			return {
-				update: () => {
-					if (this.options.editable) view.dom.setAttribute("is-template", "true");
-					else view.dom.removeAttribute("is-template");
-				},
 				destroy: () => {
 					this.options.editable && view.dom.removeAttribute("is-template");
 				},
@@ -42,7 +42,7 @@ function template(this: Extension) {
 
 			return validateRules(transaction, nodeRule, selectionRule);
 		},
-		appendTransaction: (transactions, oldState, newState) => {
+		appendTransaction: (transactions, _, newState) => {
 			if (!this.options.editable) {
 				return null;
 			}

@@ -24,6 +24,7 @@ export type StaticArticlePageData = {
 export interface Options {
 	pdfTemplates?: string[];
 	wordTemplates?: string[];
+	aiEnabled?: boolean;
 }
 
 export class ArticleDataService {
@@ -141,9 +142,10 @@ export class ArticleDataService {
 			isArticle: true,
 			isReadOnly: true,
 		});
-		pageDataContext.userInfo = null;
+		pageDataContext.user.info = null;
 		pageDataContext.wordTemplates = this._options.wordTemplates || [];
 		pageDataContext.pdfTemplates = this._options.pdfTemplates || [];
+		pageDataContext.conf.ai.enabled = this._options.aiEnabled ?? false;
 		return pageDataContext;
 	}
 
@@ -181,7 +183,7 @@ export class ArticleDataService {
 		assert(catalog, "Catalog must be provided to getStaticArticlePageData");
 		const sp = this._app.sitePresenterFactory.fromContext(context);
 		await parseContent(article, catalog, context, this._app.parser, this._app.parserContextFactory);
-		const articleProps = await sp.serializeArticleProps(article, await catalog.getPathname(article));
+		const articleProps = await sp.serializeArticleProps(article, await catalog.getPathname(article), catalog);
 		articleProps.ref.path = replacePathIfNeeded(articleProps.ref.path, catalog);
 		return {
 			mode: "read",

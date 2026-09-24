@@ -11,9 +11,11 @@ import { configureWorkspacePermission } from "@ext/security/logic/Permission/Per
 import { type Feature, getFeatureList, setFeature } from "@ext/toggleFeatures/features";
 import { Badge } from "@ui-kit/Badge";
 import { Button } from "@ui-kit/Button";
+import { Description } from "@ui-kit/Description";
 import { Divider } from "@ui-kit/Divider";
+import { Field } from "@ui-kit/Field";
 import { Popover, PopoverContent, PopoverTrigger } from "@ui-kit/Popover";
-import { SwitchField } from "@ui-kit/Switch";
+import { Switch } from "@ui-kit/Switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -27,25 +29,12 @@ const StyledPopoverContent = styled(PopoverContent)`
 const FeatureWrapper = styled.div`
 	display: flex;
 	flex-direction: column;
-	justify-content: space-between;
-	gap: 0.2rem;
-	margin-top: 0.75rem;
+	gap: 0.125rem;
 `;
 
 const Info = styled.a`
 	display: inline;
 	align-items: center;
-`;
-
-const StyledSwitchField = styled(SwitchField)`
-	> div {
-		width: 100%;
-		max-width: 100%;
-	}
-
-	label {
-		line-height: 1.5;
-	}
 `;
 
 const FeatureItem = ({ feature, disabled }: { feature: Feature; disabled: boolean }) => {
@@ -65,24 +54,10 @@ const FeatureItem = ({ feature, disabled }: { feature: Feature; disabled: boolea
 
 	return (
 		<FeatureWrapper>
-			<StyledSwitchField
-				alignment="left"
-				checked={enabled}
-				className="w-full"
-				description={
-					<div className="text-xs">
-						<span>{desc}. </span>
-						{url && (
-							<Info href={url} rel="noreferrer" target="_blank">
-								{t("read-more")}
-							</Info>
-						)}
-					</div>
-				}
-				disabled={disabled}
-				label={
-					<>
-						<span>{title}</span>
+			<Field
+				className="items-center"
+				control={() => (
+					<div className="flex items-center gap-2">
 						{feature.status && (
 							<Tooltip>
 								<TooltipTrigger tabIndex={-1}>
@@ -113,11 +88,20 @@ const FeatureItem = ({ feature, disabled }: { feature: Feature; disabled: boolea
 								<TooltipContent>{t(`experimental-features.status.${feature.status}`)}</TooltipContent>
 							</Tooltip>
 						)}
-					</>
-				}
-				onCheckedChange={onClick}
-				size="sm"
+						<Switch checked={enabled} disabled={disabled} onCheckedChange={onClick} size="sm" />
+					</div>
+				)}
+				labelClassName="w-auto shrink-0 justify-center"
+				title={title}
 			/>
+			<Description size="xs">
+				<span>{desc}. </span>
+				{url && (
+					<Info href={url} rel="noreferrer" target="_blank">
+						{t("read-more")}
+					</Info>
+				)}
+			</Description>
 		</FeatureWrapper>
 	);
 };
@@ -147,7 +131,7 @@ export const FeatureList = () => {
 	if (features.length === 0) return null;
 
 	return (
-		<div className="flex flex-col">
+		<div className="flex flex-col gap-5">
 			{features.map((feature) => {
 				if (feature.status === "in-dev" && isRelease) return null;
 				return <FeatureItem disabled={isNext || isStatic} feature={feature} key={feature.name} />;

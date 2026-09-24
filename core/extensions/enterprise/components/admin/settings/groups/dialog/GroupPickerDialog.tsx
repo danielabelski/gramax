@@ -48,9 +48,6 @@ const GroupPickerDialogContent = (props: GroupPickerDialogContentProps) => {
 
 	return (
 		<div className="flex h-full flex-col gap-2">
-			{data.ssoEnabled && (
-				<span className="text-sm text-muted">{t("enterprise.admin.groups.use-search-for-sso")}</span>
-			)}
 			<SelectableTable
 				className="flex flex-col min-h-0"
 				columns={data.columns}

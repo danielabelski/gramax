@@ -13,6 +13,16 @@ const LEVELS: { level: Level; labelKey: Parameters<typeof t>[0]; descKey: Parame
 	{ level: Level.Full, labelKey: "log-level.full", descKey: "log-level.desc.full" },
 ];
 
+/**
+ * Levels the user may pick. The rest stay fully supported by the backend (settings schema, capture
+ * filter, Rust `EnvFilter`) — six degrees of verbosity are for support and developers, not for the
+ * settings dialog, where nobody can tell them apart. A stored hidden level is still rendered (see
+ * `visibleLevels`) so the trigger never goes blank and the value stays switchable.
+ */
+const SELECTABLE = new Set<Level>([Level.Off, Level.Important, Level.Full]);
+
+const visibleLevels = (current: Level) => LEVELS.filter(({ level }) => SELECTABLE.has(level) || level === current);
+
 const LogLevelSelect = ({ className, disabled }: { className?: string; disabled?: boolean }) => {
 	const { watch, setValue } = useFormContext<AppSettingsFormData>();
 	const level = watch("logging.level");
@@ -32,7 +42,7 @@ const LogLevelSelect = ({ className, disabled }: { className?: string; disabled?
 				<SelectValue />
 			</SelectTrigger>
 			<SelectContent>
-				{LEVELS.map(({ level, labelKey, descKey }) => (
+				{visibleLevels(current).map(({ level, labelKey, descKey }) => (
 					<SelectItem key={level} value={level}>
 						<span className="flex flex-col items-start">
 							<span>{t(labelKey)}</span>

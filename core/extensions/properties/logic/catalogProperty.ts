@@ -51,11 +51,11 @@ class CatalogProperty {
 		const article = this._catalog.findItemByItemPath(articlePath);
 		if (!article) return;
 
-		const newProps = { ...article.props, logicPath: article.logicPath };
+		const newProps = { ...article.props };
 		if (isDelete) newProps.properties = deleteProperty(propertyName, newProps.properties);
 		else newProps.properties = updateProperty(propertyName, newValue, this._catalogMap, newProps.properties);
 
-		await this._catalog.updateItemProps(newProps, this._resourceUpdaterFactory);
+		await this._catalog.updateItemProps(article, newProps, this._resourceUpdaterFactory);
 	}
 
 	public async remove(articlePath: Path, propertyName: string, value?: string[]): Promise<PropertyValue[]> {
@@ -67,12 +67,12 @@ class CatalogProperty {
 				);
 
 				if (index === -1) return;
-				const newProps = { ...article.props, logicPath: article.logicPath };
+				const newProps = { ...article.props };
 
 				if (value?.some((val) => newProps.properties[index].value.includes(val)) || !value)
 					newProps.properties.splice(index, 1);
 
-				await this._catalog.updateItemProps(newProps, this._resourceUpdaterFactory);
+				await this._catalog.updateItemProps(article, newProps, this._resourceUpdaterFactory);
 			}),
 		);
 

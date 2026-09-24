@@ -1,6 +1,5 @@
 import Icon from "@components/Atoms/Icon";
-import NavigationTabsService from "@components/Layouts/LeftNavigationTabs/NavigationTabsService";
-import { LeftNavigationTab } from "@components/Layouts/StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
+import { HISTORY_PANEL_ID } from "@ext/git/actions/Revisions/HistoryPanel/constants";
 import {
 	type RevisionArticleFilter,
 	useRevisionCatalogStore,
@@ -8,9 +7,11 @@ import {
 import t from "@ext/localization/locale/translate";
 import type { ItemLink } from "@ext/navigation/NavigationLinks";
 import { DropdownMenuItem } from "@ui-kit/Dropdown";
+import { usePanelToggle } from "@ui-kit/FloatingPanel";
 import { useCallback } from "react";
 
 export const ArticleRevisionTrigger = ({ itemLink }: { itemLink: ItemLink }) => {
+	const { open } = usePanelToggle(HISTORY_PANEL_ID);
 	const { filter, setFilter } = useRevisionCatalogStore((state) => {
 		return { filter: state.filter, setFilter: state.setFilter };
 	});
@@ -20,9 +21,9 @@ export const ArticleRevisionTrigger = ({ itemLink }: { itemLink: ItemLink }) => 
 			const existing = filter?.articles?.find((a) => a.path === article.path);
 
 			if (!existing) setFilter({ ...filter, articles: [...(filter?.articles || []), article] });
-			NavigationTabsService.setBottom(LeftNavigationTab.CatalogRevisions);
+			open();
 		},
-		[filter, setFilter],
+		[filter, open, setFilter],
 	);
 
 	return (

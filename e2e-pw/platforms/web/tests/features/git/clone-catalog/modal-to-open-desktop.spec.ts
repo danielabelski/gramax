@@ -4,7 +4,7 @@ import { homeTest as test } from "@web/fixtures/home.fixture";
 
 const repo = getTestRepoInfoFromEnv();
 
-const clonePath = `/${repo.domain}/${repo.group}/${repo.testRepo}`;
+const clonePath = `/${repo.host}/${repo.group}/${repo.testRepo}`;
 
 test.use({ startUrl: clonePath });
 

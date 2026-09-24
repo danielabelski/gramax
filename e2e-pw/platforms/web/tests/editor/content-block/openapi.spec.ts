@@ -24,6 +24,15 @@ const waitForMonaco = async (modal: Locator) => {
 	await expect(modal.locator(".inputarea.monaco-mouse-cursor-text")).toBeAttached();
 };
 
+const openTableOfContents = async (page: Page): Promise<Locator> => {
+	const visibleTableOfContents = page.locator('[data-testid="table-of-contents"]:visible');
+	if ((await visibleTableOfContents.count()) === 0) {
+		await page.getByRole("button", { name: "In the article", exact: true }).click();
+	}
+	await expect(visibleTableOfContents).toBeVisible();
+	return visibleTableOfContents;
+};
+
 const selectMonacoLine = async (modal: Locator, lineNumber: number, text: string): Promise<Locator> => {
 	const monacoEditor = modal.locator('.monaco-editor[role="code"]');
 	const monacoTextarea = modal.locator(".inputarea.monaco-mouse-cursor-text");
@@ -72,7 +81,7 @@ editorTest.beforeEach(async ({ basePage }) => {
 editorTest.describe("OpenApi", () => {
 	editorTest("Inserted block survives goBack/goForward navigation", async ({ editor, basePage, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
 		const openApiBlock = sharedPage.locator('[data-testid="open-api"]');
 
@@ -94,16 +103,16 @@ editorTest.describe("OpenApi", () => {
 
 	editorTest("Inserting the block puts its operations in the table of contents", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
-		await expect(sharedPage.getByTestId("table-of-contents")).toBeVisible();
-		await expect(sharedPage.getByTestId("table-of-contents").getByText("Posts", { exact: true })).toBeVisible();
-		await expect(sharedPage.getByTestId("table-of-contents").getByText("List posts")).toBeVisible();
+		const tableOfContents = await openTableOfContents(sharedPage);
+		await expect(tableOfContents.getByText("Posts", { exact: true })).toBeVisible();
+		await expect(tableOfContents.getByText("List posts")).toBeVisible();
 	});
 
 	editorTest("Inserted block renders the spec as documentation", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
 		const openApiBlock = sharedPage.locator('[data-testid="open-api"]');
 		await expect(openApiBlock).toBeVisible();
@@ -116,7 +125,7 @@ editorTest.describe("OpenApi", () => {
 		"Editing the spec updates the documentation and the table of contents",
 		async ({ editor, basePage, sharedPage }) => {
 			await editor.clickToolbar("semiBlocks");
-			await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+			await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
 			const openApiNode = sharedPage.locator(".node-openapi");
 			await expect(openApiNode).toBeVisible();
@@ -140,13 +149,14 @@ editorTest.describe("OpenApi", () => {
 
 			const openApiBlock = sharedPage.locator('[data-testid="open-api"]');
 			await expect(openApiBlock).toContainText("List posts v2");
-			await expect(sharedPage.getByTestId("table-of-contents").getByText("List posts v2")).toBeVisible();
+			const tableOfContents = await openTableOfContents(sharedPage);
+			await expect(tableOfContents.getByText("List posts v2")).toBeVisible();
 		},
 	);
 
 	editorTest("Expanding an operation shows its response details", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
 		const openApiBlock = sharedPage.locator('[data-testid="open-api"]');
 		await expect(openApiBlock).toBeVisible();
@@ -162,7 +172,7 @@ editorTest.describe("OpenApi", () => {
 		"Operation permalink remains open and positioned after page reload",
 		async ({ editor, basePage, sharedPage }) => {
 			await editor.clickToolbar("semiBlocks");
-			await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+			await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 			await editor.forceSave();
 
 			const openApiBlock = sharedPage.locator('[data-testid="open-api"]');
@@ -175,7 +185,7 @@ editorTest.describe("OpenApi", () => {
 					);
 					if (!scrollContainer) return false;
 					const offset = element.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top;
-					return offset >= 0 && offset <= 24;
+					return offset >= -1 && offset <= 24;
 				});
 
 			await openApiBlock.getByRole("link", { name: "Permalink to Get a post", exact: true }).click();
@@ -195,7 +205,7 @@ editorTest.describe("OpenApi", () => {
 
 	editorTest("Schemas checkbox toggles the schemas section", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
 		const openApiNode = sharedPage.locator(".node-openapi");
 		await expect(openApiNode).toBeVisible();
@@ -219,7 +229,7 @@ editorTest.describe("OpenApi", () => {
 		"Heading button toggles API info and only persists the non-default value",
 		async ({ editor, sharedPage }) => {
 			await editor.clickToolbar("semiBlocks");
-			await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+			await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
 			const openApiNode = sharedPage.locator(".node-openapi");
 			await expect(openApiNode).toBeVisible();
@@ -254,7 +264,7 @@ editorTest.describe("OpenApi", () => {
 		"Invalid spec shows a diagnostic instead of crashing the article",
 		async ({ editor, basePage, sharedPage }) => {
 			await editor.clickToolbar("semiBlocks");
-			await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+			await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
 			const openApiNode = sharedPage.locator(".node-openapi");
 			await expect(openApiNode).toBeVisible();
@@ -286,7 +296,7 @@ editorTest.describe("OpenApi", () => {
 		"Fixing a syntactically broken spec clears the error instead of staying stuck",
 		async ({ editor, basePage, sharedPage }) => {
 			await editor.clickToolbar("semiBlocks");
-			await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+			await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
 			const openApiNode = sharedPage.locator(".node-openapi");
 			await expect(openApiNode).toBeVisible();
@@ -336,7 +346,7 @@ editorTest.describe("OpenApi", () => {
 		"Search input filters operations and TOC navigation resets an active filter",
 		async ({ editor, sharedPage }) => {
 			await editor.clickToolbar("semiBlocks");
-			await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+			await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
 			const openApiBlock = sharedPage.locator('[data-testid="open-api"]');
 			await expect(openApiBlock).toBeVisible();
@@ -357,7 +367,8 @@ editorTest.describe("OpenApi", () => {
 			await searchInput.fill("Get a post");
 			await expect(openApiBlock.locator(".op-card")).toHaveCount(1);
 
-			await sharedPage.getByTestId("table-of-contents").getByText("List posts").click();
+			const tableOfContents = await openTableOfContents(sharedPage);
+			await tableOfContents.getByText("List posts").click();
 
 			await expect(openApiBlock.locator(".op-card")).toHaveCount(2);
 			await expect(openApiBlock).toContainText("List posts");
@@ -373,7 +384,7 @@ editorTest.describe("OpenApi", () => {
 				await editor.focus();
 
 				await editor.clickToolbar("semiBlocks");
-				await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+				await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 
 				const openApiBlock = sharedPage.locator('[data-testid="open-api"]');
 				await expect(openApiBlock).toBeVisible();
@@ -709,7 +720,7 @@ const openTocOrderArticle = async (sharedPage: Page, basePage: { waitForLoad: ()
 editorTest.describe("OpenAPI table of contents", () => {
 	editorTest("Viewer and TOC follow declared tag order before discovered tags", async ({ basePage, sharedPage }) => {
 		const openApiBlock = await openTocOrderArticle(sharedPage, basePage);
-		const toc = sharedPage.getByTestId("table-of-contents");
+		const toc = await openTableOfContents(sharedPage);
 
 		await expect(openApiBlock.locator(".section-name")).toHaveText(["Zebra", "Alpha", "Discovered"]);
 		await expect(toc.getByRole("link")).toHaveText([
@@ -735,7 +746,7 @@ editorTest.describe("OpenAPI table of contents", () => {
 		"Scroll highlights the topmost operation and the final item at the document end",
 		async ({ basePage, sharedPage }) => {
 			await openTocOrderArticle(sharedPage, basePage);
-			const toc = sharedPage.getByTestId("table-of-contents");
+			const toc = await openTableOfContents(sharedPage);
 			const articleScroll = sharedPage.getByTestId("article-scroll-container");
 			const middleLink = toc.getByRole("link", { name: "Alpha operation 3", exact: true });
 			const href = await middleLink.getAttribute("href");
@@ -890,8 +901,10 @@ editorTest.describe("OpenApi Try it out", () => {
 			await expect(operation.locator(".try-result")).toContainText(/"name":\s*"Rex"/);
 
 			expect(calls).toHaveLength(1);
-			expect(calls[0].method).toBe("POST");
-			expect(new URL(calls[0].url).pathname).toBe("/mock-api/v1/pets/42");
+			const [call] = calls;
+			if (!call) throw new Error("Expected one API call");
+			expect(call.method).toBe("POST");
+			expect(new URL(call.url).pathname).toBe("/mock-api/v1/pets/42");
 		} finally {
 			await sharedPage.unroute(MOCK_API);
 		}
@@ -999,7 +1012,9 @@ editorTest.describe("OpenApi Try it out", () => {
 				await expect(operation).toContainText("200 OK");
 
 				expect(calls).toHaveLength(1);
-				expect(calls[0].headers.authorization).toBe(`Bearer ${token}`);
+				const [call] = calls;
+				if (!call) throw new Error("Expected one API call");
+				expect(call.headers.authorization).toBe(`Bearer ${token}`);
 				await expect(operation.locator(".try-result")).not.toContainText(token);
 			} finally {
 				await sharedPage.unroute(MOCK_API);

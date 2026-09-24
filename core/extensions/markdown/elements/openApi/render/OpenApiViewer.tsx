@@ -1,3 +1,4 @@
+import { useArticleWidthStyle } from "@components/Layouts/CatalogLayout/ArticleLayout/useArticleDimensions";
 import type {
 	OpenApiDiagnostic,
 	OpenApiDocElement,
@@ -12,6 +13,7 @@ import "@gramax/openapi-viewer/style.css";
 import "@ext/markdown/elements/openApi/render/openapi-viewer-theme.css";
 import renderOpenApiCode from "@ext/markdown/elements/openApi/render/openApiCode";
 import renderOpenApiMarkdown from "@ext/markdown/elements/openApi/render/openApiMarkdown";
+import watchTableScrollShadows from "@ext/markdown/elements/openApi/render/tableScrollShadows";
 import { useEffect, useRef } from "react";
 
 interface OpenApiViewerProps {
@@ -41,6 +43,7 @@ const OpenApiViewer = ({
 	onError,
 	onRendered,
 }: OpenApiViewerProps) => {
+	const articleWidthStyle = useArticleWidthStyle();
 	const containerRef = useRef<HTMLDivElement>(null);
 	const docRef = useRef<OpenApiDocElement>(null);
 	// The mount effect below creates the custom element exactly once ([] deps) and attaches its listeners
@@ -83,8 +86,16 @@ const OpenApiViewer = ({
 			const { error, phase } = (event as OpenApiErrorEvent).detail;
 			onErrorRef.current?.(error, phase, el.diagnostics);
 		};
+		// Re-attached after every render: the element rewrites its subtree, so the previous watchers point at
+		// elements that no longer exist.
+		let unwatchTables = () => {};
 		const handleUpdated = () => {
-			if (el.model && !el.model.validationErrors.length) onRenderedRef.current?.(el.diagnostics);
+			unwatchTables();
+			unwatchTables = watchTableScrollShadows(el);
+			const model = el.model;
+			const rendered = !!model && model.validationErrors.length === 0;
+			el.toggleAttribute("data-openapi-rendered", rendered);
+			if (rendered) onRenderedRef.current?.(el.diagnostics);
 		};
 		el.addEventListener("openapi-error", handleError);
 		el.addEventListener("openapi-updated", handleUpdated);
@@ -93,6 +104,7 @@ const OpenApiViewer = ({
 		return () => {
 			el.removeEventListener("openapi-error", handleError);
 			el.removeEventListener("openapi-updated", handleUpdated);
+			unwatchTables();
 			el.remove();
 			docRef.current = null;
 		};
@@ -102,6 +114,7 @@ const OpenApiViewer = ({
 		if (!docRef.current) return;
 		docRef.current.showDiagnostics = showDiagnostics;
 		docRef.current.showErrorShell = showErrorShell;
+		docRef.current.removeAttribute("data-openapi-rendered");
 		docRef.current.render();
 	}, [showDiagnostics, showErrorShell]);
 
@@ -111,21 +124,24 @@ const OpenApiViewer = ({
 	useEffect(() => {
 		if (!docRef.current) return;
 		docRef.current.hideInfo = !!hideInfo;
+		docRef.current.removeAttribute("data-openapi-rendered");
 		docRef.current.render();
 	}, [hideInfo]);
 
 	useEffect(() => {
 		if (!docRef.current) return;
 		docRef.current.hideSchemas = !!hideSchemas;
+		docRef.current.removeAttribute("data-openapi-rendered");
 		docRef.current.render();
 	}, [hideSchemas]);
 
 	useEffect(() => {
 		if (!docRef.current) return;
+		docRef.current.removeAttribute("data-openapi-rendered");
 		docRef.current.spec = spec;
 	}, [spec]);
 
-	return <div data-testid="open-api-viewer" ref={containerRef} />;
+	return <div data-testid="open-api-viewer" ref={containerRef} style={articleWidthStyle} />;
 };
 
 export default OpenApiViewer;

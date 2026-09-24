@@ -61,6 +61,22 @@ resizerTest.describe("Resizer — Image", () => {
 		},
 	);
 
+	resizerTest("drag handle remains available after resize", async ({ editor, sharedPage, resizer, dragResizer }) => {
+		await editor.setMarkdown(IMAGE_MD);
+
+		const image = sharedPage.getByTestId("image");
+		await expect(image).toBeVisible();
+		await image.click();
+		await expect(resizer).toHaveAttribute("aria-hidden", "false");
+
+		const dragHandle = image.locator("xpath=ancestor::*[@data-node-view-wrapper]");
+		await expect(dragHandle).toHaveAttribute("data-drag-handle", "true");
+
+		await dragResizer(60);
+
+		await expect(dragHandle).toHaveAttribute("data-drag-handle", "true");
+	});
+
 	resizerTest(
 		"drag resizer far right snaps to full width and saves scale ≥ 100",
 		async ({ editor, sharedPage, resizer, dragResizer }) => {

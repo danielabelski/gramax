@@ -6,7 +6,7 @@ import { Plugin, PluginKey } from "prosemirror-state";
 
 interface BrOptions {
 	keepMarks: boolean;
-	HTMLAttributes: Record<string, any>;
+	HTMLAttributes: Record<string, unknown>;
 }
 
 const Br = Node.create<BrOptions>({
@@ -23,7 +23,7 @@ const Br = Node.create<BrOptions>({
 				props: {
 					handleKeyDown: (view, event) => {
 						if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-							splitBlock(view.state, view.dispatch);
+							return splitBlock(view.state, view.dispatch);
 						}
 					},
 				},

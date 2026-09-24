@@ -1,13 +1,15 @@
 import { classNames } from "@components/libs/classNames";
 import useElementExistence from "@core-ui/hooks/useElementExistence";
 import useMediaQuery from "@core-ui/hooks/useMediaQuery";
+import { delayOf, type TooltipDelayTier, tooltipDelay } from "@core-ui/timings";
 import { mediaQueries } from "@core-ui/utils/cssUtils";
+// biome-ignore lint/style/noRestrictedImports: pre-existing @emotion/styled import; the Tailwind migration is not this change's scope
 import styled from "@emotion/styled";
 import Tippy, { type TippyProps } from "@tippyjs/react";
 import { forwardRef, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import type { Placement } from "tippy.js";
 
-interface TooltipProps extends TippyProps {
+interface TooltipProps extends Omit<TippyProps, "delay"> {
 	place?: Placement;
 	distance?: number;
 	arrow?: boolean;
@@ -19,15 +21,13 @@ interface TooltipProps extends TippyProps {
 	contentClassName?: string;
 	interactive?: boolean;
 	inverseStyle?: boolean;
-	delay?: number | [number, number];
+	/** Named delay instead of a number: the show delay is a product-wide decision, not a local one. */
+	delay?: TooltipDelayTier;
 }
 
 interface TooltipContentProps extends Omit<TooltipProps, "children"> {
 	children: ReactNode;
 }
-
-export const DEFAULT_TOOLTIP_SHOW_DELAY = 560;
-const DEFAULT_DELAY = [DEFAULT_TOOLTIP_SHOW_DELAY, 0] as [number, number];
 
 const Tooltip = forwardRef((props: TooltipProps, ref?: RefObject<Element>) => {
 	const {
@@ -81,7 +81,7 @@ const Tooltip = forwardRef((props: TooltipProps, ref?: RefObject<Element>) => {
 					</TooltipContent>
 				)
 			}
-			delay={interactive ? delay : DEFAULT_DELAY}
+			delay={[delayOf(delay ?? "standard"), tooltipDelay.hide]}
 			duration={0}
 			hideOnClick={visible !== undefined && !hideOnClick ? undefined : hideOnClick}
 			interactive={interactive}

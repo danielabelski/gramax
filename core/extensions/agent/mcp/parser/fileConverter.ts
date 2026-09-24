@@ -1,21 +1,24 @@
 import resolveModule from "@app/resolveModule/frontend";
 import Path from "@core/FileProvider/Path/Path";
+import assert from "assert";
 import { agentConfig } from "../../core/agentConfig";
 
 export class FileConverter {
 	private constructor() {}
 
-	private static _getFileExtension(fileName: string): string {
-		return new Path(fileName).extension?.toLowerCase() ?? "";
+	static isConvertible(fileName: string): boolean {
+		return this._hasExtension(fileName, agentConfig.convertibleAttachmentExtensions);
 	}
 
 	static isBinaryAttachment(fileName: string): boolean {
-		const extension = this._getFileExtension(fileName);
-		const binaryExtensions = agentConfig.binaryAttachmentExtensions ?? [];
-		return !!extension && binaryExtensions.includes(extension);
+		return this._hasExtension(fileName, agentConfig.binaryAttachmentExtensions);
 	}
 
-	static async convertToText(fileName: string, bytes: Uint8Array): Promise<string | null> {
+	static isImage(fileName: string): boolean {
+		return this._hasExtension(fileName, agentConfig.imageAttachmentExtensions);
+	}
+
+	static async toAgentText(fileName: string, bytes: Uint8Array): Promise<string> {
 		const extension = this._getFileExtension(fileName);
 		switch (extension) {
 			case "docx":
@@ -25,8 +28,21 @@ export class FileConverter {
 			case "pdf":
 				return this._parsePdf(bytes);
 			default:
-				return null;
+				assert(
+					!this.isBinaryAttachment(fileName) && !this.isImage(fileName),
+					`Cannot read this file type: ${extension || "(none)"}`,
+				);
+				return new TextDecoder("utf-8").decode(bytes);
 		}
+	}
+
+	private static _getFileExtension(fileName: string): string {
+		return new Path(fileName).extension?.toLowerCase() ?? "";
+	}
+
+	private static _hasExtension(fileName: string, extensions: string[]): boolean {
+		const extension = this._getFileExtension(fileName);
+		return !!extension && extensions.includes(extension);
 	}
 
 	private static async _parseDocx(bytes: Uint8Array): Promise<string> {

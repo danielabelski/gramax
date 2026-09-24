@@ -1,4 +1,5 @@
 import { classNames } from "@components/libs/classNames";
+// biome-ignore lint/style/noRestrictedImports: expected
 import styled from "@emotion/styled";
 import type { CSSProperties, ElementType, ReactNode } from "react";
 
@@ -10,11 +11,23 @@ interface SkeletonProps {
 	children: ReactNode;
 	style?: CSSProperties;
 	className?: string;
+	layoutReserved?: boolean;
 }
 
-const ImageSkeleton = ({ className, style, children, isLoaded, elementType: Tag = "div" }: SkeletonProps) => {
+const ImageSkeleton = ({
+	className,
+	style,
+	children,
+	isLoaded,
+	layoutReserved,
+	elementType: Tag = "div",
+}: SkeletonProps) => {
 	return (
-		<Tag className={classNames(className, { skeleton: !isLoaded })} style={style}>
+		<Tag
+			className={classNames(className, { skeleton: !isLoaded })}
+			data-layout-reserved={layoutReserved || undefined}
+			style={style}
+		>
 			{children}
 		</Tag>
 	);

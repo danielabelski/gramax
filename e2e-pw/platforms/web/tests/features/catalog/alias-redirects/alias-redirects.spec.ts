@@ -229,8 +229,9 @@ catalogTest.describe("Alias redirects: article settings", () => {
 		await aliasesInput(dialog).fill("bad path!");
 		await aliasesInput(dialog).press("Enter");
 		await dialog.getByRole("button", { name: "Save" }).click();
-		// validation rejects the submit — the dialog stays open
+		// validation rejects the submit — the dialog stays open and names the offending path
 		await expect(dialog.getByText("Article settings")).toBeVisible();
-		await expect(dialog.getByText("bad path!")).toBeVisible();
+		await expect(dialog.getByText("bad path!", { exact: true })).toBeVisible();
+		await expect(dialog.getByText(/^bad path! — /)).toBeVisible();
 	});
 });

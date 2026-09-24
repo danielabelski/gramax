@@ -34,11 +34,10 @@ export function linkPastePlugin(editor) {
 				if (!clipboardData) return false;
 
 				const pastedText = clipboardData.getData("text").trim();
-				const isVideo = isVideoSupported(pastedText);
-				if (!isValidURL(pastedText) || !isVideo) return false;
+				if (!isValidURL(pastedText)) return false;
 
-				if (isVideo) return addVideo(editor, pastedText);
 				if (wrapSelectionWithLink(view, pastedText)) return editor.commands.toggleMark("link");
+				if (view.state.selection.empty && isVideoSupported(pastedText)) return addVideo(editor, pastedText);
 
 				return false;
 			},

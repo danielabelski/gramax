@@ -6,11 +6,14 @@ import { useInsertionLine } from "../useInsertionLine";
 
 const ROW_LEFT = 100;
 
-/** Fakes a mousemove at `offsetX` px from the row's left edge, the only geometry the hook reads. */
-const mouseMoveAt = (offsetX: number) =>
+/**
+ * Fakes a mousemove at `offsetX` px from the row's left edge, the only geometry the hook reads. The hit area
+ * starts `overhang` px further left than the row, so that is where the element's own rect begins.
+ */
+const mouseMoveAt = (offsetX: number, overhang = 0) =>
 	({
 		clientX: ROW_LEFT + offsetX,
-		currentTarget: { getBoundingClientRect: () => ({ left: ROW_LEFT }) },
+		currentTarget: { getBoundingClientRect: () => ({ left: ROW_LEFT - overhang }) },
 	}) as unknown as ReactMouseEvent<HTMLDivElement>;
 
 const render = (overrides: Partial<Parameters<typeof useInsertionLine>[0]> = {}) =>
@@ -42,7 +45,7 @@ describe("useInsertionLine", () => {
 	test("hovering a depth reveals it and everything shallower, hiding the rest", () => {
 		const { result } = render();
 
-		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(2))));
+		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(2), result.current.overhang)));
 
 		const [d1, d2, d3] = result.current.items;
 		expect(d1.isHidden).toBe(false);
@@ -53,7 +56,7 @@ describe("useInsertionLine", () => {
 	test("only the hovered depth is active; shallower ones are placeholders", () => {
 		const { result } = render();
 
-		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(2))));
+		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(2), result.current.overhang)));
 
 		const [d1, d2, d3] = result.current.items;
 		expect(d1.isPlaceholder).toBe(true);
@@ -66,7 +69,7 @@ describe("useInsertionLine", () => {
 	test("the tail follows the hovered depth and turns solid", () => {
 		const { result } = render();
 
-		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(2))));
+		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(2), result.current.overhang)));
 
 		expect(result.current.tailLeft).toBe(iconLeft(2, 0) + INSERTION_BUTTON_SIZE);
 		expect(result.current.isTailSolid).toBe(true);
@@ -76,7 +79,11 @@ describe("useInsertionLine", () => {
 	test("hovering past the last icon parks on the tail — deepest depth, nothing clickable", () => {
 		const { result } = render({ maxDepth: 3 });
 
-		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(3) + INSERTION_BUTTON_SIZE + 20)));
+		act(() =>
+			result.current.handleMouseMove(
+				mouseMoveAt(iconLeft(3) + INSERTION_BUTTON_SIZE + 20, result.current.overhang),
+			),
+		);
 
 		expect(result.current.items.every((i) => !i.isActive)).toBe(true);
 		expect(result.current.isTailSolid).toBe(false);
@@ -103,17 +110,21 @@ describe("useInsertionLine", () => {
 		const onParentHover = jest.fn();
 		const { result } = render({ maxDepth: 3, onParentHover });
 
-		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(2))));
+		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(2), result.current.overhang)));
 		expect(onParentHover).toHaveBeenLastCalledWith(2);
 
-		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(3) + INSERTION_BUTTON_SIZE + 20)));
+		act(() =>
+			result.current.handleMouseMove(
+				mouseMoveAt(iconLeft(3) + INSERTION_BUTTON_SIZE + 20, result.current.overhang),
+			),
+		);
 		expect(onParentHover).toHaveBeenLastCalledWith(null);
 	});
 
 	test("leaving the row resets every derived flag and clears the parent hover", () => {
 		const onParentHover = jest.fn();
 		const { result } = render({ onParentHover });
-		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(2))));
+		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(2), result.current.overhang)));
 
 		act(() => result.current.handleMouseLeave());
 
@@ -123,13 +134,38 @@ describe("useInsertionLine", () => {
 		expect(onParentHover).toHaveBeenLastCalledWith(null);
 	});
 
+	test("off hover the hit area is exactly the row — a wider strip would catch the pointer too early", () => {
+		const { result } = render({ levelOffset: 1, maxDepth: 3 });
+
+		expect(result.current.overhang).toBe(0);
+	});
+
+	test("the hit area reaches the shallowest icon, which renders left of the row", () => {
+		// inside a level-2 container, depth 1 renders at a negative left — x = 0 already reads as depth 2, so the
+		// hit area has to start where that icon does, or it could never be reached
+		const { result } = render({ isHovered: true, levelOffset: 1, maxDepth: 3 });
+
+		expect(result.current.overhang).toBe(-iconLeft(1, 1));
+
+		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(1, 1), result.current.overhang)));
+
+		expect(result.current.clickableDepth).toBe(1);
+	});
+
+	test("a hit area starting on the row itself needs no overhang beyond the icon's own half", () => {
+		const { result } = render({ isHovered: true, minDepth: 2, maxDepth: 3, levelOffset: 1 });
+
+		// depth 2 is the container's own level: its icon straddles the row edge by half its width and no more
+		expect(result.current.overhang).toBe(INSERTION_BUTTON_SIZE / 2 - 0.5);
+	});
+
 	test("clamps the hover to the allowed range", () => {
 		const { result } = render({ minDepth: 2, maxDepth: 3 });
 
-		act(() => result.current.handleMouseMove(mouseMoveAt(-500)));
+		act(() => result.current.handleMouseMove(mouseMoveAt(-500, result.current.overhang)));
 		expect(result.current.clickableDepth).toBe(2);
 
-		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(3))));
+		act(() => result.current.handleMouseMove(mouseMoveAt(iconLeft(3), result.current.overhang)));
 		expect(result.current.clickableDepth).toBe(3);
 	});
 });

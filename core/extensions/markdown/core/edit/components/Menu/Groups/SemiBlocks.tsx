@@ -12,8 +12,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@ui-kit/Dropdown";
-import { ComponentVariantProvider } from "@ui-kit/Providers";
-import { ToolbarIcon, ToolbarTriggerChevron } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarTriggerChevron } from "@ui-kit/GlassToolbar";
 import { Fragment, useCallback, useRef, useState } from "react";
 
 interface SemiBlocksProps {
@@ -71,58 +70,58 @@ const SemiBlocks = ({ editor, includeResources, fileName, isSmallEditor }: SemiB
 	if (!hasDiagrams && !hasFiles && !hasTools) return null;
 
 	return (
-		<ComponentVariantProvider variant="inverse">
-			<DropdownMenu onOpenChange={onOpenChange} open={isOpen}>
-				<DropdownMenuTrigger asChild>
-					<ToolbarTriggerChevron
-						active={isActived}
-						className="p-1 py-1"
-						data-testid="tb-semi-blocks"
-						disabled={disabled}
-					>
-						<ToolbarIcon icon="pencil-ruler" />
-					</ToolbarTriggerChevron>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent
-					className="shadow-hard-base overflow-hidden flex flex-col"
-					onCloseAutoFocus={onCloseAutoFocus}
-					onKeyDown={handleContentKeyDown}
-					side="top"
-					sideOffset={8}
+		<DropdownMenu onOpenChange={onOpenChange} open={isOpen}>
+			<DropdownMenuTrigger asChild>
+				<GlassToolbarTriggerChevron active={isActived} data-testid="tb-semi-blocks" disabled={disabled}>
+					<GlassToolbarIcon icon="pencil-ruler" />
+				</GlassToolbarTriggerChevron>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="start"
+				className="overflow-hidden flex flex-col"
+				onCloseAutoFocus={onCloseAutoFocus}
+				onKeyDown={handleContentKeyDown}
+				side="top"
+				sideOffset={6}
+			>
+				<DropdownMenuSearchItem
+					onChange={(e) => setSearch(e.target.value)}
+					onClick={(e) => e.stopPropagation()}
+					onKeyDown={handleInputKeyDown}
+					placeholder={t("search.placeholder")}
+					ref={inputRef}
+					value={search}
+				/>
+				<DropdownMenuSeparator />
+				<div
+					className="flex flex-1 flex-col min-h-0 overflow-x-hidden overflow-y-auto lg:max-h-[30rem]"
+					ref={listRef}
+					style={
+						fixedHeight != null
+							? {
+									height: fixedHeight,
+									minHeight: fixedHeight,
+									maxHeight: fixedHeight,
+								}
+							: undefined
+					}
 				>
-					<DropdownMenuSearchItem
-						onChange={(e) => setSearch(e.target.value)}
-						onClick={(e) => e.stopPropagation()}
-						onKeyDown={handleInputKeyDown}
-						placeholder={t("search.placeholder")}
-						ref={inputRef}
-						value={search}
-					/>
-					<DropdownMenuSeparator />
-					<div
-						className="flex flex-1 flex-col min-h-0 overflow-x-hidden overflow-y-auto lg:max-h-[30rem]"
-						ref={listRef}
-						style={fixedHeight != null ? { height: fixedHeight } : undefined}
-					>
-						{renderedSections.length === 0 ? (
-							<DropdownEmpty>{t("list.no-results-found")}</DropdownEmpty>
-						) : (
-							renderedSections.map((items, i) => (
-								<Fragment key={items[0].section}>
-									{i > 0 && <DropdownMenuSeparator />}
-									<DropdownMenuLabel className="font-normal text-inverse-muted">
-										{SECTION_LABELS[items[0].section]()}
-									</DropdownMenuLabel>
-									{items.map((item) => (
-										<Fragment key={item.key}>{item.node}</Fragment>
-									))}
-								</Fragment>
-							))
-						)}
-					</div>
-				</DropdownMenuContent>
-			</DropdownMenu>
-		</ComponentVariantProvider>
+					{renderedSections.length === 0 ? (
+						<DropdownEmpty>{t("list.no-results-found")}</DropdownEmpty>
+					) : (
+						renderedSections.map((items, i) => (
+							<Fragment key={items[0].section}>
+								{i > 0 && <DropdownMenuSeparator />}
+								<DropdownMenuLabel>{SECTION_LABELS[items[0].section]()}</DropdownMenuLabel>
+								{items.map((item) => (
+									<Fragment key={item.key}>{item.node}</Fragment>
+								))}
+							</Fragment>
+						))
+					)}
+				</div>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 };
 

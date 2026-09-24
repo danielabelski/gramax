@@ -1,7 +1,7 @@
 import { useCatalogActionsContext } from "@components/Actions/CatalogActions/CatalogActionsContext";
 import CatalogItem from "@components/Actions/CatalogItems/Base";
 import Icon from "@components/Atoms/Icon";
-import { LeftNavigationTab } from "@components/Layouts/StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
+import { LeftNavigationTab } from "@components/Layouts/LeftNavigationTabs/LeftNavigationTab";
 import t from "@ext/localization/locale/translate";
 import type { ReactNode } from "react";
 

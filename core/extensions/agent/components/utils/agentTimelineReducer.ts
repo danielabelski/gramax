@@ -29,6 +29,7 @@ export const hasAgentResponseEvent = (events: AgentEvent[]): boolean => {
 			e.type === "tool_call_requested" ||
 			e.type === "tool_result" ||
 			e.type === "turn_finished" ||
+			e.type === "context_compacted" ||
 			e.type === "error",
 	);
 };
@@ -44,6 +45,7 @@ export const reduceTimeline = (prev: AgentTimelineEntry[], incoming: AgentEvent[
 					content: e.content,
 					ts: e.ts,
 					attachments: e.attachments,
+					quotedText: e.quote?.text,
 				});
 				break;
 			case "assistant_delta": {
@@ -73,15 +75,16 @@ export const reduceTimeline = (prev: AgentTimelineEntry[], incoming: AgentEvent[
 				break;
 			}
 			case "assistant_message": {
+				const content = e.contentPreview ?? e.content;
 				const streamingIdx = findStreamingAssistantIndex(next);
 				const target = streamingIdx >= 0 ? next[streamingIdx] : undefined;
 				if (target?.kind === "message" && target.role === "assistant") {
-					next[streamingIdx] = { ...target, content: e.content, streaming: false, ts: e.ts };
+					next[streamingIdx] = { ...target, content, streaming: false, ts: e.ts };
 				} else {
 					next.push({
 						kind: "message",
 						role: "assistant",
-						content: e.content,
+						content,
 						ts: e.ts,
 					});
 				}
@@ -117,6 +120,13 @@ export const reduceTimeline = (prev: AgentTimelineEntry[], incoming: AgentEvent[
 					errorType: e.errorType,
 				});
 				break;
+			case "context_compacted": {
+				const existing = next.find((entry) => entry.kind === "context_compacted" && entry.turnId === e.turnId);
+				if (!existing) {
+					next.push({ kind: "context_compacted", ts: e.ts, turnId: e.turnId, visible: false });
+				}
+				break;
+			}
 			case "turn_finished": {
 				const last = next.at(-1);
 				if (last?.kind === "message" && last.role === "assistant" && last.streaming) {
@@ -124,6 +134,12 @@ export const reduceTimeline = (prev: AgentTimelineEntry[], incoming: AgentEvent[
 				}
 				if (e.status === "cancelled") {
 					next.push({ kind: "cancelled", ts: e.ts });
+				}
+				const compactedIdx = next.findIndex(
+					(entry) => entry.kind === "context_compacted" && entry.turnId === e.turnId,
+				);
+				if (compactedIdx >= 0) {
+					next[compactedIdx] = { kind: "context_compacted", ts: e.ts, turnId: e.turnId, visible: true };
 				}
 				const hasUserMessage = next.some((entry) => entry.kind === "message" && entry.role === "user");
 				if (hasUserMessage) {

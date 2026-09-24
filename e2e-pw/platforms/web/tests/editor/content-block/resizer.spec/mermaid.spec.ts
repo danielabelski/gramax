@@ -4,7 +4,7 @@ import { resizerTest } from "./resizer.fixture";
 resizerTest.describe("Resizer — Mermaid diagram", () => {
 	resizerTest("resizer appears when diagram is selected", async ({ sharedPage, editor, resizer }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "Mermaid" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "Mermaid" }).click();
 
 		const diagram = sharedPage.getByTestId("Mermaid");
 		await expect(diagram).toBeVisible();
@@ -16,7 +16,7 @@ resizerTest.describe("Resizer — Mermaid diagram", () => {
 		"drag resizer on diagram saves updated scale to markdown",
 		async ({ editor, sharedPage, dragResizer, resizer }) => {
 			await editor.clickToolbar("semiBlocks");
-			await sharedPage.getByRole("menuitem", { name: "Mermaid" }).click();
+			await sharedPage.getByRole("menuitemradio", { name: "Mermaid" }).click();
 
 			const diagram = sharedPage.getByTestId("Mermaid");
 			await expect(diagram).toBeVisible();

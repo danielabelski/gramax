@@ -1,6 +1,7 @@
 import { MinimizedArticleStyled } from "@components/Article/MiniArticle";
 import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/ButtonStateService";
 import { cn } from "@core-ui/utils/cn";
+// biome-ignore lint/style/noRestrictedImports: out of scope
 import styled from "@emotion/styled";
 import t from "@ext/localization/locale/translate";
 import { getSimpleExtensions } from "@ext/markdown/core/edit/logic/getExtensions";
@@ -63,6 +64,7 @@ const inlineToolbarButtons: InlineToolbarButtons = {
 		file: false,
 		comment: false,
 		prettify: false,
+		discuss: false,
 	},
 };
 
@@ -84,6 +86,7 @@ export const CommentInput = memo((props: CommentInputProps) => {
 
 				event.preventDefault();
 				onConfirm(view.state.doc.toJSON().content);
+				return true;
 			}
 		},
 		[onConfirm],
@@ -111,6 +114,7 @@ export const CommentInput = memo((props: CommentInputProps) => {
 				handleKeyDown: onKeyDown,
 				attributes: {
 					"data-testid": "comment-editor",
+					...(editable ? { role: "textbox", "aria-label": t("leave-comment") } : {}),
 				},
 			},
 			autofocus: autofocus,

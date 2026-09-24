@@ -58,10 +58,10 @@ describe("AgentSession.lastAssistantReply", () => {
 	test("returns last assistant_message, ignoring deltas and errors", () => {
 		const session = createSession([
 			{ type: "user_message", turnId: "turn-1", ts: 1, content: "hi" },
-			{ type: "assistant_message", turnId: "turn-1", ts: 2, content: "first" },
+			{ type: "assistant_message", turnId: "turn-1", ts: 2, content: "first", contentPreview: "first" },
 			{ type: "assistant_delta", turnId: "turn-2", ts: 3, content: "partial" },
 			{ type: "error", turnId: "turn-2", ts: 4, message: "fail", errorType: AgentErrorType.Unexpected },
-			{ type: "assistant_message", turnId: "turn-2", ts: 5, content: "second" },
+			{ type: "assistant_message", turnId: "turn-2", ts: 5, content: "second", contentPreview: "second" },
 		]);
 
 		expect(session.lastAssistantReply()).toBe("second");

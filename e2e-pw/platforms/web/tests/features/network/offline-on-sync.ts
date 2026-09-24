@@ -26,7 +26,7 @@ test.describe("Network", () => {
 		await expect(repositoryCombobox).toBeVisible();
 
 		await repositoryCombobox.click();
-		await sharedPage.getByPlaceholder("Find").fill("test-catalog");
+		await sharedPage.getByPlaceholder("Find").fill(repo.testRepo);
 		await homePage.waitForLoad();
 
 		await sharedPage.getByRole("option", { name: `${repo.group}/${repo.testRepo}` }).click({ timeout: 15_000 });

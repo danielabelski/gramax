@@ -3,16 +3,16 @@ import { cn } from "@core-ui/utils/cn";
 import { AiWritingPanel } from "@ext/ai/components/AiWritingPanel";
 import { AnimatedPopoverContent } from "@ext/ai/components/Helpers/AnimatedPopoverContent";
 import type { Editor } from "@tiptap/core";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
+import type { IconCode } from "@ui-kit/Icon";
 import { Popover, PopoverTrigger } from "@ui-kit/Popover";
-import { ComponentVariantProvider } from "@ui-kit/Providers";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
 import { type Dispatch, memo, type SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 
 interface AiWritingPopoverProps {
 	editor: Editor;
 
 	triggerTooltipText: string;
-	triggerIcon: string;
+	triggerIcon: IconCode;
 
 	contentPlaceholder: string;
 
@@ -39,7 +39,6 @@ const AiWritingPopover = (props: AiWritingPopoverProps) => {
 		toolbarSelector,
 	} = props;
 
-	const [toolbarElement, setToolbarElement] = useState<HTMLElement>(null);
 	const [options, setOptions] = useState<{ width: number; offset: number }>({ width: 0, offset: 0 });
 	const isMobile = isMobileService.value;
 
@@ -58,8 +57,6 @@ const AiWritingPopover = (props: AiWritingPopoverProps) => {
 
 		const toolbar: HTMLElement = document.querySelector(toolbarSelector);
 		if (!toolbar) return;
-
-		setToolbarElement(toolbar);
 
 		const handleResize = () => {
 			const toolbarRect = toolbar.getBoundingClientRect();
@@ -97,39 +94,36 @@ const AiWritingPopover = (props: AiWritingPopoverProps) => {
 	}, [setIsOpen]);
 
 	return (
-		<ComponentVariantProvider variant="inverse">
-			<Popover onOpenChange={onOpenChange} open={!disabled && isOpen}>
-				<PopoverTrigger asChild>
-					<div className={cn(disabled && "pointer-events-none")}>
-						<ToolbarToggleButton
-							active={isOpen}
-							disabled={disabled}
-							focusable
-							ref={triggerRef}
-							tooltipText={triggerTooltipText}
-						>
-							<ToolbarIcon icon={triggerIcon} />
-						</ToolbarToggleButton>
-					</div>
-				</PopoverTrigger>
-				<AnimatedPopoverContent
-					align="start"
-					alignOffset={options.offset}
-					className={cn("p-0 bg-transparent border-none lg:shadow-hard-base", isMobile && "px-0.5")}
-					portalContainer={toolbarElement}
-					side="top"
-					sideOffset={8}
-					style={{ width: options.width, pointerEvents: "all" }}
-				>
-					<AiWritingPanel
-						closeHandler={closeHandler}
-						onSubmit={onSubmit}
-						placeholder={contentPlaceholder}
-						setOpen={setIsOpen}
-					/>
-				</AnimatedPopoverContent>
-			</Popover>
-		</ComponentVariantProvider>
+		<Popover onOpenChange={onOpenChange} open={!disabled && isOpen}>
+			<PopoverTrigger asChild>
+				<div className={cn(disabled && "pointer-events-none")}>
+					<GlassToolbarToggleButton
+						active={isOpen}
+						disabled={disabled}
+						focusable
+						ref={triggerRef}
+						tooltipText={triggerTooltipText}
+					>
+						<GlassToolbarIcon icon={triggerIcon} />
+					</GlassToolbarToggleButton>
+				</div>
+			</PopoverTrigger>
+			<AnimatedPopoverContent
+				align="start"
+				alignOffset={options.offset}
+				className={cn("p-0 bg-transparent border-none !shadow-none", isMobile && "px-0.5")}
+				side="top"
+				sideOffset={8}
+				style={{ width: options.width, pointerEvents: "all" }}
+			>
+				<AiWritingPanel
+					closeHandler={closeHandler}
+					onSubmit={onSubmit}
+					placeholder={contentPlaceholder}
+					setOpen={setIsOpen}
+				/>
+			</AnimatedPopoverContent>
+		</Popover>
 	);
 };
 

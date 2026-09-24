@@ -1,0 +1,18 @@
+[package]
+name = "plugin-mail"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+links = "plugin-mail"
+
+[dependencies]
+tauri = { workspace = true }
+serde = { workspace = true }
+tauri-otel-context = { path = "../tauri-otel-context" }
+url = "2.4.0"
+percent-encoding = "2.3"
+native-tls = "0.2"
+base64 = "0.22"
+
+[build-dependencies]
+tauri-plugin = { workspace = true }

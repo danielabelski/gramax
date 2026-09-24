@@ -2,8 +2,10 @@ import type DefaultError from "@ext/errorHandlers/logic/DefaultError";
 import type { GitRevisionsFilter } from "@ext/git/actions/Revisions/model/GitRevisionsFilter";
 import type {
 	CommitAuthorInfo,
+	CommitRangeInfo,
 	ConfigValue,
 	MergeResult,
+	StashInfo,
 	UpstreamCountFileChanges,
 } from "@ext/git/core/GitCommands/LibGit2IntermediateCommands";
 import type GitStash from "@ext/git/core/model/GitStash";
@@ -210,8 +212,10 @@ interface GitCommandsModel {
 	restore(staged: boolean, filePaths: Path[]): Promise<void>;
 	diff(opts: DiffConfig): Promise<DiffTree2TreeInfo>;
 
-	stash(data: SourceData): Promise<string>;
+	stash(): Promise<string>;
 	applyStash(stashOid: string): Promise<MergeResult>;
+	restoreStash(stashOid: string): Promise<MergeResult>;
+	listStashes(): Promise<StashInfo[]>;
 	deleteStash(stashOid: string): Promise<void>;
 	stashParent(stashOid: string): Promise<GitVersion>;
 
@@ -248,7 +252,8 @@ interface GitCommandsModel {
 	showFileContent(filePath: Path, ref?: GitVersion | GitStash): Promise<string>;
 	getParentCommit(commitOid: string): Promise<string>;
 	getReferencesByGlob(patterns: string[]): Promise<RefInfo[]>;
-	getCommitAuthors(): Promise<CommitAuthorInfo[]>;
+	getCommitAuthors(pathspecs?: string[]): Promise<CommitAuthorInfo[]>;
+	getCommitRange(pathspecs?: string[]): Promise<CommitRangeInfo | null>;
 
 	readFile(filePath: Path, scope: TreeReadScope): Promise<ArrayBuffer>;
 	readDir(dirPath: Path, scope: TreeReadScope): Promise<DirEntry[]>;

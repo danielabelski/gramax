@@ -1,5 +1,6 @@
 import { type Page, test, type WebContext } from "@playwright/test";
 import "@utils/async";
+import { gotoWhenReady } from "@utils/navigation";
 
 export interface BaseFixture {
 	startUrl: string;
@@ -22,7 +23,7 @@ export const baseTest = test.extend<object, BaseFixture>({
 	sharedPage: [
 		async ({ sharedContext, startUrl }, use) => {
 			const page = await sharedContext.newPage();
-			await page.goto(startUrl, { waitUntil: "domcontentloaded" });
+			await gotoWhenReady(page, startUrl);
 
 			await use(page);
 

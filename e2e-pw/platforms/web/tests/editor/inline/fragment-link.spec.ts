@@ -41,10 +41,10 @@ const fragmentTest = editorTest.extend<FragmentFixture>({
 		await expect(inlineToolbar).toBeVisible();
 		await inlineToolbar.locator('[data-qa="fragment-link-button"]').click();
 
-		const listItem = catalogPage.raw.locator('[data-slot="command-item"]', { hasText: FRAGMENT_TITLE });
+		const listItem = catalogPage.raw.locator(`[data-fragment-id="${FRAGMENT_ID}"]`);
 		await expect(listItem).toBeVisible();
 		await listItem.click();
-		await expect(catalogPage.raw.locator('[data-slot="command-item"]')).not.toBeVisible();
+		await expect(listItem).not.toBeVisible();
 
 		await use(null);
 	},

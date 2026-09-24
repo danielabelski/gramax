@@ -5,6 +5,9 @@ node_modules
 out
 dist
 report/
+
+# accumulated measurements; deliberately outside report/, which Playwright wipes each run
+timings/
 *.tgz
 
 # code coverage

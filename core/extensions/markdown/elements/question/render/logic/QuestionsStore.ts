@@ -208,7 +208,7 @@ export const useCheckAnswers = () => {
 
 export const useIsAnsweredToTest = (deps: DependencyList) => {
 	const workspace = Workspace.current();
-	const user = PageDataContext.value?.userInfo;
+	const user = PageDataContext.value?.user?.info;
 	const catalogExist = useCatalogPropsStore((state) => !!state.data?.name);
 
 	const { setState, restoreStoredAnswers } = useQuestionsStore(

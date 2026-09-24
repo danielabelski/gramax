@@ -26,7 +26,13 @@ enum EnvVariables {
 	MATOMO_CONTAINER_URL = "MATOMO_CONTAINER_URL",
 	FORCE_UI_LANG_SYNC = "FORCE_UI_LANG_SYNC",
 	FEATURES = "FEATURES",
+	AI_SERVER_URL = "AI_SERVER_URL",
+	AI_INSTANCE_NAME = "AI_INSTANCE_NAME",
+	AI_TOKEN = "AI_TOKEN",
+	AI_PUBLIC_TOKEN = "AI_PUBLIC_TOKEN",
 }
+
+const secretEnvVariables = new Set<EnvVariables>([EnvVariables.AI_TOKEN, EnvVariables.AI_PUBLIC_TOKEN]);
 
 const envVariableNames: Record<EnvVariables, string> = {
 	[EnvVariables.LOGO_IMAGE_URL]: "Logo image URL",
@@ -37,6 +43,10 @@ const envVariableNames: Record<EnvVariables, string> = {
 	[EnvVariables.MATOMO_CONTAINER_URL]: "Matomo container URL",
 	[EnvVariables.FORCE_UI_LANG_SYNC]: "Force ui lang sync",
 	[EnvVariables.FEATURES]: "Features",
+	[EnvVariables.AI_SERVER_URL]: "AI server URL",
+	[EnvVariables.AI_INSTANCE_NAME]: "AI instance name",
+	[EnvVariables.AI_TOKEN]: "AI token",
+	[EnvVariables.AI_PUBLIC_TOKEN]: "AI public token",
 };
 
 type EnvValue = string | boolean | undefined;
@@ -66,6 +76,10 @@ const setEnv = async (fullPath: string, options: { forceUiLangSync: boolean; fea
 		[EnvVariables.FORCE_UI_LANG_SYNC]: buildConfig?.forceUiLangSync,
 		[EnvVariables.FEATURES]:
 			typeof buildConfig?.features === "string" ? buildConfig?.features : buildConfig?.features?.join(","),
+		[EnvVariables.AI_SERVER_URL]: buildConfig?.ai?.url,
+		[EnvVariables.AI_INSTANCE_NAME]: buildConfig?.ai?.instance,
+		[EnvVariables.AI_TOKEN]: buildConfig?.ai?.token,
+		[EnvVariables.AI_PUBLIC_TOKEN]: buildConfig?.ai?.publicToken,
 	};
 
 	const optionsMapping: Partial<Record<EnvVariables, EnvValue>> = {
@@ -83,10 +97,23 @@ const setEnv = async (fullPath: string, options: { forceUiLangSync: boolean; fea
 		ChalkLogger.log("Used parameters:");
 		existingKeys.forEach((key) => {
 			const readableKey = envVariableNames[key as EnvVariables];
-			ChalkLogger.log(`  ${readableKey}: "${process.env[key]}"`);
+			const value = secretEnvVariables.has(key as EnvVariables) ? "***" : process.env[key];
+			ChalkLogger.log(`  ${readableKey}: "${value}"`);
 		});
 		ChalkLogger.log();
 	}
+
+	warnOnIncompleteAiSetup();
+};
+
+const warnOnIncompleteAiSetup = () => {
+	const aiConfigured = process.env[EnvVariables.AI_SERVER_URL] && process.env[EnvVariables.AI_INSTANCE_NAME];
+	if (!aiConfigured || process.env[EnvVariables.AI_PUBLIC_TOKEN]) return;
+
+	ChalkLogger.warn(
+		`AI search will not be enabled in the built site: ${EnvVariables.AI_PUBLIC_TOKEN} (build.ai.publicToken) is not set. `,
+	);
+	ChalkLogger.log();
 };
 
 const validateBaseUrl = (baseUrl: string | undefined): void => {
@@ -184,6 +211,7 @@ const buildCommandFunction = async (options: BuildOptions) => {
 			copyPdfTemplatesFunction: copyPdfTemplatesInCli({ fp, catalogName, sourcePath: pdfTemplates }),
 		},
 		baseUrl,
+		aiPublicToken: process.env[EnvVariables.AI_PUBLIC_TOKEN],
 	});
 };
 

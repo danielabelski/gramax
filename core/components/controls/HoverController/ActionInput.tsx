@@ -1,6 +1,7 @@
 import Icon from "@components/Atoms/Icon";
 import Input from "@components/Atoms/Input";
 import Tooltip from "@components/Atoms/Tooltip";
+// biome-ignore lint/style/noRestrictedImports: pre-existing @emotion/styled import; the Tailwind migration is not this change's scope
 import styled from "@emotion/styled";
 import { type ChangeEvent, type MouseEvent, memo, useCallback, useRef } from "react";
 
@@ -23,7 +24,7 @@ const ActionInput = ({ icon, className, tooltipText, defaultValue, placeholder, 
 			input?.classList.add("visible");
 			input?.focus();
 		} else input?.classList.remove("visible");
-	}, [inputRef.current]);
+	}, []);
 
 	const onInputClick = useCallback((event: MouseEvent<HTMLInputElement>) => {
 		event.stopPropagation();
@@ -31,7 +32,7 @@ const ActionInput = ({ icon, className, tooltipText, defaultValue, placeholder, 
 	}, []);
 
 	return (
-		<Tooltip content={tooltipText} delay={[500, 0]}>
+		<Tooltip content={tooltipText}>
 			<div className={className} onClick={onClick}>
 				<Icon code={icon} />
 				<Input

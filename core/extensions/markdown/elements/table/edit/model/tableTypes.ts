@@ -1,3 +1,5 @@
+import type { IconCode } from "@ui-kit/Icon";
+
 export enum HoverEnumTypes {
 	DELETE = "delete",
 	ADD = "add",
@@ -18,7 +20,7 @@ export enum AggregationMethod {
 	COUNT_DISTINCT = "countDistinct",
 }
 
-export const aggregationMethodIcons: { [type in AggregationMethod]: string } = {
+export const aggregationMethodIcons: { [type in AggregationMethod]: IconCode } = {
 	[AggregationMethod.SUM]: "circle-plus",
 	[AggregationMethod.AVG]: "circle-percent",
 	[AggregationMethod.MIN]: "circle-arrow-down",

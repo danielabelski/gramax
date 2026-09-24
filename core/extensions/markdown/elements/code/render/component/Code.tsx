@@ -1,5 +1,6 @@
 import isNavigatorAvailable from "@core-ui/isNavigatorAvailable";
 import { tryCopyToClipboard } from "@core-ui/utils/clipboard";
+import { isTouchClick, keepTooltipOpen } from "@core-ui/utils/copyTooltip";
 import t from "@ext/localization/locale/translate";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 import { type MouseEvent, useCallback, useState } from "react";
@@ -12,23 +13,24 @@ export default function Code({ children }: { children: string }) {
 		(event: MouseEvent<HTMLSpanElement>) => {
 			if (!copyAllowed) return;
 			event.preventDefault();
-			tryCopyToClipboard(children, { showPopover: false }).then((copied) => setIsCopied(copied));
+			// On touch there is no tooltip to switch to "copied", so confirm with a popover.
+			tryCopyToClipboard(children, { showPopover: isTouchClick(event) }).then((copied) => setIsCopied(copied));
 		},
 		[children, copyAllowed],
 	);
 
-	const onOpenChange = useCallback((open: boolean) => {
-		if (!open) return;
-		setIsCopied(false);
-	}, []);
+	// The tooltip opens after a hover delay, so a quick click lands before it is shown.
+	// Resetting on the way in instead of on open keeps that click's "copied" visible.
+	const resetCopied = useCallback(() => setIsCopied(false), []);
 
 	return (
-		<Tooltip delayDuration={0} onOpenChange={onOpenChange}>
+		<Tooltip>
 			<TooltipTrigger asChild>
 				<span
 					className="inline-code"
 					onClick={onClickHandler}
-					onPointerDown={(event) => event.preventDefault()}
+					onPointerDown={keepTooltipOpen}
+					onPointerEnter={resetCopied}
 				>
 					<code>{children}</code>
 				</span>

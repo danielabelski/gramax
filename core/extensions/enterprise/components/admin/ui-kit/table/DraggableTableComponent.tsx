@@ -17,7 +17,7 @@ interface DraggableTableComponentProps<T> {
 
 export function DraggableTableComponent<T>({ table, columns, onDragChange, rowKey }: DraggableTableComponentProps<T>) {
 	const rows = table.getRowModel()?.rows ?? [];
-	const dataIds = rows.map(({ original }) => original[rowKey] as string) || [];
+	const dataIds = rows.map(({ original }) => original[rowKey] as string);
 
 	const { sensors, handleDragEnd } = useSortableCatalogs(onDragChange);
 
@@ -41,7 +41,7 @@ export function DraggableTableComponent<T>({ table, columns, onDragChange, rowKe
 							columns={columns}
 							renderRow={(row) => (
 								<DraggableTableRow<T>
-									key={row.id}
+									key={row.original[rowKey] as string}
 									row={row as Row<T>}
 									rowKey={rowKey}
 									state={row.getIsSelected() && "selected"}

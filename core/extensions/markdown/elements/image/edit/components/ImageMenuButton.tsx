@@ -2,24 +2,21 @@ import InputFile from "@components/Atoms/InputFile";
 import ArticlePropsService from "@core-ui/ContextServices/ArticleProps";
 import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/ButtonStateService";
 import ResourceService from "@core-ui/ContextServices/ResourceService/ResourceService";
-import { cn } from "@core-ui/utils/cn";
-import styled from "@emotion/styled";
 import t from "@ext/localization/locale/translate";
 import type { Editor } from "@tiptap/core";
+import { DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@ui-kit/Dropdown";
 import { Icon } from "@ui-kit/Icon";
-import { ToolbarDropdownMenuItem } from "@ui-kit/Toolbar";
 import { type ChangeEvent, useCallback } from "react";
 import createImages from "../logic/createImages";
 
 interface ImageMenuButtonProps {
 	editor: Editor;
-	className?: string;
 	fileName?: string;
 	onSave?: () => void;
 	onStart?: () => void;
 }
 
-const ImageMenuButton = ({ editor, className, fileName, onSave, onStart }: ImageMenuButtonProps) => {
+const ImageMenuButton = ({ editor, fileName, onSave, onStart }: ImageMenuButtonProps) => {
 	const articleProps = ArticlePropsService.value;
 	const resourceService = ResourceService.value;
 
@@ -29,6 +26,7 @@ const ImageMenuButton = ({ editor, className, fileName, onSave, onStart }: Image
 		onSave?.();
 	}, [onSave]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	const onChange = useCallback(
 		async (event: ChangeEvent<HTMLInputElement>) => {
 			await createImages(
@@ -45,49 +43,41 @@ const ImageMenuButton = ({ editor, className, fileName, onSave, onStart }: Image
 
 	if (disabled) {
 		return (
-			<ToolbarDropdownMenuItem active={isActive} dataQa={`qa-edit-menu-image`} disabled={disabled}>
-				<div className="flex flex-row items-center gap-2 w-full">
-					<Icon icon="image" />
-					{t("image")}
-				</div>
-			</ToolbarDropdownMenuItem>
+			<DropdownMenuRadioGroup value={isActive ? "image" : undefined}>
+				<DropdownMenuRadioItem disabled={disabled} value="image">
+					<div className="flex flex-row items-center gap-2 w-full" data-qa="qa-edit-menu-image">
+						<Icon icon="image" />
+						{t("image")}
+					</div>
+				</DropdownMenuRadioItem>
+			</DropdownMenuRadioGroup>
 		);
 	}
 
 	return (
-		<ToolbarDropdownMenuItem
-			active={isActive}
-			className={cn(className, "flex flex-row items-center gap-2 whitespace-nowrap")}
-			dataQa={`qa-edit-menu-image`}
-			disabled={disabled}
-			onSelect={(e) => {
-				e.preventDefault();
-				onStart?.();
-			}}
-		>
-			<InputFile
-				className="flex flex-row items-center w-full cursor-pointer"
-				onAbort={onAbort}
-				onChange={onChange}
+		<DropdownMenuRadioGroup value={isActive ? "image" : undefined}>
+			<DropdownMenuRadioItem
+				className="relative flex flex-row items-center gap-2 whitespace-nowrap"
+				disabled={disabled}
+				onSelect={(e) => {
+					e.preventDefault();
+					onStart?.();
+				}}
+				value="image"
 			>
-				<div className="flex flex-row items-center gap-2 w-full">
-					<Icon icon="image" />
-					{t("image")}
-				</div>
-			</InputFile>
-		</ToolbarDropdownMenuItem>
+				<InputFile
+					className="flex flex-row items-center w-full cursor-pointer"
+					onAbort={onAbort}
+					onChange={onChange}
+				>
+					<div className="flex flex-row items-center gap-2 w-full" data-qa="qa-edit-menu-image">
+						<Icon icon="image" />
+						{t("image")}
+					</div>
+				</InputFile>
+			</DropdownMenuRadioItem>
+		</DropdownMenuRadioGroup>
 	);
 };
 
-export default styled(ImageMenuButton)`
-	position: relative;
-
-	input[type="file"] {
-		position: absolute;
-		z-index: var(--z-index-background);
-		opacity: 0;
-		display: block;
-		width: 0;
-		height: 0;
-	}
-`;
+export default ImageMenuButton;

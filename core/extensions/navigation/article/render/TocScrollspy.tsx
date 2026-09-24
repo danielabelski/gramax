@@ -46,14 +46,10 @@ const TocScrollspy = forwardRef((props: TocScrollspyProps, articleElementRef: Mu
 		let prevUrl: string = null;
 
 		function onScroll() {
-			if (
-				!pairs ||
-				!pairs?.[0]?.hEl ||
-				!pairs?.[0]?.hEl.parentNode ||
-				!pairs?.[0]?.hEl.offsetTop ||
-				!pairs?.[0]?.aEl.isConnected
-			)
+			if (!pairs?.[0]?.hEl?.parentNode || !pairs?.[0]?.hEl.offsetTop || !pairs?.[0]?.aEl.isConnected) {
 				refreshPairs();
+			}
+
 			const y = scrollEl.scrollTop + SCROLLSPY_OFFSET;
 			let active = null as Pair;
 

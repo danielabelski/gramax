@@ -27,7 +27,7 @@ test.describe("prepare tests: clone required test catalogs", () => {
 			await page.getByRole("option", { name: "GitLab" }).click();
 
 			await page.getByRole("combobox", { name: "Repository" }).click();
-			await page.getByPlaceholder("Find").fill("test-catalog");
+			await page.getByPlaceholder("Find").fill(repoName);
 			await basePage.waitForLoad();
 
 			await page.getByRole("option", { name: `${repo.group}/${repoName}` }).click();

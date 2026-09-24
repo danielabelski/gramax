@@ -1,28 +1,38 @@
 import useWatch from "@core-ui/hooks/useWatch";
 import { cn } from "@core-ui/utils/cn";
-import type { DatePreset } from "@core-ui/utils/dateUtils";
-import DateUtils from "@core-ui/utils/dateUtils";
+import DateUtils, { DatePreset } from "@core-ui/utils/dateUtils";
+import useGitCommitRange from "@ext/git/actions/Branch/components/useGitCommitRange";
 import t from "@ext/localization/locale/translate";
 import { Calendar } from "@ui-kit/Calendar";
-import { Divider } from "@ui-kit/Divider";
 import { Icon } from "@ui-kit/Icon";
+import { Label } from "@ui-kit/Label";
 import { Popover, PopoverContent, PopoverTriggerButton } from "@ui-kit/Popover";
 import { ToggleGroup, ToggleGroupItem } from "@ui-kit/ToggleGroup";
-import { Fragment, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import type { DateRange } from "react-day-picker";
 
 interface RevisionDateFilterProps {
 	value: DateRange;
 	onChange: (value: DateRange) => void;
+	pathspecs?: string[];
 }
 
-export const RevisionDateFilter = ({ value, onChange }: RevisionDateFilterProps) => {
+export const RevisionDateFilter = ({ value, onChange, pathspecs }: RevisionDateFilterProps) => {
 	const [localValue, setLocalValue] = useState<DateRange>(value);
 	const activePreset = DateUtils.detectPreset(localValue);
+	const { available } = useGitCommitRange(true, pathspecs);
 
-	useWatch(() => {
-		setLocalValue(value);
-	}, [value]);
+	useWatch(() => setLocalValue(value), [value]);
+
+	const isPresetAvailable = useCallback(
+		(preset: DatePreset) => {
+			if (preset === DatePreset.AllTime || !available?.from) return true;
+
+			const range = DateUtils.getDatePresetRange(preset);
+			return range.to >= available.from && range.from <= (available.to ?? new Date());
+		},
+		[available],
+	);
 
 	const handlePreset = useCallback(
 		(preset: DatePreset) => {
@@ -45,60 +55,62 @@ export const RevisionDateFilter = ({ value, onChange }: RevisionDateFilterProps)
 		[onChange],
 	);
 
-	const formatDate = (date: Date) => date?.toLocaleDateString() ?? "";
-	const presets = DateUtils.getDatePresets();
+	const formatDate = (date: Date) =>
+		date?.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit", year: "2-digit" }) ?? "";
+	const presets = DateUtils.getDatePresets().filter((preset) => preset !== "all-time");
 
 	return (
-		<div className="space-y-3">
-			<div className="flex items-center justify-between">
-				<span className="text-xs font-normal uppercase text-muted tracking-wide">
-					{t("git.history.filters.date.title")}
-				</span>
-			</div>
-			<ToggleGroup
-				className="gap-0 rounded-lg border border-secondary-border shadow-soft-sm"
-				onValueChange={handlePreset}
-				type="single"
-				value={activePreset}
-				variant="ghost"
-			>
-				{presets.map((preset, index) => (
-					<Fragment key={preset}>
+		<div className="space-y-1.5">
+			<div>
+				<Label className="text-xs text-muted ml-2">{t("git.history.filters.date.title")}</Label>
+				<ToggleGroup
+					className="justify-start gap-1"
+					onValueChange={handlePreset}
+					type="single"
+					value={activePreset}
+					variant="ghost"
+				>
+					{presets.map((preset) => (
 						<ToggleGroupItem
-							className={cn(
-								"text-xs font-normal whitespace-nowrap rounded-none flex-1",
-								index === 0 && "rounded-none rounded-l-md",
-								index === presets.length - 1 && "rounded-none rounded-r-md",
-							)}
+							className="h-7 whitespace-nowrap rounded-full border border-primary-border bg-secondary-bg px-2.5 text-sm font-normal text-primary-fg hover:bg-status-neutral-bg-hover data-[state=on]:border-transparent data-[state=on]:bg-status-neutral data-[state=on]:text-primary-bg data-[state=on]:hover:bg-status-neutral-hover"
+							disabled={!isPresetAvailable(preset)}
 							key={preset}
 							size="sm"
 							value={preset}
 						>
 							{t(`git.history.filters.date.${preset}`)}
 						</ToggleGroupItem>
-						{index < presets.length - 1 && <Divider className="h-8" orientation="vertical" />}
-					</Fragment>
-				))}
-			</ToggleGroup>
+					))}
+				</ToggleGroup>
+			</div>
 			<Popover>
-				<PopoverTriggerButton asChild className="w-full font-normal pl-2 justify-between" size="sm">
-					<span className="text-muted">
-						<Icon className="text-muted shrink-0 inline-flex mr-2" icon="calendar" />
-						{localValue?.from ? formatDate(localValue.from) : t("git.history.filters.date.placeholder")}
+				<PopoverTriggerButton
+					className={cn(
+						"w-full justify-start h-auto font-normal !shadow-none hover:!shadow-none active:!shadow-none focus:!shadow-none focus-visible:!shadow-none",
+						"invalid:!shadow-none invalid:hover:!shadow-none invalid:focus:!shadow-none",
+						"aria-[invalid=true]:!shadow-none aria-[invalid=true]:hover:!shadow-none aria-[invalid=true]:focus:!shadow-none",
+						"read-only:!shadow-none disabled:!shadow-none",
+					)}
+					containerClassName="w-full"
+					size="sm"
+				>
+					<span className="flex-1 text-left text-sm text-muted">
+						{localValue?.from && localValue?.to
+							? `${formatDate(localValue.from)} — ${formatDate(localValue.to)}`
+							: t("git.history.filters.date.range-placeholder")}
 					</span>
-					<Icon className="text-muted shrink-0" icon="move-right" />
-					<span className="text-muted">
-						<Icon className="text-muted shrink-0 inline-flex mr-2" icon="calendar" />
-						{localValue?.to ? formatDate(localValue.to) : t("git.history.filters.date.placeholder")}
-					</span>
+					<Icon className="shrink-0 text-muted" icon="calendar" />
 				</PopoverTriggerButton>
 				<PopoverContent className="p-0">
 					<Calendar
-						className="border-0 shadow-none bg-transparent"
-						defaultMonth={localValue?.from ?? new Date()}
+						className="border-0 bg-transparent shadow-none"
+						defaultMonth={localValue?.from ?? available?.to ?? new Date()}
+						disabled={available?.from ? [{ before: available.from }, { after: available.to }] : undefined}
+						endMonth={available?.to}
 						mode="range"
 						onSelect={handleCalendarSelect}
 						selected={localValue}
+						startMonth={available?.from}
 					/>
 				</PopoverContent>
 			</Popover>

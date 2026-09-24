@@ -1,5 +1,5 @@
 import { type Environment, getExecutingEnvironment } from "@app/resolveModule/env";
-import { PlatformEnvironments } from "@plugins/api/sdk";
+import { PlatformEnvironments } from "@plugins/api/sdk/utilities";
 
 const environmentToPlatformMap: Partial<Record<Environment, keyof typeof PlatformEnvironments>> = {
 	web: "Web",

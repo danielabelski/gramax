@@ -1,6 +1,7 @@
 import DiffFileInput from "@components/Atoms/FileInput/DiffFileInput/DiffFileInput";
 import FileInput from "@components/Atoms/FileInput/FileInput";
 import useMonacoLinesRestriction from "@components/Atoms/FileInput/hooks/useMonacoLinesRestriction";
+import { useArticleWidthStyle } from "@components/Layouts/CatalogLayout/ArticleLayout/useArticleDimensions";
 import { useRouter } from "@core/Api/useRouter";
 import type { EditorContext } from "@core-ui/stores/EditorStore";
 import { DiffModeView } from "@ext/git/core/Diff/components/DiffModeView";
@@ -28,6 +29,7 @@ interface ArticleDiffModeViewProps {
 }
 
 const ArticleDiffModeView = (props: ArticleDiffModeViewProps) => {
+	const articleWidthStyle = useArticleWidthStyle();
 	const {
 		oldEditTree,
 		newEditTree,
@@ -120,7 +122,10 @@ const ArticleDiffModeView = (props: ArticleDiffModeViewProps) => {
 			)}
 			{isMarkdown && (
 				<div className="w-full h-full">
-					<div className="h-full w-[var(--article-content-wrapper-width)] ml-[calc((var(--article-content-wrapper-width)-100%)/-2)]">
+					<div
+						className="h-full w-[var(--article-content-wrapper-width)] ml-[calc((var(--article-content-wrapper-width)-100%)/-2)]"
+						style={articleWidthStyle}
+					>
 						{isDeleted || isAdded ? (
 							<FileInput
 								height={"85dvh"}

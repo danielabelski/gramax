@@ -1,7 +1,7 @@
 import type LinkItem from "@ext/article/LinkCreator/models/LinkItem";
 import { LinkHeadings } from "@ext/markdown/elements/link/edit/components/LinkMenu/LinkHeadings";
 import { CommandItem } from "@ui-kit/Command";
-import { Icon } from "@ui-kit/Icon";
+import { Icon, type IconCode } from "@ui-kit/Icon";
 import type { SearchSelectOption } from "@ui-kit/SearchSelect";
 import { TextOverflowTooltip } from "@ui-kit/Tooltip";
 
@@ -9,7 +9,7 @@ export type ItemLinkOption = Omit<SearchSelectOption, "value"> & LinkItem & { va
 
 export interface LinkMenuItemProps {
 	option: ItemLinkOption;
-	icon: string;
+	icon: IconCode;
 	depth: number;
 	onUpdate: (relativePath: string, newHref: string) => void;
 }

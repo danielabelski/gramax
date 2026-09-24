@@ -7,6 +7,7 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
 
+import { buildHttpError, toTransportError, type XhrBody } from "./httpError";
 import { ptr2bytes, ptr2str, str2ptr } from "./utils";
 
 self.ptr2str = ptr2str;
@@ -25,28 +26,18 @@ const setLastHttpError = async (status: number, body: string) => {
 	await fn(status, bodyPtr, bodyLen);
 };
 
-const decoder = new TextDecoder();
-
-const trySetLastHttpError = async (status: number, body: Uint8Array, url?: string) => {
-	if (status >= 200 && status < 300) return false;
+/** Returns the error status recorded for this response, or 0 when it was not an error. */
+const trySetLastHttpError = async (status: number, body: XhrBody, url?: string): Promise<number> => {
+	const error = buildHttpError(status, body, url);
+	if (!error) return 0;
 
 	try {
-		// limit body size to 4096 bytes
-		if (body.length > 4096) body = body.slice(0, 4096);
-		let bodyStr = decoder.decode(body);
-
-		if (status === 0 && bodyStr === "") {
-			status = 999;
-			const domain = url ? new URL(url).hostname : "";
-			bodyStr = `Failed to send request to '${url}': domain '${domain}' unreachable or CORS headers incorrect`;
-		}
-
-		await setLastHttpError(status, bodyStr);
+		await setLastHttpError(error.status, error.body);
 	} catch (err) {
 		console.error("failed to set last http error", err);
 	}
 
-	return true;
+	return error.status;
 };
 
 broadcast.addEventListener("message", (ev) => {
@@ -127,12 +118,12 @@ Object.assign(Module, {
 			}
 
 			xhr.onload = async () => {
-				const set = await trySetLastHttpError(xhr.status, xhr.response);
-				resolve(set ? -xhr.status : connId);
+				const errStatus = await trySetLastHttpError(xhr.status, xhr.response, url);
+				resolve(errStatus ? toTransportError(errStatus) : connId);
 			};
 			xhr.onerror = async () => {
-				await trySetLastHttpError(xhr.status, xhr.response, url);
-				resolve(-xhr.status);
+				const errStatus = await trySetLastHttpError(xhr.status, xhr.response, url);
+				resolve(toTransportError(errStatus));
 			};
 			xhr.onabort = () => {
 				resolve(-999);
@@ -165,6 +156,7 @@ Object.assign(Module, {
 
 			self.emscriptenhttpconnections[connId] = {
 				xhr: xhr,
+				url: url,
 				abortController: abortController,
 				resultbufferpointer: 0,
 				buffersize: buffersize,
@@ -256,15 +248,23 @@ Object.assign(Module, {
 			const connection = self.emscriptenhttpconnections[connectionNo];
 			if (connection.content) {
 				connection.xhr.onload = async () => {
-					const set = await trySetLastHttpError(connection.xhr.status, connection.xhr.response);
-					resolve(set ? -connection.xhr.status : handleResponse(buffer, buffersize));
+					const errStatus = await trySetLastHttpError(
+						connection.xhr.status,
+						connection.xhr.response,
+						connection.url,
+					);
+					resolve(errStatus ? toTransportError(errStatus) : handleResponse(buffer, buffersize));
 				};
 				connection.xhr.onabort = () => {
 					resolve(-999);
 				};
-				connection.xhr.onerror = () => {
-					void trySetLastHttpError(connection.xhr.status, connection.xhr.response);
-					resolve(-connection.xhr.status);
+				connection.xhr.onerror = async () => {
+					const errStatus = await trySetLastHttpError(
+						connection.xhr.status,
+						connection.xhr.response,
+						connection.url,
+					);
+					resolve(toTransportError(errStatus));
 				};
 				connection.xhr.send(connection.content.buffer);
 				connection.content = null;

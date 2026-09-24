@@ -2,10 +2,13 @@ import type { MenuItem as MenuItemSDK, ModalProps, Modal as ModalSdk } from "@gr
 import type { ReactNode } from "react";
 import { getDeps, type ModalInstance } from "./core";
 
-export const Modal: typeof ModalSdk = new Proxy((() => {}) as any, {
-	construct() {
+// biome-ignore lint/complexity/useArrowFunction: it's a class, not a function, but we want to use a Proxy to override the constructor
+const ModalTarget = function () {} as unknown as typeof ModalSdk;
+
+export const Modal: typeof ModalSdk = new Proxy(ModalTarget, {
+	construct(_target, args) {
 		const ModalClass = getDeps().Modal;
-		return new ModalClass();
+		return Reflect.construct(ModalClass, args);
 	},
 });
 

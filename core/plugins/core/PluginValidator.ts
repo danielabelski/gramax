@@ -1,19 +1,30 @@
 import type { PlatformEnvironmentKey } from "@plugins/api/sdk/utilities";
+import { GRAMAX_SDK_VERSION, LEGACY_PLUGIN_MAX_SDK_VERSION } from "@plugins/constants/sdkVersion";
 import { PluginFileParser } from "@plugins/core/PluginFileParser";
 import type { PluginConfig, PluginMetadata } from "@plugins/types";
 import semver from "semver";
 
-interface ValidationResult {
+export type SdkCompatibilityIssueReason = "invalid-range" | "unsupported-sdk";
+
+export interface SdkCompatibilityResult {
+	compatible: boolean;
+	sdkVersion: string;
+	requiredRange: string;
+	reason?: SdkCompatibilityIssueReason;
+}
+
+export interface ValidationResult {
 	valid: boolean;
 	errors: string[];
 	metadata?: PluginMetadata;
+	sdkCompatibility?: SdkCompatibilityResult;
 }
-const PLUGIN_ARCHITECTURE_VERSION = "0.1.0";
 
 export class PluginValidator {
-	private _systemVersion: string = PLUGIN_ARCHITECTURE_VERSION;
-
-	validateFiles(pluginConfig: PluginConfig | PluginMetadata): ValidationResult {
+	validateFiles(
+		pluginConfig: PluginConfig | PluginMetadata,
+		sdkVersion: string = GRAMAX_SDK_VERSION,
+	): ValidationResult {
 		const errors: string[] = [];
 		const metadata = "metadata" in pluginConfig ? pluginConfig.metadata : pluginConfig;
 
@@ -21,12 +32,21 @@ export class PluginValidator {
 		this._validateStyleMetadata(metadata, errors);
 		if ("metadata" in pluginConfig) this._validateDeclaredStyleAssets(pluginConfig, errors);
 
-		this._validateCompatibility(metadata, errors);
+		this._validatePluginVersion(metadata, errors);
+		const sdkCompatibility = this.validateSdkCompatibility(metadata, sdkVersion);
+		if (!sdkCompatibility.compatible) {
+			errors.push(
+				sdkCompatibility.reason === "invalid-range"
+					? `Plugin SDK range '${sdkCompatibility.requiredRange}' is not a valid semantic version range`
+					: `Plugin requires Gramax SDK '${sdkCompatibility.requiredRange}', but the application provides '${sdkCompatibility.sdkVersion}'`,
+			);
+		}
 
 		return {
 			valid: errors.length === 0,
 			errors,
 			metadata: errors.length === 0 ? metadata : undefined,
+			sdkCompatibility: sdkCompatibility.compatible ? undefined : sdkCompatibility,
 		};
 	}
 
@@ -75,7 +95,7 @@ export class PluginValidator {
 		}
 	}
 
-	private _validateCompatibility(metadata: PluginMetadata, errors: string[]): void {
+	private _validatePluginVersion(metadata: PluginMetadata, errors: string[]): void {
 		const pluginVersion = metadata.version;
 
 		// Skip compatibility check if version field is already invalid
@@ -88,31 +108,23 @@ export class PluginValidator {
 			errors.push(`Plugin version '${pluginVersion}' is not a valid semantic version`);
 			return;
 		}
+	}
 
-		// 2. Check if system version is valid semver format
-		if (!semver.valid(this._systemVersion)) {
-			errors.push(`System version '${this._systemVersion}' is not a valid semantic version`);
-			return;
+	validateSdkCompatibility(
+		metadata: PluginMetadata,
+		sdkVersion: string = GRAMAX_SDK_VERSION,
+	): SdkCompatibilityResult {
+		const requiredRange = metadata.engines?.gramaxSdk ?? `<=${LEGACY_PLUGIN_MAX_SDK_VERSION}`;
+
+		if (typeof requiredRange !== "string" || !requiredRange.trim() || !semver.validRange(requiredRange)) {
+			return { compatible: false, sdkVersion, requiredRange, reason: "invalid-range" };
 		}
 
-		const pluginMajor = semver.major(pluginVersion);
-		const pluginMinor = semver.minor(pluginVersion);
-		const systemMajor = semver.major(this._systemVersion);
-		const systemMinor = semver.minor(this._systemVersion);
-
-		// 3. Major version must match exactly
-		if (pluginMajor !== systemMajor) {
-			errors.push(`Plugin major version ${pluginMajor} is incompatible with system major version ${systemMajor}`);
-			return;
+		if (!semver.satisfies(sdkVersion, requiredRange, { includePrerelease: true })) {
+			return { compatible: false, sdkVersion, requiredRange, reason: "unsupported-sdk" };
 		}
 
-		// 4. Plugin cannot require a higher minor version than system provides
-		if (pluginMinor > systemMinor) {
-			errors.push(
-				`Plugin requires minor version ${pluginMajor}.${pluginMinor}.x, but system is ${this._systemVersion}`,
-			);
-			return;
-		}
+		return { compatible: true, sdkVersion, requiredRange };
 	}
 
 	validatePlatform(metadata: PluginMetadata, currentPlatform: PlatformEnvironmentKey): boolean {

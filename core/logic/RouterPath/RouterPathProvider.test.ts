@@ -394,6 +394,28 @@ describe("RouterPathProvider", () => {
 			expect(RouterPathProvider.isEditorPathname("source/group/repo/branch/dir/file")).toBe(false);
 			expect(RouterPathProvider.isEditorPathname("catalog/subdir/file")).toBe(false);
 		});
+
+		it("должен распознавать bare host:port без точки как путь редактора (gh#926)", () => {
+			// Внутренний Gitea по короткому DNS-алиасу: host:port без точки в хосте
+			expect(RouterPathProvider.isEditorPathname("gitea-server:3000/user/repo/master/-/file")).toBe(true);
+			// host:port без точки без -сепаратора тоже внешний источник
+			expect(RouterPathProvider.isEditorPathname("gitea-server:3000/user/repo/branch/dir/file")).toBe(true);
+			// имя с двоеточием, но без числового порта — не источник, остаётся локальным
+			expect(RouterPathProvider.isEditorPathname("catalog:draft/subdir/file")).toBe(false);
+		});
+	});
+
+	describe("parsePath bare host:port (gh#926)", () => {
+		it("должен разбирать host:port без точки как внешний источник", () => {
+			const result = RouterPathProvider.parsePath("gitea-server:3000/user/repo/master/-/file");
+
+			expect(result.sourceName).toBe("gitea-server:3000");
+			expect(result.group).toBe("user");
+			expect(result.repo).toBe("repo");
+			expect(result.refname).toBe("master");
+			expect(result.filePath).toEqual(["file"]);
+			expect(RouterPathProvider.validate(result)).toBe(true);
+		});
 	});
 
 	describe("updatePathnameData", () => {

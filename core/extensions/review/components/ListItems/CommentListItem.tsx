@@ -16,24 +16,26 @@ export const CommentListItem = ({ author, date, commentBlock, isRead, ...props }
 
 	return (
 		<BaseListItem {...props}>
-			<div className="flex items-center gap-2 w-full min-w-0">
-				<Avatar className="shrink-0 font-normal" size="2xs">
-					<AvatarFallback uniqueId={author?.email}>{getAvatarFallback(author?.name ?? "")}</AvatarFallback>
-				</Avatar>
-				<TextOverflowTooltip className="text-xs font-semibold text-primary-fg">
-					{author?.name}
+			<Avatar className="shrink-0 font-normal" size="2xs">
+				<AvatarFallback uniqueId={author?.email}>{getAvatarFallback(author?.name ?? "")}</AvatarFallback>
+			</Avatar>
+			<div className="min-w-0 flex-1 space-y-1">
+				<div className="flex min-w-0 items-baseline gap-2 pr-4">
+					<TextOverflowTooltip className="min-w-0 font-semibold text-primary-fg">
+						{author?.name}
+					</TextOverflowTooltip>
+					<span className="shrink-0 text-xs font-normal text-muted">
+						<Date date={date} />
+					</span>
+				</div>
+				<TextOverflowTooltip className="line-clamp-2 w-full whitespace-normal text-xs font-normal text-primary-fg">
+					{extractTextFromJSONContent(commentBlock?.comment?.content)}
 				</TextOverflowTooltip>
-				<span className="ml-auto shrink-0 text-xs text-muted">
-					<Date date={date} />
-				</span>
-				{!isRead && <Indicator className="shrink-0 bg-status-error rounded-full" size="xs" />}
+				{(commentBlock?.answers?.length ?? 0) > 0 && (
+					<span className="block text-xs font-normal text-muted">{pluralized}</span>
+				)}
 			</div>
-			<TextOverflowTooltip className="line-clamp-2 w-full whitespace-normal text-xs text-primary-fg">
-				{extractTextFromJSONContent(commentBlock?.comment?.content)}
-			</TextOverflowTooltip>
-			{(commentBlock?.answers?.length ?? 0) > 0 && (
-				<span className="mr-auto shrink-0 text-xs text-muted">{pluralized}</span>
-			)}
+			{!isRead && <Indicator className="absolute right-3 top-3 rounded-full bg-status-error" size="xs" />}
 		</BaseListItem>
 	);
 };

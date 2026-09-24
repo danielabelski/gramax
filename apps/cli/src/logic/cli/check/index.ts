@@ -24,6 +24,7 @@ enum ErrorMessages {
 	unsupported = "Unsupported element",
 	content = "Incorrect syntax",
 	comments = "Unlinked comments",
+	aliases = "Conflicting path",
 }
 
 interface ResourceError {
@@ -43,7 +44,7 @@ const transformCatalogErrors: TransformCatalogErrorsFn = (catalogErrors, checkCo
 	for (const [groupKey, errors] of Object.entries(catalogErrors)) {
 		if (groupKey === CatalogErrorGroups.comments.type && !checkComments) continue;
 		for (const error of errors) {
-			const { logicPath, title, editorLink, value } = error.args;
+			const { logicPath, title, editorLink, value, hint } = error.args;
 
 			if (!groupedByLogicPath.has(logicPath)) {
 				groupedByLogicPath.set(logicPath, {
@@ -55,7 +56,7 @@ const transformCatalogErrors: TransformCatalogErrorsFn = (catalogErrors, checkCo
 			}
 
 			const resourceError = groupedByLogicPath.get(logicPath);
-			resourceError.errors[groupKey].push(value);
+			resourceError.errors[groupKey].push(hint ? `${value} — ${hint}` : value);
 			totalErrors++;
 		}
 	}

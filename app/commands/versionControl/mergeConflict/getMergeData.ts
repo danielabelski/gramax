@@ -27,7 +27,10 @@ const getMergeData: Command<{ catalogName: string }, MergeData> = Command.create
 			if (!isValid) return { ok: true };
 			return {
 				ok: false,
-				caller: state.inner.value === "mergeConflict" ? MergeConflictCaller.Branch : MergeConflictCaller.Sync,
+				caller:
+					state.inner.value === "mergeConflict"
+						? (state.inner.data.caller ?? MergeConflictCaller.Branch)
+						: MergeConflictCaller.Sync,
 				mergeFiles: await state.mergeConflictResolver.convertToMergeResultContent(
 					state.inner.data.conflictFiles,
 					fs,

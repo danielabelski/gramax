@@ -1,6 +1,5 @@
-import Icon from "@components/Atoms/Icon";
 import TruncatedText from "@components/Atoms/TruncatedText";
-import ButtonLink from "@components/Molecules/ButtonLink";
+import { RightNavigationButton } from "@components/Layouts/CatalogLayout/RightNavigation/RightNavigationButton";
 import { useRouter } from "@core/Api/useRouter";
 import RouterPathProvider from "@core/RouterPath/RouterPathProvider";
 import { useApi, useApiEvent } from "@core-ui/hooks/useApi";
@@ -16,9 +15,14 @@ import {
 	DropdownMenuRadioItem,
 	DropdownMenuTrigger,
 } from "@ui-kit/Dropdown";
-import { useCallback, useEffect, useState } from "react";
+import { TextOverflowTooltip } from "@ui-kit/Tooltip";
+import { type ReactElement, useCallback, useEffect, useState } from "react";
 
-const SwitchVersion = () => {
+interface SwitchVersionProps {
+	trigger?: ReactElement;
+}
+
+const SwitchVersion = ({ trigger }: SwitchVersionProps) => {
 	const { isTauri, isWeb } = usePlatform();
 	const catalogName = useCatalogPropsStore((s) => s.data.name);
 	const { resolvedVersions, resolvedVersion } = useCatalogPropsStore(
@@ -84,18 +88,19 @@ const SwitchVersion = () => {
 
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<ButtonLink
-					iconCode={"tag"}
-					iconFw
-					iconIsLoading={isLoading}
-					rightActions={[<Icon code="chevron-down" key={0} />]}
-					text={
-						<TruncatedText maxWidth={180}>
+			<DropdownMenuTrigger asChild data-testid="switch-version-trigger">
+				{trigger ?? (
+					<RightNavigationButton
+						asTrigger
+						isLoading={isLoading}
+						startIcon="git-compare"
+						trailingIcon="chevron-down"
+					>
+						<TextOverflowTooltip>
 							{isActualVersion ? branch?.name || t("versions.switch") : resolvedVersion.name}
-						</TruncatedText>
-					}
-				/>
+						</TextOverflowTooltip>
+					</RightNavigationButton>
+				)}
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start">
 				<DropdownMenuRadioGroup onValueChange={onSwitch} value={resolvedVersion?.name || branch?.name}>

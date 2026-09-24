@@ -41,7 +41,18 @@ impl Fs for DiskFs {
 	}
 
 	fn exists(&self, path: &Path) -> Result<bool> {
-		Ok(self.sanitize(path)?.exists())
+		// `Path::exists` answers `false` for every failure, including a refusal — which is how a
+		// directory we are merely not allowed to look at ends up reported as absent.
+		//
+		// Only the refusal is worth propagating. Callers lean on `false` meaning "cannot see it,
+		// carry on" for failures that are nobody's fault and have a sensible fallback — a path
+		// component that is not a directory, a bad filename, a network mount mid-blip — and
+		// turning those into hard errors breaks them for no gain.
+		match self.sanitize(path)?.try_exists() {
+			Ok(exists) => Ok(exists),
+			Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => Err(err.into()),
+			Err(_) => Ok(false),
+		}
 	}
 
 	#[instrument(target = TAG)]

@@ -1,4 +1,5 @@
-export { MenuItem, MenuItemInfoTemplate, MenuItemText } from "ics-ui-kit/components/menu-item";
+export { MenuItemButton, MenuItemInfoTemplate, MenuItemText } from "ics-ui-kit/components/menu-item";
+export { MenuItem } from "./MenuItem";
 export { MenuItemAction } from "./MenuItemAction";
 export { MenuItemCommonTemplate } from "./MenuItemCommonTemplate";
 export { MenuItemIcon } from "./MenuItemIcon";

@@ -1,7 +1,8 @@
-import { ARTICLE_CONTENT_WRAPPER_WIDTH_ATTRIBUTE } from "@components/Layouts/CatalogLayout/ArticleLayout/consts";
-import ArticleRefService from "@core-ui/ContextServices/ArticleRef";
+import {
+	useArticleContainerWidth,
+	useArticleWidth,
+} from "@components/Layouts/CatalogLayout/ArticleLayout/useArticleDimensions";
 import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
-import SidebarsIsPinService from "@core-ui/ContextServices/Sidebars/SidebarsIsPin";
 import { useTouchHandler } from "@core-ui/hooks/useTouchHandler";
 import { cn } from "@core-ui/utils/cn";
 import getScale from "@ext/markdown/elements/image/render/logic/getScale";
@@ -49,16 +50,19 @@ export const ArticleComponentResizer = (props: ArticleComponentResizerProps): Re
 	const isReadOnly = PageDataContextService.value.conf.isReadOnly;
 
 	const containerRef = useRef<HTMLDivElement>(null);
+	const dragHandleRef = useRef<HTMLElement | null>(null);
 	const startWidthRef = useRef<number>(0);
 	const startClientXRef = useRef<number>(0);
-	const articleRef = ArticleRefService.value;
-	const sidebarsIsPin = SidebarsIsPinService.value;
+	const articleWidth = useArticleWidth();
 
 	const getContainer = useCallback(() => {
-		const container = containerRef.current.closest("[data-resize-container]");
-		if (!container) return containerRef.current;
-		return container.parentElement;
+		const component = containerRef.current;
+		if (!component) return null;
+		const container = component.closest("[data-resize-container]") ?? component.closest("[data-component]");
+		// Observe the available column, not the element whose width we are changing.
+		return container?.parentElement ?? component.parentElement?.parentElement;
 	}, []);
+	const containerWidth = useArticleContainerWidth(getContainer);
 
 	const hasFloat = useCallback(() => {
 		const container = containerRef.current.closest("[data-float]");
@@ -72,18 +76,13 @@ export const ArticleComponentResizer = (props: ArticleComponentResizerProps): Re
 		return !!component?.parentElement?.closest("[data-component], td, th") || !!el.closest("td, th");
 	}, []);
 
-	const getMaxWidth = useCallback(() => {
-		const article = articleRef.current?.firstElementChild as HTMLElement;
-		if (!article) return 0;
-		return parseFloat(window.getComputedStyle(article).getPropertyValue(ARTICLE_CONTENT_WRAPPER_WIDTH_ATTRIBUTE));
-	}, []);
-
 	const handleResizeStart = useCallback((startX: number) => {
 		const mainContainer = containerRef.current;
 		startWidthRef.current = mainContainer.offsetWidth;
 		startClientXRef.current = startX;
 		const nodeViewWrapper = mainContainer.closest("[data-drag-handle]");
 		if (!nodeViewWrapper) return;
+		dragHandleRef.current = nodeViewWrapper as HTMLElement;
 		nodeViewWrapper.removeAttribute("data-drag-handle");
 	}, []);
 
@@ -102,9 +101,9 @@ export const ArticleComponentResizer = (props: ArticleComponentResizerProps): Re
 			const isFloat = hasFloat();
 			const nested = isNested();
 
-			const articleMaxWidth = parseFloat(getComputedStyle(container).width);
+			const articleMaxWidth = containerWidth;
 			const minWidth = 2.5 * parseFloat(getComputedStyle(object).fontSize);
-			const fullArticleWidth = isFloat || nested ? articleMaxWidth : getMaxWidth();
+			const fullArticleWidth = isFloat || nested ? articleMaxWidth : articleWidth || articleMaxWidth;
 
 			const snapThreshold = parseFloat(getComputedStyle(document.documentElement).fontSize) * 2;
 			const distanceToMax = Math.abs(newWidth - articleMaxWidth);
@@ -122,14 +121,14 @@ export const ArticleComponentResizer = (props: ArticleComponentResizerProps): Re
 
 			setIsFullArticle(!nested && effectiveWidth > articleMaxWidth);
 		},
-		[getContainer, getMaxWidth, hasFloat, isNested],
+		[getContainer, articleWidth, containerWidth, hasFloat, isNested],
 	);
 
 	const handleResizeEnd = useCallback(() => {
-		const mainContainer = containerRef.current;
-		const nodeViewWrapper = mainContainer.closest("[data-drag-handle]");
+		const nodeViewWrapper = dragHandleRef.current;
 		if (nodeViewWrapper) {
 			nodeViewWrapper.setAttribute("data-drag-handle", "true");
+			dragHandleRef.current = null;
 		}
 
 		const object = containerRef.current;
@@ -145,7 +144,6 @@ export const ArticleComponentResizer = (props: ArticleComponentResizerProps): Re
 		onEnd: handleResizeEnd,
 	});
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	useLayoutEffect(() => {
 		const currentScale = scale ?? defaultScale;
 
@@ -158,14 +156,11 @@ export const ArticleComponentResizer = (props: ArticleComponentResizerProps): Re
 				return true;
 			}
 
-			const container = getContainer();
-			if (!container) return false;
-
-			const articleMaxWidth = parseFloat(getComputedStyle(container).width);
+			const articleMaxWidth = containerWidth;
 			if (!articleMaxWidth) return false;
 
 			const nested = isNested();
-			const fullArticleWidth = nested ? articleMaxWidth : getMaxWidth() || articleMaxWidth;
+			const fullArticleWidth = nested ? articleMaxWidth : articleWidth || articleMaxWidth;
 
 			let width: number;
 			if (typeof newScale === "string" && newScale.endsWith("px")) {
@@ -181,34 +176,13 @@ export const ArticleComponentResizer = (props: ArticleComponentResizerProps): Re
 			width = Math.min(width, fullArticleWidth);
 
 			setIsFullArticle(!nested && width > articleMaxWidth);
-			component.style.width = `min(${width}px, var(${ARTICLE_CONTENT_WRAPPER_WIDTH_ATTRIBUTE}))`;
+			const nextWidth = `${width}px`;
+			if (component.style.width !== nextWidth) component.style.width = nextWidth;
 			return true;
 		};
 
-		const applied = applyScale(currentScale);
-
-		const resize = () => {
-			applyScale(currentScale);
-		};
-
-		window.addEventListener("resize", resize);
-
-		const container = getContainer();
-		let observer: ResizeObserver;
-		if (container && (!applied || isNested())) {
-			observer = new ResizeObserver(() => {
-				if (!applyScale(currentScale)) return;
-				observer.disconnect();
-				observer = null;
-			});
-			observer.observe(container);
-		}
-
-		return () => {
-			window.removeEventListener("resize", resize);
-			observer?.disconnect();
-		};
-	}, [scale, defaultScale, getContainer, sidebarsIsPin]);
+		applyScale(currentScale);
+	}, [scale, defaultScale, articleWidth, containerWidth, isNested]);
 
 	const { resizer, container } = styles();
 	return (
@@ -217,9 +191,9 @@ export const ArticleComponentResizer = (props: ArticleComponentResizerProps): Re
 			style={
 				isFullArticle && !isPrint
 					? {
-							width: `var(${ARTICLE_CONTENT_WRAPPER_WIDTH_ATTRIBUTE})`,
-							maxWidth: `var(${ARTICLE_CONTENT_WRAPPER_WIDTH_ATTRIBUTE})`,
-							marginLeft: `calc((var(${ARTICLE_CONTENT_WRAPPER_WIDTH_ATTRIBUTE}) - 100%) / -2)`,
+							width: articleWidth || undefined,
+							maxWidth: articleWidth || undefined,
+							marginLeft: articleWidth ? `calc((${articleWidth}px - 100%) / -2)` : undefined,
 						}
 					: undefined
 			}
@@ -227,7 +201,7 @@ export const ArticleComponentResizer = (props: ArticleComponentResizerProps): Re
 			<div
 				className={cn(className, container())}
 				ref={containerRef}
-				style={{ maxWidth: `var(${ARTICLE_CONTENT_WRAPPER_WIDTH_ATTRIBUTE})` }}
+				style={{ maxWidth: articleWidth || "100%" }}
 				{...rest}
 			>
 				{children}

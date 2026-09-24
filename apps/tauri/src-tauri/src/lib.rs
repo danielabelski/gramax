@@ -22,6 +22,12 @@ use std::path::Path;
 use anyhow::Context;
 use platform::*;
 
+// `tests/print_to_pdf.rs` is an external integration test and needs this reachable; see the comment on
+// `macos_print_test_support` in `platform/desktop/mod.rs` for why it isn't a `#[cfg(test)]` unit test instead.
+#[cfg(target_os = "macos")]
+#[doc(hidden)]
+pub use platform::macos_print_test_support;
+
 use shared::http_server::start_ping_server;
 use shared::AppBuilder;
 use tauri::*;
@@ -95,7 +101,12 @@ pub fn run() {
 		let app_updater = app.handle().clone();
 		std::thread::spawn(move || {
 			use crate::updater::UpdaterExt;
-			app_updater.updater_init().expect("unable to setup updater");
+			// Auto-update is a convenience; the editor is the product. A binary started through a
+			// symlink is one tauri refuses to update in place — `/tmp` on macOS is a symlink, so a
+			// build run from there hits it — and the app has no business dying over that.
+			if let Err(err) = app_updater.updater_init() {
+				error!("updater is unavailable in this session: {err}");
+			}
 		});
 
 		app.setup_legacy_updater().expect("unable to setup legacy updater");
@@ -115,11 +126,18 @@ impl<R: Runtime> AppBuilder for Builder<R> {
 		let app = self
 			.plugin(plugin_gramax_core::init())
 			.plugin(plugin_browser_session::init())
+			.plugin(plugin_mail::init())
 			.plugin(tauri_plugin_dialog::init())
+			.plugin(tauri_plugin_http::init())
 			.plugin(tauri_plugin_deep_link::init());
 
 		#[cfg(not(target_os = "android"))]
-		let app = app.plugin(tauri_plugin_window_state::Builder::new().with_filename("gramax-windows-state").build());
+		let app = app.plugin(
+			tauri_plugin_window_state::Builder::new()
+				.with_filename("gramax-windows-state")
+				.with_filter(|label| !plugin_browser_session::is_browser_session_label(label))
+				.build(),
+		);
 
 		#[cfg(desktop)]
 		let app = app

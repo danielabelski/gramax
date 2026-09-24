@@ -6,7 +6,8 @@ import t from "@ext/localization/locale/translate";
 import { IconButton } from "@ui-kit/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 import { type ComponentProps, useCallback } from "react";
-import { SignOut, UserAvatar } from "../../../../components/UserAvatar";
+import { OpenSettings, SignOut, UserAvatar } from "../../../../components/UserAvatar";
+import type GesCloudAppSettingsEditor from "../GesCloudAppSettingsEditor";
 
 export const GesCloudSignInOut = () => {
 	const isLogged = PageDataContextService.value.isLogged;
@@ -18,14 +19,6 @@ export const GesCloudSignInOut = () => {
 	if (enabled) return null;
 
 	return <GesCloudSignInButton />;
-};
-
-export const GesCloudTauriSignInOut = () => {
-	const isLogged = PageDataContextService.value.isLogged;
-
-	if (isLogged) return <GesCloudSignOut />;
-
-	return <GesCloudSignInButton overrideIcon="cloud" withUrlStep />;
 };
 
 const GesCloudSignOut = () => {
@@ -44,25 +37,25 @@ const GesCloudSignOut = () => {
 		});
 	}, [workspaceConfig]);
 
-	return <UserAvatar logoutComponent={<SignOut />} onLogoutClick={onLogoutClick} />;
+	const openSettings = () =>
+		ModalToOpenService.setValue<ComponentProps<typeof GesCloudAppSettingsEditor>>(ModalToOpen.GesAppSettings, {
+			onClose: () => ModalToOpenService.resetValue(),
+		});
+
+	return (
+		<UserAvatar
+			logoutComponent={<SignOut />}
+			onLogoutClick={onLogoutClick}
+			onSettingsClick={openSettings}
+			settingsComponent={<OpenSettings />}
+		/>
+	);
 };
 
-interface GesCloudSignInButtonProps {
-	overrideIcon?: string;
-	withUrlStep?: boolean;
-}
-
-const GesCloudSignInButton = (props: GesCloudSignInButtonProps) => {
+const GesCloudSignInButton = () => {
 	const { url: gesCloudUrl } = PageDataContextService.value.conf.enterpriseCloud;
 
 	const onClick = () => {
-		if (props.withUrlStep) {
-			const modalId = ModalToOpenService.addModal(ModalToOpen.GesCloudUrl, {
-				onClose: () => ModalToOpenService.removeModal(modalId),
-			});
-			return;
-		}
-
 		const modalId = ModalToOpenService.addModal(ModalToOpen.GesCloudSignIn, {
 			gesCloudUrl,
 			allowContinueWithoutAccount: false,
@@ -78,7 +71,7 @@ const GesCloudSignInButton = (props: GesCloudSignInButtonProps) => {
 			<TooltipTrigger asChild>
 				<IconButton
 					className="p-2"
-					icon={props.overrideIcon || "user-round"}
+					icon="user-round"
 					iconClassName="w-5 h-5 stroke-[1.6]"
 					onClick={onClick}
 					size="lg"

@@ -7,6 +7,7 @@ import { nodePolyfills as polyfills } from "vite-plugin-node-polyfills";
 import env from "./scripts/compileTimeEnv.mjs";
 import isProductionFunc from "./scripts/isProduction.mjs";
 import ViteSourceMapUploader from "./scripts/sourceMaps/ViteSourceMapUploader.mjs";
+import { desktopHandoffScript } from "./scripts/web/desktopHandoff";
 
 const { getBuiltInVariables, dynamicModules } = env;
 if (!process.env.VITE_ENVIRONMENT) process.env.VITE_ENVIRONMENT = "next";
@@ -77,7 +78,7 @@ export default (): UserConfig => ({
 					themes: `<style>${readFileAsString("core/styles/themes.css")}</style>`,
 					bodyDatasetInjector: `<script>${readFileAsString("scripts/web/bodyDatasetInjector.js")}</script>`,
 					polyfill: `<script>${readFileAsString("scripts/web/polyfill.js")}</script>`,
-					tryOpenInDesktop: `<script>${readFileAsString("scripts/web/tryOpenInDesktop.js")}</script>`,
+					tryOpenInDesktop: desktopHandoffScript(process.env, readFileAsString),
 					ensureCustomStyleLast: `<script>${readFileAsString(
 						"scripts/static/ensureCustomStyleLast.js",
 					)}</script>`,

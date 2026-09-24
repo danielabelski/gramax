@@ -1,5 +1,4 @@
 import Path from "@core/FileProvider/Path/Path";
-import assert from "assert";
 import { agentConfig } from "../../core/agentConfig";
 import { MCP_PROMPT_MAP } from "../../prompts/mcpPromptMap";
 import { FileConverter, MarkdownDocumentParser } from "../parser";
@@ -38,10 +37,7 @@ export async function runReadFile({ app, ctx, input }: ToolExecutionContext): Pr
 		}
 
 		const fileName = resolvedPath.nameWithExtension;
-		const raw = FileConverter.isBinaryAttachment(fileName)
-			? await FileConverter.convertToText(fileName, Uint8Array.from(await wmFp.readAsBinary(resolvedPath)))
-			: await wmFp.read(resolvedPath);
-		assert(raw != null, "Failed to parse file content");
+		const raw = await FileConverter.toAgentText(fileName, Uint8Array.from(await wmFp.readAsBinary(resolvedPath)));
 		const content = headingId ? MarkdownDocumentParser.getHeadingSectionMarkdown(raw, headingId, false) : raw;
 
 		if (content.length > agentConfig.readMaxChars) {

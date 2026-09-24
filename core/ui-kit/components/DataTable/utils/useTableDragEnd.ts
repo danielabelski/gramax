@@ -14,9 +14,15 @@ export function useSortableCatalogs(
 	const handleDragEnd = useCallback(
 		({ active, over }: DragEndEvent) => {
 			if (active && over && active.id !== over.id) {
+				const activeId = active.id as string;
+				const overId = over.id as string;
+
 				setItems((data) => {
-					const oldIndex = data.indexOf(active.id as string);
-					const newIndex = data.indexOf(over.id as string);
+					const oldIndex = data.indexOf(activeId);
+					const newIndex = data.indexOf(overId);
+
+					if (oldIndex === -1 || newIndex === -1) return data;
+
 					return arrayMove(data, oldIndex, newIndex);
 				});
 			}

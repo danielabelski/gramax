@@ -28,29 +28,38 @@ const getPageDataByPathname = async (
 	let itemLogicPath: string[];
 	let catalog: Catalog;
 
-	if (await wm.getCatalogOrFindAtAnyWorkspace(pathnameData.catalogName)) {
-		catalog = await wm.getCatalogOrFindAtAnyWorkspace(pathnameData.catalogName);
+	const catalogByName = await wm.getCatalogOrFindAtAnyWorkspace(pathnameData.catalogName);
+	if (catalogByName) {
+		catalog = catalogByName;
 		itemLogicPath = pathnameData.itemLogicPath;
-	} else if (await wm.getCatalogOrFindAtAnyWorkspace(pathnameData.repo)) {
-		catalog = await wm.getCatalogOrFindAtAnyWorkspace(pathnameData.repo);
-		itemLogicPath = pathnameData.repNameItemLogicPath;
+	} else {
+		const catalogByRepo = await wm.getCatalogOrFindAtAnyWorkspace(pathnameData.repo, (candidate) =>
+			isCatalogDataReal(candidate, pathnameData),
+		);
+		if (catalogByRepo) {
+			catalog = catalogByRepo;
+			itemLogicPath = pathnameData.repNameItemLogicPath;
+		}
 	}
 
 	if (!catalog) return { type: PageDataType.home };
-	const { storage } = catalog.repo;
-
-	if (!storage) return { type: PageDataType.notFound };
-
-	const isGit = isGitSourceType(await storage.getType());
-	if (await isDataReal(isGit, storage, pathnameData)) {
+	if (await isCatalogDataReal(catalog, pathnameData)) {
 		return { type: PageDataType.article, itemLogicPath };
 	}
 	return { type: PageDataType.notFound };
 };
 
+const isCatalogDataReal = async (catalog: Catalog, pathnameData: PathnameData) => {
+	const { storage } = catalog.repo;
+	if (!storage) return false;
+	return isDataReal(isGitSourceType(await storage.getType()), storage, pathnameData);
+};
+
 const isDataReal = async (isGit: boolean, storage: Storage, pathnameData: PathnameData) => {
+	const sourceName = await storage.getSourceName();
+
 	return (
-		(await storage.getSourceName()) === pathnameData.sourceName &&
+		sourceName === pathnameData.sourceName &&
 		(isGit ? (await (storage as GitStorage).getGroup()) === pathnameData.group : true) &&
 		(await storage.getName()) === pathnameData.repo
 	);

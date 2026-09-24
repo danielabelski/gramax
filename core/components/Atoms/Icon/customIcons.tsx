@@ -4,6 +4,36 @@ import type { HTMLAttributes } from "react";
 export type CustomIcon<T extends HTMLAttributes<SVGElement> = NonNullable<unknown>> = (props: T) => JSX.Element;
 
 const customIcons = {
+	"refresh-cw-animated": ({ className, ...props }: HTMLAttributes<SVGElement>) => (
+		<svg
+			className={cn("lucide lucide-refresh-cw", className)}
+			fill="none"
+			height="24"
+			stroke="currentColor"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			strokeWidth="2"
+			viewBox="0 0 24 24"
+			width="24"
+			xmlns="http://www.w3.org/2000/svg"
+			{...props}
+		>
+			<g>
+				<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+				<path d="M21 3v5h-5" />
+				<path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+				<path d="M8 16H3v5" />
+				<animateTransform
+					attributeName="transform"
+					dur="1s"
+					from="0 12 12"
+					repeatCount="indefinite"
+					to="360 12 12"
+					type="rotate"
+				/>
+			</g>
+		</svg>
+	),
 	"pencil-sparkles": (props) => {
 		return (
 			<svg
@@ -223,20 +253,16 @@ const customIcons = {
 				data-qa="table-del-row"
 				fill="none"
 				height="1em"
-				viewBox="-1.5 -1.5 15 15"
+				stroke="currentColor"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth="2"
+				viewBox="0 0 24 24"
 				width="1em"
 				xmlns="http://www.w3.org/2000/svg"
 			>
-				<path
-					clipRule="evenodd"
-					d="M0.954594 0.696743C0.778858 0.521007 0.493934 0.521007 0.318198 0.696743C0.142462 0.872479 0.142462 1.1574 0.318198 1.33314L2.9032 3.91814H1C0.447715 3.91814 0 4.36585 0 4.91814V7.71814C0 8.27042 0.447715 8.71814 1 8.71814H7.7032L10.2884 11.3033C10.4641 11.4791 10.7491 11.4791 10.9248 11.3033C11.1005 11.1276 11.1005 10.8427 10.9248 10.6669L0.954594 0.696743ZM6.8032 7.81814L3.8032 4.81814H1C0.944771 4.81814 0.9 4.86291 0.9 4.91814V7.71814C0.9 7.77337 0.944772 7.81814 1 7.81814H6.8032Z"
-					fill="currentColor"
-					fillRule="evenodd"
-				/>
-				<path
-					d="M11 7.81814H9.31745L10.2174 8.71814H11C11.5523 8.71814 12 8.27042 12 7.71814V4.91814C12 4.36585 11.5523 3.91814 11 3.91814H5.41745L6.31745 4.81814H11C11.0552 4.81814 11.1 4.86291 11.1 4.91814V7.71814C11.1 7.77337 11.0552 7.81814 11 7.81814Z"
-					fill="currentColor"
-				/>
+				<rect height="10" rx="2" width="18" x="3" y="7" />
+				<path d="M3 3l18 18" />
 			</svg>
 		);
 	},
@@ -246,48 +272,56 @@ const customIcons = {
 				data-qa="table-del-col"
 				fill="none"
 				height="1em"
-				viewBox="-1.25 -1.5 15 15"
+				stroke="currentColor"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth="2"
+				viewBox="0 0 24 24"
 				width="1em"
 				xmlns="http://www.w3.org/2000/svg"
 			>
-				<path
-					clipRule="evenodd"
-					d="M8.7784 9.09663V11C8.7784 11.5523 8.33068 12 7.7784 12H4.9784C4.42611 12 3.9784 11.5523 3.9784 11V4.29663L0.696743 1.01498C0.521007 0.839239 0.521007 0.554315 0.696743 0.378579C0.872479 0.202843 1.1574 0.202843 1.33314 0.378579L11.3033 10.3488C11.4791 10.5245 11.4791 10.8094 11.3033 10.9852C11.1276 11.1609 10.8427 11.1609 10.6669 10.9852L8.7784 9.09663ZM7.8784 8.19663V11C7.8784 11.0552 7.83363 11.1 7.7784 11.1H4.9784C4.92317 11.1 4.8784 11.0552 4.8784 11L4.8784 5.19663L7.8784 8.19663Z"
-					fill="currentColor"
-					fillRule="evenodd"
-				/>
-				<path
-					d="M8.7784 6.58243L7.8784 5.68243L7.8784 1C7.8784 0.944771 7.83363 0.9 7.7784 0.9L4.9784 0.9C4.92317 0.9 4.8784 0.944771 4.8784 1V2.68243L3.9784 1.78243V1C3.9784 0.447715 4.42611 0 4.9784 0H7.7784C8.33068 0 8.7784 0.447715 8.7784 1L8.7784 6.58243Z"
-					fill="currentColor"
-				/>
+				<rect height="18" rx="2" width="10" x="7" y="3" />
+				<path d="M3 3l18 18" />
 			</svg>
 		);
 	},
 	"merge-cells": () => {
 		return (
-			<svg fill="none" height="1em" viewBox="-1.5 -1.5 15 15" width="1em" xmlns="http://www.w3.org/2000/svg">
-				<path
-					d="M1.42456 10.35H4.22456C4.27979 10.35 4.32456 10.3052 4.32456 10.25V9.5H5.22456V10.25C5.22456 10.8023 4.77685 11.25 4.22456 11.25H1.42456C0.872275 11.25 0.424561 10.8023 0.424561 10.25V1.75C0.424561 1.19772 0.872276 0.75 1.42456 0.75H4.22456C4.77685 0.75 5.22456 1.19772 5.22456 1.75V2.5H4.32456V1.75C4.32456 1.69477 4.27979 1.65 4.22456 1.65L1.42456 1.65C1.36933 1.65 1.32456 1.69477 1.32456 1.75L1.32456 5.55237H2.57637L2.56242 3.75121C2.56242 3.67966 2.64527 3.64011 2.69988 3.68342L5.5432 5.93361C5.58651 5.9675 5.58651 6.0334 5.5432 6.0673L2.69988 8.3156C2.64339 8.36079 2.56242 8.31936 2.56242 8.24781V6.44526H1.32456L1.32456 10.25C1.32456 10.3052 1.36933 10.35 1.42456 10.35Z"
-					fill="currentColor"
-				/>
-				<path
-					d="M7.77544 1.65L10.5754 1.65C10.6307 1.65 10.6754 1.69477 10.6754 1.75V5.55474H9.43758V3.75219C9.43758 3.68064 9.35661 3.63921 9.30012 3.6844L6.4568 5.9327C6.41349 5.9666 6.41349 6.0325 6.4568 6.06639L9.30012 8.31658C9.35473 8.35989 9.43758 8.32034 9.43758 8.24879L9.42363 6.44763H10.6754V10.25C10.6754 10.3052 10.6307 10.35 10.5754 10.35H7.77544C7.72021 10.35 7.67544 10.3052 7.67544 10.25V9.5H6.77544V10.25C6.77544 10.8023 7.22315 11.25 7.77544 11.25H10.5754C11.1277 11.25 11.5754 10.8023 11.5754 10.25L11.5754 1.75C11.5754 1.19772 11.1277 0.75 10.5754 0.75L7.77544 0.75C7.22315 0.75 6.77544 1.19772 6.77544 1.75V2.5L7.67544 2.5V1.75C7.67544 1.69477 7.72021 1.65 7.77544 1.65Z"
-					fill="currentColor"
-				/>
+			<svg
+				fill="none"
+				height="1em"
+				stroke="currentColor"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth="2"
+				viewBox="0 0 24 24"
+				width="1em"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<rect height="18" rx="2" width="7" x="2" y="3" />
+				<rect height="18" rx="2" width="7" x="15" y="3" />
+				<path d="M5 12h5m-2.5-2.5L10 12l-2.5 2.5" />
+				<path d="M19 12h-5m2.5-2.5L14 12l2.5 2.5" />
 			</svg>
 		);
 	},
 	"split-cells": () => {
 		return (
-			<svg fill="none" height="1em" viewBox="-1 -1.5 15 15" width="1em" xmlns="http://www.w3.org/2000/svg">
-				<path
-					d="M7.84888 10.35H10.6489C10.7041 10.35 10.7489 10.3052 10.7489 10.25V9.5H11.6489V10.25C11.6489 10.8023 11.2012 11.25 10.6489 11.25H7.84888C7.29659 11.25 6.84888 10.8023 6.84888 10.25V1.75C6.84888 1.19772 7.29659 0.75 7.84888 0.75H10.6489C11.2012 0.75 11.6489 1.19772 11.6489 1.75V2.5H10.7489V1.75C10.7489 1.69477 10.7041 1.65 10.6489 1.65L7.84888 1.65C7.79365 1.65 7.74888 1.69477 7.74888 1.75V5.55237H9.00068L8.98673 3.75121C8.98673 3.67966 9.06958 3.64011 9.12419 3.68342L11.9675 5.93361C12.0108 5.9675 12.0108 6.0334 11.9675 6.0673L9.12419 8.3156C9.0677 8.36079 8.98673 8.31936 8.98673 8.24781V6.44526H7.74888L7.74888 10.25C7.74888 10.3052 7.79365 10.35 7.84888 10.35Z"
-					fill="currentColor"
-				/>
-				<path
-					d="M1.35112 1.65L4.15112 1.65C4.20635 1.65 4.25112 1.69477 4.25112 1.75L4.25112 5.55462H3.01327L3.01327 3.75207C3.01327 3.68051 2.9323 3.63909 2.87581 3.68428L0.0324817 5.93258C-0.0108272 5.96647 -0.0108272 6.03238 0.0324817 6.06627L2.87581 8.31645C2.93042 8.35976 3.01327 8.32022 3.01327 8.24867L2.99932 6.44751H4.25112V10.25C4.25112 10.3052 4.20635 10.35 4.15112 10.35H1.35112C1.29589 10.35 1.25112 10.3052 1.25112 10.25V9.5H0.351123L0.351123 10.25C0.351123 10.8023 0.798838 11.25 1.35112 11.25H4.15112C4.70341 11.25 5.15112 10.8023 5.15112 10.25L5.15112 1.75C5.15112 1.19772 4.70341 0.75 4.15112 0.75L1.35112 0.75C0.798838 0.75 0.351122 1.19772 0.351122 1.75L0.351122 2.5L1.25112 2.5L1.25112 1.75C1.25112 1.69477 1.29589 1.65 1.35112 1.65Z"
-					fill="currentColor"
-				/>
+			<svg
+				fill="none"
+				height="1em"
+				stroke="currentColor"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth="2"
+				viewBox="0 0 24 24"
+				width="1em"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<rect height="18" rx="2" width="7" x="2" y="3" />
+				<rect height="18" rx="2" width="7" x="15" y="3" />
+				<path d="M10 12H5m2.5-2.5L5 12l2.5 2.5" />
+				<path d="M14 12h5m-2.5-2.5L19 12l-2.5 2.5" />
 			</svg>
 		);
 	},
@@ -312,20 +346,6 @@ const customIcons = {
 					fill="currentColor"
 					fillRule="evenodd"
 				/>
-			</svg>
-		);
-	},
-	"custom-cloud-up": () => {
-		return (
-			<svg height="1rem" viewBox="0 0 640 512" width="1rem" xmlns="http://www.w3.org/2000/svg">
-				<path d="M389.8 125.2C363.7 88.1 320.7 64 272 64c-77.4 0-140.5 61-143.9 137.5c-.6 13-9 24.4-21.3 28.8C63.2 245.7 32 287.2 32 336c0 61.9 50.1 112 112 112l368 0c53 0 96-43 96-96c0-36.8-20.7-68.8-51.2-84.9c-13.4-7.1-20-22.5-15.8-37.1c2-6.9 3-14.3 3-22c0-44.2-35.8-80-80-80c-12.3 0-23.9 2.8-34.3 7.7c-14.1 6.7-30.9 2.3-39.9-10.5zM272 32c59.5 0 112.1 29.5 144 74.8C430.5 99.9 446.8 96 464 96c61.9 0 112 50.1 112 112c0 10.7-1.5 21-4.3 30.8C612.3 260.2 640 302.9 640 352c0 70.7-57.3 128-128 128l-368 0C64.5 480 0 415.5 0 336c0-62.8 40.2-116.1 96.2-135.9C100.3 106.6 177.4 32 272 32zM228.7 244.7l80-80c6.2-6.2 16.4-6.2 22.6 0l80 80c6.2 6.2 6.2 16.4 0 22.6s-16.4 6.2-22.6 0L336 214.6 336 368c0 8.8-7.2 16-16 16s-16-7.2-16-16l0-153.4-52.7 52.7c-6.2 6.2-16.4 6.2-22.6 0s-6.2-16.4 0-22.6z" />
-			</svg>
-		);
-	},
-	"crossed-cloud": () => {
-		return (
-			<svg height="1em" viewBox="0 0 640 512" width="1em" xmlns="http://www.w3.org/2000/svg">
-				<path d="M25.9 3.4C19-2 8.9-.8 3.4 6.1S-.8 23.1 6.1 28.6l608 480c6.9 5.5 17 4.3 22.5-2.6s4.3-17-2.6-22.5L25.9 3.4zM640 352c0-49.1-27.7-91.8-68.3-113.2c2.8-9.8 4.3-20.1 4.3-30.8c0-61.9-50.1-112-112-112c-17.2 0-33.5 3.9-48 10.8C384.1 61.5 331.5 32 272 32c-35.5 0-68.6 10.5-96.2 28.6l26.8 21.2C223.2 70.5 246.8 64 272 64c48.7 0 91.7 24.1 117.8 61.2c9 12.7 25.8 17.2 39.9 10.5c10.3-4.9 21.9-7.7 34.3-7.7c44.2 0 80 35.8 80 80c0 7.7-1.1 15-3 22c-4.1 14.5 2.5 30 15.8 37.1C587.3 283.2 608 315.2 608 352c0 15.1-3.5 29.4-9.7 42.2l25.6 20.2C634.1 395.9 640 374.6 640 352zM101.3 164.9c-2.9 11.3-4.6 23.1-5.1 35.2C40.2 219.9 0 273.2 0 336c0 79.5 64.5 144 144 144l356.4 0-40.5-32L144 448C82.1 448 32 397.9 32 336c0-48.8 31.2-90.3 74.8-105.7c12.3-4.3 20.8-15.7 21.3-28.8c.2-4.9 .7-9.7 1.4-14.4l-28.2-22.2z" />
 			</svg>
 		);
 	},
@@ -422,19 +442,25 @@ const customIcons = {
 		);
 	},
 	"color-highlighter": (props: HTMLAttributes<SVGElement>) => (
-		<svg fill="none" height="1em" viewBox="0 0 13 13" width="1em" xmlns="http://www.w3.org/2000/svg" {...props}>
+		<svg fill="none" height="1em" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg" {...props}>
 			<path
-				d="M4.6875 5.11979L1.5625 8.65104V10.4167H6.25L7.8125 8.65104M11.4584 5.70833L9.06254 8.41562C8.86783 8.63129 8.60604 8.7521 8.33338 8.7521C8.06072 8.7521 7.79893 8.63129 7.60421 8.41562L4.89588 5.35521C4.70502 5.13517 4.59811 4.83935 4.59811 4.53125C4.59811 4.22314 4.70502 3.92732 4.89588 3.70729L7.29171 1"
+				className="fill-current"
+				d="M8.29322 9.2089L2.24738 15.9496C2.08976 16.1254 2.00241 16.353 2.00204 16.5891L1.99663 20.0453C1.99579 20.5764 2.42626 21.0072 2.95731 21.0068L12.0172 21.0003C12.2881 21.0001 12.5463 20.8855 12.7282 20.6847L15.7032 17.3989"
 				fill="none"
+			/>
+			<path
+				d="M8.29322 9.2089L2.24738 15.9496C2.08976 16.1254 2.00241 16.353 2.00204 16.5891L1.99663 20.0453C1.99579 20.5764 2.42626 21.0072 2.95731 21.0068L12.0172 21.0003C12.2881 21.0001 12.5463 20.8855 12.7282 20.6847L15.7032 17.3989"
 				stroke="currentColor"
 				strokeLinecap="round"
 				strokeLinejoin="round"
-				strokeWidth="1.04167"
+				strokeWidth="2"
 			/>
 			<path
-				className="fill-current"
-				d="M4.13281 4.96484L1.16857 8.30758C1.08764 8.39884 1.04286 8.51655 1.04267 8.63853L1.03985 10.4403C1.03941 10.7169 1.26362 10.9412 1.54021 10.941L6.2556 10.9377C6.39861 10.9376 6.53474 10.8762 6.62956 10.7692L7.99219 9.23047"
-				fill="currentColor"
+				d="M23 12L18.4001 17.1579C18.0262 17.572 17.5236 17.804 17.0001 17.804C16.4766 17.804 15.9739 17.572 15.6001 17.1579L8.40008 9.28192C8.03363 8.85946 7.82837 8.29148 7.82837 7.69992C7.82837 7.10836 8.03363 6.54038 8.40008 6.11792L13 1"
+				stroke="currentColor"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth="2"
 			/>
 		</svg>
 	),
@@ -484,29 +510,38 @@ const customIcons = {
 			</path>
 		</svg>
 	),
-	"list-stars": (props: HTMLAttributes<SVGElement>) => (
-		<svg fill="none" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg" {...props}>
-			<path
-				d="M14 5H22M14 12H22M14 19H22"
-				stroke="currentColor"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				strokeWidth="2"
-			/>
-			<path
-				d="M5.5 1L6.8905 3.96215L10 4.44006L7.75 6.74448L8.281 10L5.5 8.46215L2.719 10L3.25 6.74448L1 4.44006L4.1095 3.96215C4.65252 2.80536 4.95698 2.15679 5.5 1Z"
-				stroke="currentColor"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				strokeWidth="1.5"
-			/>
-			<path
-				d="M5.5 14L6.8905 16.9621L10 17.4401L7.75 19.7445L8.281 23L5.5 21.4621L2.719 23L3.25 19.7445L1 17.4401L4.1095 16.9621C4.65252 15.8054 4.95698 15.1568 5.5 14Z"
-				stroke="currentColor"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				strokeWidth="1.5"
-			/>
+	"loader-throbber": (props: HTMLAttributes<SVGElement>) => (
+		<svg
+			className="lucide lucide-loader-icon lucide-loader"
+			fill="none"
+			height="24"
+			stroke="currentColor"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			strokeWidth="2"
+			viewBox="0 0 24 24"
+			width="24"
+			xmlns="http://www.w3.org/2000/svg"
+			{...props}
+		>
+			<g>
+				<animateTransform
+					attributeName="transform"
+					dur="1s"
+					from="0 12 12"
+					repeatCount="indefinite"
+					to="360 12 12"
+					type="rotate"
+				/>
+				<path d="M12 2v4" />
+				<path d="m16.2 7.8 2.9-2.9" />
+				<path d="M18 12h4" />
+				<path d="m16.2 16.2 2.9 2.9" />
+				<path d="M12 18v4" />
+				<path d="m4.9 19.1 2.9-2.9" />
+				<path d="M2 12h4" />
+				<path d="m4.9 4.9 2.9 2.9" />
+			</g>
 		</svg>
 	),
 	"heading-2-custom": (props: HTMLAttributes<SVGElement>) => (
@@ -516,7 +551,7 @@ const customIcons = {
 				stroke="currentColor"
 				strokeLinecap="round"
 				strokeLinejoin="round"
-				strokeWidth="1.5"
+				strokeWidth="2"
 			/>
 		</svg>
 	),
@@ -527,7 +562,7 @@ const customIcons = {
 				stroke="currentColor"
 				strokeLinecap="round"
 				strokeLinejoin="round"
-				strokeWidth="1.5"
+				strokeWidth="2"
 			/>
 		</svg>
 	),
@@ -538,7 +573,7 @@ const customIcons = {
 				stroke="currentColor"
 				strokeLinecap="round"
 				strokeLinejoin="round"
-				strokeWidth="1.5"
+				strokeWidth="2"
 			/>
 		</svg>
 	),
@@ -563,9 +598,9 @@ const customIcons = {
 		<svg
 			className={cn("lucide-message-square", className)}
 			fill="none"
-			height="24"
+			height="1em"
 			viewBox="0 0 24 24"
-			width="24"
+			width="1em"
 			xmlns="http://www.w3.org/2000/svg"
 			{...props}
 		>
@@ -845,17 +880,25 @@ const customIcons = {
 			/>
 		</svg>
 	),
-	markdown: (props: HTMLAttributes<SVGElement>) => (
-		<svg fill="none" height="1rem" viewBox="0 0 24 24" width="1rem" xmlns="http://www.w3.org/2000/svg" {...props}>
+	comment: (props: HTMLAttributes<SVGElement>) => (
+		<svg fill="none" height="1em" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg" {...props}>
 			<path
-				d="M4 16.1029V7.54736H6.31541L8.63082 10.3251L10.9462 7.54736H13.2616V16.1029H10.9462V10.7696L8.63082 13.5474L6.31541 10.7696V16.1029H4ZM17.5269 16.1029L14.0538 12.4363H16.3692V7.54736H18.6846V12.4363H21L17.5269 16.1029Z"
-				fill="currentColor"
-			/>
-			<path
-				d="M20.8005 3.8252H3.20049C1.98546 3.8252 1.00049 4.72063 1.00049 5.8252V17.8252C1.00049 18.9298 1.98546 19.8252 3.20049 19.8252H20.8005C22.0155 19.8252 23.0005 18.9298 23.0005 17.8252V5.8252C23.0005 4.72063 22.0155 3.8252 20.8005 3.8252Z"
+				d="M13.0001 22C18.5229 22 23.0001 17.5228 23.0001 12C23.0001 6.47715 18.5229 2 13.0001 2C7.47721 2 3.00006 6.47715 3.00006 12L3 22H13.0001Z"
 				stroke="currentColor"
 				strokeLinecap="round"
 				strokeLinejoin="round"
+				strokeWidth="2"
+			/>
+		</svg>
+	),
+	"list-content": (props: HTMLAttributes<SVGElement>) => (
+		<svg fill="none" height="1rem" viewBox="0 0 24 24" width="1rem" xmlns="http://www.w3.org/2000/svg" {...props}>
+			<path
+				d="M16 12H8M21 18H8M21 6L8 6"
+				stroke="currentColor"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth="2"
 			/>
 		</svg>
 	),

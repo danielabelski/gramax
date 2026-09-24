@@ -81,10 +81,8 @@ supportedLanguages:
 			expect(catalog.findArticle("catalog/en/article", [])).not.toBeNull();
 
 			await catalog.updateItemProps(
-				{
-					logicPath: useInner ? "catalog/en/article" : "catalog/article",
-					fileName: "article-renamed",
-				} as unknown as UpdateItemProps,
+				catalog.findArticle(useInner ? "catalog/en/article" : "catalog/article", []),
+				{ fileName: "article-renamed" } as unknown as UpdateItemProps,
 				makeResourceUpdater,
 			);
 
@@ -301,8 +299,8 @@ supportedLanguages:
 			expect(await fp.exists(p("catalog/en/test.md"))).toBeFalsy();
 
 			await catalog.updateItemProps(
+				ruArticle,
 				{
-					logicPath: "catalog/test",
 					order: 1,
 					description: "123",
 				},
@@ -334,8 +332,8 @@ supportedLanguages:
 			expect(await fp.exists(p("catalog/untitled.md"))).toBeTruthy();
 
 			await catalog.updateItemProps(
+				enArticle,
 				{
-					logicPath: enArticle.logicPath,
 					order: 1,
 					description: "created in English",
 				},
@@ -375,8 +373,8 @@ docroot: docs`,
 			expect(enArticle).not.toBeNull();
 
 			await catalog.updateItemProps(
+				ruArticle,
 				{
-					logicPath: ruArticle.logicPath,
 					order: 5,
 					description: "New description",
 				},

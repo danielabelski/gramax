@@ -115,7 +115,7 @@ editorTest.describe("Note", () => {
 			</note>
 		`);
 		await editor.clickToolbar("notes");
-		await sharedPage.getByRole("menuitem", { name: "Quote" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "Quote" }).click();
 		await editor.assertMarkdown(md`
 			<note type="quote">
 

@@ -52,17 +52,23 @@ export default class InboxProvider extends ArticleProvider {
 		return droppedArticle;
 	}
 
-	public async getItems<T = InboxArticle>(simple: boolean = true, filterUserMail?: string): Promise<T[]> {
+	public async getInboxItems(
+		filterUserMail: string,
+		parser: MarkdownParser,
+		parserContextFactory: ParserContextFactory,
+		ctx: Context,
+	): Promise<InboxArticle[]> {
 		if (filterUserMail) await this.readArticles();
-		const values = (await super.getItems(simple)) as Article<InboxProps>[];
-		const notes: T[] = [];
+		const values = (await super.getItems(true)) as Article<InboxProps>[];
+		const notes: InboxArticle[] = [];
 
 		for (const item of values) {
 			const props: InboxProps = item.props;
 			const author = AuthorInfoCodec.deserialize(props.author);
 			if (filterUserMail && author.email !== filterUserMail) continue;
 
-			notes.push(this._createItem<T>(item));
+			const editTree = await this.getEditTree(item.ref.path.name, parser, parserContextFactory, ctx);
+			notes.push({ ...this._createItem<InboxArticle>(item), editTree });
 		}
 
 		return notes;
@@ -79,21 +85,11 @@ export default class InboxProvider extends ArticleProvider {
 		return Array.from(setOfUsers);
 	}
 
-	public createInboxArticle(item: Article<InboxProps>): InboxArticle {
-		return {
-			id: item.ref.path.name,
-			title: item.props.title ?? "",
-			props: {
-				date: item.props.date,
-				author: item.props.author,
-			},
-		};
-	}
-
 	override _createItem<T = InboxArticle>(item: Article<InboxProps>): T {
 		return {
 			id: item.ref.path.name,
 			title: item.props.title ?? "",
+			editTree: { type: "doc", content: [{ type: "paragraph" }] },
 			props: {
 				date: item.props.date,
 				author: item.props.author,

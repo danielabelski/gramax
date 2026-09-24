@@ -11,7 +11,7 @@ export const loadPlugins = async (
 	props?: PluginProps,
 	app?: unknown,
 ) => {
-	await PluginStore.getState().init(plugins, props, app);
+	return PluginStore.getState().init(plugins, props, app);
 };
 
 export const useIsPluginReady = () => {
@@ -19,7 +19,7 @@ export const useIsPluginReady = () => {
 };
 
 export const makePluginReady = () => {
-	PluginStore.setState({ pluginsReady: true });
+	PluginStore.setState({ pluginsReady: true, isLoading: false });
 };
 
 export const clearAllPlugins = () => {

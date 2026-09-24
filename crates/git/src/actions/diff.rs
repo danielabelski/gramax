@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::path::Path;
 use std::path::PathBuf;
 
 use git2::*;
@@ -360,6 +361,25 @@ impl DiffFile {
 		})
 	}
 
+	/// name the file had in the parent commit — set it when the commit renamed the file, since a
+	/// diff limited to both names reports the rename as a plain add
+	pub fn with_parent_path(mut self, parent_path: PathBuf) -> Self {
+		self.parent_path = Some(parent_path);
+		self
+	}
+
+	pub fn commit_oid(&self) -> &str {
+		&self.commit_oid
+	}
+
+	pub fn path(&self) -> &Path {
+		&self.path
+	}
+
+	pub fn parent_path(&self) -> Option<&Path> {
+		self.parent_path.as_deref()
+	}
+
 	pub fn has_changes(&self) -> bool {
 		self.has_changes || !self.parent_path.as_ref().map(|p| p == &self.path).unwrap_or(true)
 	}
@@ -548,3 +568,53 @@ impl<C: Creds> Repo<C> {
 }
 
 */
+
+/// Turns libgit2's refusal to check out into one that names the files.
+///
+/// It says "N conflicts prevent checkout" and stops there. Which files it means is the only thing
+/// the user can act on, and it is cheap to answer: the candidates are the paths the checkout was
+/// given, and each is one status call. Without this a sync or a branch switch fails with a number.
+pub(crate) fn name_what_blocks(
+	repo: &Repository,
+	result: std::result::Result<(), git2::Error>,
+	paths: &[PathBuf],
+) -> Result<()> {
+	let Err(error) = result else { return Ok(()) };
+
+	if error.code() != ErrorCode::Conflict {
+		return Err(error.into());
+	}
+
+	let blocking = paths
+		.iter()
+		.filter(|path| repo.status_file(path).is_ok_and(|status| !status.is_empty()))
+		.map(|path| path.display().to_string())
+		.collect::<Vec<_>>();
+
+	if blocking.is_empty() {
+		return Err(error.into());
+	}
+
+	warn!(target: TAG, "checkout refused; blocked by {}", blocking.join(", "));
+	Err(Error::new(error.code(), error.class(), format!("{}: {}", error.message(), blocking.join(", "))).into())
+}
+
+pub(crate) fn changed_paths(repo: &Repository, from: &Tree, to: &Tree) -> Result<Vec<PathBuf>> {
+	let diff = repo.diff_tree_to_tree(Some(from), Some(to), None)?;
+
+	let mut paths = vec![];
+	for delta in diff.deltas() {
+		let old = delta.old_file().path();
+		let new = delta.new_file().path();
+
+		if let Some(old) = old {
+			paths.push(old.to_path_buf());
+		}
+
+		if let Some(new) = new.filter(|new| old != Some(*new)) {
+			paths.push(new.to_path_buf());
+		}
+	}
+
+	Ok(paths)
+}

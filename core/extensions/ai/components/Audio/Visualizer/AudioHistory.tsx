@@ -4,7 +4,7 @@ import AudioRecorderService from "@ext/ai/components/Audio/AudioRecorderService"
 import type { AudioHistoryItem } from "@ext/ai/models/types";
 import t from "@ext/localization/locale/translate";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ui-kit/Dropdown";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 import { memo, useMemo, useState } from "react";
 
 const AudioHistory = ({ disabled, onClick }: { disabled?: boolean; onClick?: (audio: AudioHistoryItem) => void }) => {
@@ -28,9 +28,9 @@ const AudioHistory = ({ disabled, onClick }: { disabled?: boolean; onClick?: (au
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<ToolbarToggleButton disabled={isDisabled} tooltipText={t("ai.transcribe.history")}>
-					<ToolbarIcon icon="history" />
-				</ToolbarToggleButton>
+				<GlassToolbarToggleButton disabled={isDisabled} tooltipText={t("ai.transcribe.history")}>
+					<GlassToolbarIcon icon="history" />
+				</GlassToolbarToggleButton>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start">{memoChildren}</DropdownMenuContent>
 		</DropdownMenu>

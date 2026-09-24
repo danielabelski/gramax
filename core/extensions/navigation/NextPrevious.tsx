@@ -2,6 +2,7 @@ import Link from "@components/Atoms/Link";
 import UiUrlUtils from "@components/libs/UiUrlUtils";
 import ArticleRefService from "@core-ui/ContextServices/ArticleRef";
 import { cn } from "@core-ui/utils/cn";
+import t from "@ext/localization/locale/translate";
 import { Icon } from "@ui-kit/Icon";
 import type { ItemLink } from "./NavigationLinks";
 
@@ -13,6 +14,7 @@ const Arrow = ({ next, link }: { next: boolean; link: ItemLink }) => {
 	return (
 		<div className={cn("flex min-w-0 flex-1 print:hidden", next ? "justify-end" : "justify-start")}>
 			<Link
+				aria-label={next ? t("article.next-article") : t("article.previous-article")}
 				className={cn(
 					"flex min-w-0 w-fit items-center no-underline text-sm",
 					"text-[var(--color-primary-general)] hover:text-[var(--color-primary)]",

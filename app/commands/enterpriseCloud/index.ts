@@ -4,12 +4,14 @@ import disableCloud from "./disableCloud";
 import enableCloud from "./enableCloud";
 import getCatalogRepositoryName from "./getCatalogRepositoryName";
 import initNewCatalog from "./initNewCatalog";
+import prepareNewCatalog from "./prepareNewCatalog";
 import setGesCloudUrl from "./setGesCloudUrl";
 import switchOrganization from "./switchOrganization";
 
 const enterpriseCloud = {
 	addWorkspace,
 	getCatalogRepositoryName,
+	prepareNewCatalog,
 	initNewCatalog,
 	disableCloud,
 	enableCloud,

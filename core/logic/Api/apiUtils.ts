@@ -1,3 +1,4 @@
+import { CLIENT_CLOSED_STATUS_CODE } from "@core/Api/consts";
 import type MimeTypes from "@core-ui/ApiServices/Types/MimeTypes";
 import type DefaultError from "../../extensions/errorHandlers/logic/DefaultError";
 import Path from "../FileProvider/Path/Path";
@@ -14,6 +15,12 @@ export const apiUtils = {
 	send(res: ApiResponse, body: unknown) {
 		if (typeof res.send === "function") res.send(body);
 		else res.end(typeof body === "string" ? body : JSON.stringify(body));
+	},
+
+	sendAborted(res: ApiResponse) {
+		if (res.headersSent) return;
+		res.statusCode = CLIENT_CLOSED_STATUS_CODE;
+		res.end();
 	},
 
 	sendError(res: ApiResponse, error: DefaultError, code = 500) {

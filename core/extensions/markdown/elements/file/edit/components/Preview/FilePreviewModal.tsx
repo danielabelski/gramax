@@ -186,7 +186,7 @@ const PreviewModal = (props: PreviewModalProps): ReactElement => {
 				<Overlay blur className="data-close" data-state={isClosing ? "closed" : "open"} />
 				<section
 					aria-label={t("file-preview.title").toString()}
-					className="relative z-[51] grid h-[min(92vh,900px)] w-[min(96vw,1320px)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-primary-border bg-secondary-bg text-primary-fg shadow-soft-xl max-[860px]:h-[calc(100vh-20px)] max-[860px]:w-[calc(100vw-20px)]"
+					className="relative z-50 grid h-[min(92vh,900px)] w-[min(96vw,1320px)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-primary-border bg-secondary-bg text-primary-fg shadow-soft-xl max-[860px]:h-[calc(100vh-20px)] max-[860px]:w-[calc(100vw-20px)]"
 				>
 					<FilePreviewModalProvider value={context}>
 						<FilePreviewModalHeader />

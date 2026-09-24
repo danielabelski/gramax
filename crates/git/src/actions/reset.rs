@@ -1,7 +1,6 @@
 use std::fmt::Display;
 use std::path::Path;
 
-use git2::build::CheckoutBuilder;
 use git2::*;
 use git2_lfs::ext::RepoLfsExt;
 use serde::Deserialize;
@@ -64,14 +63,23 @@ impl<C: Creds> Reset for Repo<'_, C> {
 		match mode {
 			ResetMode::Soft => {
 				self.0.reset(commit.as_object(), ResetType::Soft, None)?;
+
+				// `HEAD` moved and the index stayed. Everything the two agreed about a moment ago may now
+				// live on one side only, and a marked entry's one-sided delta is dropped whole — the change
+				// would vanish from what the app lists. Publishing does exactly this when the push fails.
+				self.forget_assume_unchanged()?;
 			}
 			ResetMode::Mixed => {
 				self.0.reset(commit.as_object(), ResetType::Mixed, None)?;
 			}
 			ResetMode::Hard => {
-				let mut opts = CheckoutBuilder::new();
-				opts.remove_ignored(true).remove_untracked(true);
-				self.0.reset(commit.as_object(), ResetType::Hard, Some(&mut opts))?;
+				// Deliberately without `remove_untracked` / `remove_ignored`: `git reset --hard` moves the
+				// branch and restores tracked files, and leaves everything git does not track alone.
+				// Every caller of this is a recovery path — a failed pull, an aborted conflict — and
+				// deleting the files the user has but git never heard of is not what recovering means.
+				// Since the stash no longer carries untracked files either, removing them here would be
+				// the one place left where work disappears without anyone asking.
+				self.0.reset(commit.as_object(), ResetType::Hard, None)?;
 			}
 		}
 

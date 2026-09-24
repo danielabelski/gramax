@@ -2,8 +2,8 @@ import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/Butt
 import Workspace from "@core-ui/ContextServices/Workspace";
 import t from "@ext/localization/locale/translate";
 import type { Editor } from "@tiptap/core";
+import { DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@ui-kit/Dropdown";
 import { Icon } from "@ui-kit/Icon";
-import { ToolbarDropdownMenuItem } from "@ui-kit/Toolbar";
 
 interface QuestionMenuButtonProps {
 	editor: Editor;
@@ -15,22 +15,24 @@ const QuestionMenuButton = ({ editor }: QuestionMenuButtonProps) => {
 	const { disabled, isActive } = ButtonStateService.useCurrentAction({ action: "question" });
 
 	return (
-		<ToolbarDropdownMenuItem
-			active={isActive}
-			disabled={disabled}
-			onClick={() =>
-				editor
-					.chain()
-					.focus()
-					.setQuestion({ options: { type: "one" } })
-					.run()
-			}
-		>
-			<div className="flex items-center gap-2">
-				<Icon icon="file-question-mark" />
-				{t("editor.question.name")}
-			</div>
-		</ToolbarDropdownMenuItem>
+		<DropdownMenuRadioGroup value={isActive ? "question" : undefined}>
+			<DropdownMenuRadioItem
+				disabled={disabled}
+				onClick={() =>
+					editor
+						.chain()
+						.focus()
+						.setQuestion({ options: { type: "one" } })
+						.run()
+				}
+				value="question"
+			>
+				<div className="flex items-center gap-2">
+					<Icon icon="file-question-mark" />
+					{t("editor.question.name")}
+				</div>
+			</DropdownMenuRadioItem>
+		</DropdownMenuRadioGroup>
 	);
 };
 

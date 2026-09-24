@@ -99,7 +99,7 @@ const LogoPickerField = ({ state, onChange }: LogoPickerFieldProps) => {
 			</PopoverTriggerButton>
 			<PopoverContent className="p-0 w-auto rounded-xl">
 				<IconPicker
-					className="max-h-96"
+					className="max-h-[min(24rem,var(--radix-popover-content-available-height))]"
 					color={iconColor}
 					disableCatalogIcons
 					onChange={onChange}

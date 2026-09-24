@@ -14,7 +14,6 @@ const emptyDraft = (): AccessSnapshot => ({
 
 const baseWorkspace = {
 	name: "ws",
-	sections: {},
 	git: { source: { url: "https://example.com", type: "GitLab" as const, repos: ["repo-1"] } },
 	wordTemplates: [],
 	pdfTemplates: [],

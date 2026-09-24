@@ -39,6 +39,7 @@ const GuestsComponent = () => {
 								size="sm"
 							/>
 						)}
+						labelClassName="justify-center"
 						title={t("enterprise.admin.guests.otp-enabled")}
 					/>
 					<Description>{t("enterprise.admin.guests.otp-description")}</Description>
@@ -79,6 +80,7 @@ const GuestsComponent = () => {
 										size="sm"
 									/>
 								)}
+								labelClassName="justify-center"
 								title={t("enterprise.admin.guests.whitelist-enabled")}
 							/>
 

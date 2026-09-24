@@ -49,7 +49,7 @@ const Menu = ({ editor, id, children }: MenuProps) => {
 					{shouldMount && (
 						<div
 							className={cn(
-								"transition-[transform,opacity] duration-200 lg:shadow-hard-base rounded-lg",
+								"transition-[transform,opacity] duration-200 rounded-lg",
 								!isExpanded && "translate-y-2.5 opacity-0 pointer-events-none",
 								isExpanded && "translate-y-0 opacity-100",
 							)}

@@ -18,6 +18,11 @@ const deleteLogo: Command<{ catalogName: string; theme: Theme; content: string }
 		const logoPath = Theme[theme] === Theme.light ? catalog.props.logo : catalog.props[`logo_${theme}`];
 		if (!logoPath || isLogoIcon(logoPath)) return;
 
+		// Catalogs saved before logos got per-theme file names keep both props on one file.
+		// Deleting it for one theme would take the other theme's logo with it.
+		const otherThemeLogoPath = Theme[theme] === Theme.light ? catalog.props.logo_dark : catalog.props.logo;
+		if (otherThemeLogoPath === logoPath) return;
+
 		const path = catalog.getRootCategoryDirectoryPath().join(new Path(logoPath));
 
 		await workspace.getFileProvider().delete(path);

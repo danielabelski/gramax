@@ -1,16 +1,36 @@
+import { useFloatingPanelStore } from "@ui-kit/FloatingPanel";
 import { create } from "zustand";
 
-interface AgentChatIsOpenState {
-	isOpen: boolean;
-	setIsOpen: (isOpen: boolean) => void;
+export const AGENT_CHAT_PANEL_ID = "agent-chat";
+
+export type AgentChatTarget = "enterprise" | "enterprise-cloud";
+export type AgentChatHealthcheckStatus = "idle" | "checking" | "available" | "unavailable";
+
+export type AgentChatHealthcheckReason = "balance_empty" | "unavailable";
+
+export interface AgentChatHealthcheck {
+	status: AgentChatHealthcheckStatus;
+	target?: AgentChatTarget;
+	reason?: AgentChatHealthcheckReason;
 }
 
-const useAgentChatIsOpenStore = create<AgentChatIsOpenState>()((set) => ({
-	isOpen: false,
-	setIsOpen: (isOpen) => set({ isOpen }),
+interface AgentChatHealthcheckState {
+	healthcheck: AgentChatHealthcheck;
+	setHealthcheck: (healthcheck: AgentChatHealthcheck) => void;
+}
+
+export const useAgentChatHealthcheckStore = create<AgentChatHealthcheckState>()((set) => ({
+	healthcheck: { status: "idle" },
+	setHealthcheck: (healthcheck) => set({ healthcheck }),
 }));
 
-export const useAgentChatIsOpen = () => useAgentChatIsOpenStore((s) => s.isOpen);
-export const setAgentChatIsOpen = (isOpen: boolean) => useAgentChatIsOpenStore.getState().setIsOpen(isOpen);
+export const useAgentChatIsOpen = () =>
+	useFloatingPanelStore((state) => state.panels[AGENT_CHAT_PANEL_ID]?.isOpen ?? false);
 
-export default useAgentChatIsOpenStore;
+export const useAgentChatHealthcheck = () => useAgentChatHealthcheckStore((state) => state.healthcheck);
+
+export const setAgentChatIsOpen = (isOpen: boolean) =>
+	useFloatingPanelStore.getState().setIsOpen(AGENT_CHAT_PANEL_ID, isOpen);
+
+export const setAgentChatHealthcheck = (healthcheck: AgentChatHealthcheck) =>
+	useAgentChatHealthcheckStore.getState().setHealthcheck(healthcheck);

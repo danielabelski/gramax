@@ -136,6 +136,9 @@ export default abstract class Repository implements ToSpan {
 
 	pauseGitStaging() {}
 
+	/** Waits for writes that have been made to reach the index. Only the working-copy repository stages. */
+	async flushGitStaging(): Promise<void> {}
+
 	async resumeGitStaging() {}
 
 	update(repoPath: Path, gvc: GitVersionControl, storage: Storage, fp: FileProvider) {
@@ -173,14 +176,20 @@ export default abstract class Repository implements ToSpan {
 		return this._gvc.storageStats();
 	}
 
-	async stash(data: SourceData, doAddBeforeStash = true): Promise<GitStash> {
+	async stash(doAddBeforeStash = true): Promise<GitStash> {
 		const isWeb = getExecutingEnvironment() === "web";
+
+		// In the browser nothing walks the working copy before a stash: the index is the list of
+		// changes, and it is filled by the file provider's events, which are fired and not awaited. An
+		// edit made a moment ago may still be on its way — and a stash that misses it leaves it to be
+		// overwritten by whatever comes next.
+		if (isWeb) await this.flushGitStaging();
 
 		if (!isWeb) await this.gvc.add();
 		const changes = await this.gvc.getChanges("index");
 		if (!changes.length) return null;
 
-		return this._gvc.stash(data, isWeb ? false : doAddBeforeStash);
+		return this._gvc.stash(isWeb ? false : doAddBeforeStash);
 	}
 
 	abstract publish(opts: PublishOptions): Promise<void>;

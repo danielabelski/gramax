@@ -19,15 +19,16 @@ export const getWebModules = (): DynamicModules => {
 		FileInput: WebLazyFileInput,
 		DiffFileInput: WebLazyDiffFileInput,
 		httpFetch: () => undefined,
+		mailFetch: () => undefined,
 		setBadge: () => undefined,
 		openInExplorer: () => undefined,
 		openWindowWithUrl: () => undefined,
 		gesCloudLogin: () => undefined,
+		gesCloudPaymentMethodBinding: () => Promise.resolve(),
 		openInWeb: (url) => window.open(url),
 		getPdfjs,
 		updateCheck: () => undefined,
 		updateInstallFromCache: () => undefined,
-		updateAccept: () => undefined,
 	};
 };
 

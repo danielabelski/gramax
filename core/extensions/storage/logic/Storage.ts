@@ -1,4 +1,5 @@
 import type { Event, EventEmitter } from "@core/Event/EventEmitter";
+import type GitMergeResult from "@ext/git/actions/MergeConflictHandler/model/GitMergeResult";
 import type SourceData from "@ext/storage/logic/SourceDataProvider/model/SourceData";
 import type Path from "../../../logic/FileProvider/Path/Path";
 import type ShareData from "../../catalog/actions/share/model/ShareData";
@@ -10,7 +11,7 @@ import type SourceType from "./SourceDataProvider/model/SourceType";
 export type StorageEvents = Event<"fetch", { storage: Storage; force: boolean }>;
 
 export default interface Storage {
-	pull(source: SourceData, recursive?: boolean): Promise<void>;
+	pull(source: SourceData, recursive?: boolean): Promise<GitMergeResult[]>;
 	push(source: SourceData, recursive?: boolean): Promise<void>;
 	fetch(source: SourceData, force?: boolean, lock?: boolean): Promise<void>;
 	update(): Promise<void>;

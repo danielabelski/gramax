@@ -1,7 +1,9 @@
 import { memo, type Ref } from "react";
 import type { ChatMessage } from "../../types/chat";
+import type { MissingSecretWarning } from "../getMissingSecretsFromToolResult";
 import { AssistantMessage } from "./AssistantMessage";
 import { CancelledStatusMessage } from "./CancelledStatusMessage";
+import { ContextCompactedMessage } from "./ContextCompactedMessage";
 import { ErrorStatusMessage } from "./ErrorStatusMessage";
 import { UserMessage } from "./UserMessage";
 import { WarningStatusMessage } from "./WarningStatusMessage";
@@ -15,6 +17,8 @@ export type MessageCardProps = {
 	copyButtonMessageId?: string | null;
 	cancelledDurationMs?: number;
 	footerAlwaysVisible?: boolean;
+	missingSecretWarning?: MissingSecretWarning | null;
+	missingSecretWarningMessageId?: string | null;
 };
 
 const messageCardPropsAreEqual = (prev: MessageCardProps, next: MessageCardProps): boolean =>
@@ -26,7 +30,9 @@ const messageCardPropsAreEqual = (prev: MessageCardProps, next: MessageCardProps
 	prev.responseRef === next.responseRef &&
 	prev.copyButtonMessageId === next.copyButtonMessageId &&
 	prev.cancelledDurationMs === next.cancelledDurationMs &&
-	prev.footerAlwaysVisible === next.footerAlwaysVisible;
+	prev.footerAlwaysVisible === next.footerAlwaysVisible &&
+	prev.missingSecretWarning === next.missingSecretWarning &&
+	prev.missingSecretWarningMessageId === next.missingSecretWarningMessageId;
 
 export const MessageCard = memo(
 	({
@@ -38,12 +44,15 @@ export const MessageCard = memo(
 		copyButtonMessageId,
 		cancelledDurationMs,
 		footerAlwaysVisible,
+		missingSecretWarning,
+		missingSecretWarningMessageId,
 	}: MessageCardProps) => {
 		switch (message.kind) {
 			case "user":
 				return (
 					<UserMessage
 						attachments={message.attachments}
+						quotedText={message.quotedText}
 						stickyUserPrompt={stickyUserPrompt}
 						userPromptAnchorRef={userPromptAnchorRef}
 						userText={message.userText}
@@ -61,11 +70,16 @@ export const MessageCard = memo(
 				return <WarningStatusMessage responseRef={responseRef} statusText={message.statusText} />;
 			case "cancelled":
 				return <CancelledStatusMessage durationMs={cancelledDurationMs} responseRef={responseRef} />;
+			case "context_compacted":
+				return <ContextCompactedMessage responseRef={responseRef} />;
 			case "assistant":
 				return (
 					<AssistantMessage
 						footerAlwaysVisible={footerAlwaysVisible}
 						message={message}
+						missingSecretWarning={
+							missingSecretWarningMessageId === message.id ? missingSecretWarning : null
+						}
 						responseRef={responseRef}
 						showCopyButton={copyButtonMessageId === message.id}
 						streamDescription={streamDescription}

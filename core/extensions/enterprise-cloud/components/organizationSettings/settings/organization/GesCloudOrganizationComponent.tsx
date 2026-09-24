@@ -3,7 +3,6 @@ import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
 import { FloatingAlert } from "@ext/enterprise/components/admin/ui-kit/FloatingAlert";
 import { TabInitialLoader } from "@ext/enterprise/components/admin/ui-kit/TabInitialLoader";
 import { useOrganizationSettingsNavigation } from "@ext/enterprise-cloud/components/organizationSettings/OrganizationSettingsNavigationContext";
-import { StickyHeader } from "@ext/enterprise-cloud/components/ui-kit/StickyHeader";
 import { GesCloudApi, type Organization } from "@ext/enterprise-cloud/GesCloudApi";
 import { useGesCloudOrganizationStore } from "@ext/enterprise-cloud/ui-logic/stores/GesCloudOrganizationStore/GesCloudOrganizationStore.provider";
 import t from "@ext/localization/locale/translate";
@@ -15,6 +14,7 @@ import { Input } from "@ui-kit/Input";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { StickyHeader } from "../../components/StickyHeader";
 
 const formSchema = z.object({
 	name: z.string().min(1, { message: t("must-be-not-empty") }),
@@ -52,7 +52,7 @@ const GesCloudOrganizationComponent = () => {
 			}
 		};
 
-		loadOrganization();
+		void loadOrganization();
 	}, [gesCloudApi, form]);
 
 	const [pendingAction, setPendingAction] = useState<(() => void) | undefined>(undefined);
@@ -108,7 +108,7 @@ const GesCloudOrganizationComponent = () => {
 	}, [subscribeToNavigation, subscribeToModalClose, isFormDirty]);
 
 	const handleSaveAndProceed = useCallback(() => {
-		form.handleSubmit(handleSave)();
+		void form.handleSubmit(handleSave)();
 		setShowUnsavedModal(false);
 		setPendingAction(undefined);
 	}, [form.handleSubmit, handleSave]);

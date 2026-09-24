@@ -1,8 +1,10 @@
 import type { AgentBrowserSessionMeta } from "@ext/agent/browser/browserHost";
 import type { AgentErrorType, AgentWarningType } from "@ext/agent/core/agentError";
 import type { AgentAttachment } from "@ext/agent/core/attachmentStore";
-import type { AgentEvent } from "@ext/agent/core/events";
+import type { AgentEvent, AgentQuote } from "@ext/agent/core/events";
 import type { AgentUsage } from "@ext/agent/core/session";
+import type { ProviderItemProps } from "@ext/articleProvider/models/types";
+import type { ItemLink } from "@ext/navigation/NavigationLinks";
 
 export type DiffLineType = "add" | "del" | "context" | "hunk";
 
@@ -46,6 +48,7 @@ export type UserChatMessage = ChatMessageBase & {
 	kind: "user";
 	userText: string;
 	attachments?: AgentAttachment[];
+	quotedText?: string;
 };
 
 export type AssistantChatMessage = ChatMessageBase & {
@@ -67,6 +70,8 @@ export type WarningMessage = ChatMessageBase & {
 };
 
 export type CancelledMessage = ChatMessageBase & { kind: "cancelled" };
+
+export type ContextCompactedMessage = ChatMessageBase & { kind: "context_compacted" };
 
 export type TurnDurationMessage = ChatMessageBase & { kind: "turn_duration" };
 
@@ -92,6 +97,7 @@ export type ChatMessage =
 	| ErrorMessage
 	| WarningMessage
 	| CancelledMessage
+	| ContextCompactedMessage
 	| TurnDurationMessage
 	| ToolCallMessage
 	| ToolResultMessage;
@@ -108,6 +114,14 @@ export type AgentDraftSnapshot = {
 	selectedSkillName: string | null;
 	updatedAt: number;
 	attachments?: AgentDraftAttachment[];
+	quote?: AgentQuote | null;
+};
+
+export type AgentDraftType = {
+	text: string;
+	skill: string | null;
+	attachments: AgentDraftAttachment[];
+	quote: AgentQuote | null;
 };
 
 export type SessionTabItem = {
@@ -128,5 +142,7 @@ export type SessionStatePayload = {
 	cancelled?: boolean;
 	lastError?: string | null;
 	usage?: AgentUsage;
+	itemLinks?: ItemLink[] | null;
+	skills?: ProviderItemProps[] | null;
 	browser?: AgentBrowserSessionMeta;
 };

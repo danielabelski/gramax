@@ -39,7 +39,7 @@ import {
 	SelectValue,
 } from "@ui-kit/Select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
-import { useCallback, useMemo, useState } from "react";
+import { forwardRef, type ReactNode, useCallback, useMemo, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import SelectGitHubStorageDataFields from "../../git/actions/Source/GitHub/components/SelectGitHubStorageDataFields";
 import SelectGitLabStorageDataFields from "../../git/actions/Source/GitLab/components/SelectGitLabStorageDataFields";
@@ -81,6 +81,25 @@ const useEnterpriseSourceData = (filteredSourceDatas: GitSourceDatas[]) => {
 		shouldDisableStorageSelect,
 	};
 };
+
+/**
+ * Positions the "storage is unusable" tooltip over the storage select.
+ *
+ * `FormControl` renders whatever `control` returns through a Radix `Slot`, which clones the field's
+ * `id` / `aria-describedby` / `aria-invalid` onto that single element. A plain positioning `div`
+ * would swallow them, leaving the field's `<label htmlFor>` pointing at a `div` and the select with
+ * no accessible name at all — so the wrapper re-forwards them onto the select trigger itself.
+ */
+const StorageSelectControl = forwardRef<
+	HTMLElement,
+	{ overlay?: ReactNode; children: (controlProps: object) => ReactNode }
+>(({ overlay, children, ...slotProps }, ref) => (
+	<div className="relative">
+		{overlay}
+		{children({ ...slotProps, ref })}
+	</div>
+));
+StorageSelectControl.displayName = "StorageSelectControl";
 
 const SelectStorageDataForm = (props: SelectStorageDataFormProps) => {
 	const { onSubmit, selectedStorage, mode = "clone", onClose, ...formProps } = props;
@@ -194,72 +213,82 @@ const SelectStorageDataForm = (props: SelectStorageDataFormProps) => {
 						<FormStack>
 							<FormField
 								control={({ field }) => (
-									<div className="relative">
-										{shouldDisableStorageSelect && sourceData?.isInvalid && (
-											<Tooltip>
-												<TooltipTrigger asChild>
-													<span className="absolute inset-0 z-10" tabIndex={-1} />
-												</TooltipTrigger>
-												<TooltipContent>{t("forms.clone-repo.errors.connect")}</TooltipContent>
-											</Tooltip>
+									<StorageSelectControl
+										overlay={
+											shouldDisableStorageSelect &&
+											sourceData?.isInvalid && (
+												<Tooltip>
+													<TooltipTrigger asChild>
+														<span className="absolute inset-0 z-10" tabIndex={-1} />
+													</TooltipTrigger>
+													<TooltipContent>
+														{t("forms.clone-repo.errors.connect")}
+													</TooltipContent>
+												</Tooltip>
+											)
+										}
+									>
+										{(controlProps) => (
+											<Select
+												{...field}
+												disabled={shouldDisableStorageSelect}
+												onValueChange={(val) => val && field.onChange(val)}
+											>
+												<SelectTrigger {...controlProps}>
+													<SelectValue
+														placeholder={t("forms.clone-repo.props.storage.placeholder")}
+													/>
+												</SelectTrigger>
+												<SelectContent>
+													<SelectGroup>
+														{filteredSourceDatas.map((d) => {
+															const storageKey = getStorageNameByData(d);
+															return (
+																<SourceOption
+																	key={storageKey}
+																	onDelete={
+																		isEnterprise
+																			? undefined
+																			: () => {
+																					if (sourceKey === storageKey)
+																						form.reset();
+																				}
+																	}
+																	onEdit={
+																		isEnterprise
+																			? undefined
+																			: () => {
+																					onSourceClickEdit(d);
+																				}
+																	}
+																	onInvalid={() => {
+																		onSourceClickEdit(d);
+																	}}
+																	source={d}
+																	storageKey={storageKey}
+																/>
+															);
+														})}
+													</SelectGroup>
+													{!isEnterprise && filteredSourceDatas.length > 0 && (
+														<SelectSeparator />
+													)}
+													{!isEnterprise && (
+														<SelectOption
+															asChild
+															onPointerDown={() => setIsCreateStorageOpen(true)}
+															role="button"
+															value="add-new-storage"
+														>
+															<MenuItem>
+																<MenuItemAction icon="plus" text={t("add-storage")} />
+															</MenuItem>
+														</SelectOption>
+													)}
+												</SelectContent>
+											</Select>
 										)}
-										<Select
-											{...field}
-											disabled={shouldDisableStorageSelect}
-											onValueChange={(val) => val && field.onChange(val)}
-										>
-											<SelectTrigger>
-												<SelectValue
-													placeholder={t("forms.clone-repo.props.storage.placeholder")}
-												/>
-											</SelectTrigger>
-											<SelectContent>
-												<SelectGroup>
-													{filteredSourceDatas.map((d) => {
-														const storageKey = getStorageNameByData(d);
-														return (
-															<SourceOption
-																key={storageKey}
-																onDelete={
-																	isEnterprise
-																		? undefined
-																		: () => {
-																				if (sourceKey === storageKey)
-																					form.reset();
-																			}
-																}
-																onEdit={
-																	isEnterprise
-																		? undefined
-																		: () => {
-																				onSourceClickEdit(d);
-																			}
-																}
-																onInvalid={() => {
-																	onSourceClickEdit(d);
-																}}
-																source={d}
-																storageKey={storageKey}
-															/>
-														);
-													})}
-												</SelectGroup>
-												{!isEnterprise && filteredSourceDatas.length > 0 && <SelectSeparator />}
-												{!isEnterprise && (
-													<SelectOption
-														asChild
-														onPointerDown={() => setIsCreateStorageOpen(true)}
-														role="button"
-														value="add-new-storage"
-													>
-														<MenuItem>
-															<MenuItemAction icon="plus" text={t("add-storage")} />
-														</MenuItem>
-													</SelectOption>
-												)}
-											</SelectContent>
-										</Select>
-									</div>
+									</StorageSelectControl>
 								)}
 								name="sourceKey"
 								title={t("forms.clone-repo.props.storage.name")}

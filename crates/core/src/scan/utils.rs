@@ -14,6 +14,7 @@ pub(crate) fn empty_object() -> serde_json::Value {
 }
 
 pub(crate) fn yaml_to_json_or_empty(bytes: &[u8]) -> Result<serde_json::Value> {
+	let bytes = bytes.strip_prefix(gramaxfs::backend::BOM).unwrap_or(bytes);
 	let yaml: serde_yml::Value = serde_yml::from_slice(bytes)?;
 	let json = serde_json::to_value(yaml)?;
 

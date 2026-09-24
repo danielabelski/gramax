@@ -7,4 +7,7 @@ export type GesCloudMember = {
 	email: string;
 	type: "user" | "invite";
 	isOwner?: boolean;
+	isAdmin?: boolean;
 };
+
+export type AccessChange = { kind: "setUserAdmin"; userId: string; setAdmin: boolean };

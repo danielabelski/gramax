@@ -14,6 +14,11 @@
 		"core:webview:allow-print",
 		"plugin-gramax-core:default",
 		"plugin-browser-session:default",
+		"plugin-mail:default",
+		{
+			"identifier": "http:default",
+			"allow": [{ "url": "https://**" }, { "url": "http://**" }]
+		},
 		"shell:allow-open"
 	]
 }

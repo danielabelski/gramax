@@ -1,6 +1,7 @@
 import docx from "@dynamicImports/docx";
 import { imageWordLayout } from "@ext/markdown/elements/image/word/image";
 import { getMmToTw, IMG_WIDTH_COEFF, LIST_LEFT_INDENT_MM } from "@ext/wordExport/lists/consts";
+import { TASK_LIST_CHECKED_REFERENCE, TASK_LIST_REFERENCE } from "@ext/wordExport/lists/numberingReferences";
 import { STANDARD_PAGE_WIDTH, WordFontStyles } from "@ext/wordExport/options/wordExportSettings";
 import { wrapWithListContinuationBookmark } from "@ext/wordExport/utils/listContinuation";
 import type { JSONContent } from "@tiptap/core";
@@ -25,7 +26,14 @@ export const listItemWordLayout: WordBlockChild = async ({ state, tag, addOption
 
 	let numberConsumed = false;
 
-	const { numbering, ...restAddOptions } = addOptions;
+	const { numbering: rawNumbering, ...restAddOptions } = addOptions;
+	// gh#919: a checked task-list item needs the filled-checkbox numbering so its
+	// checked state survives the DOCX export (unchecked items keep the empty box).
+	const itemAttrs = "attributes" in tag ? tag.attributes : tag.attrs;
+	const numbering =
+		rawNumbering?.reference === TASK_LIST_REFERENCE && itemAttrs?.checked
+			? { ...rawNumbering, reference: TASK_LIST_CHECKED_REFERENCE }
+			: rawNumbering;
 	const level = numbering?.level ?? 0;
 	const contentIndentTw = (await getMmToTw())(LIST_LEFT_INDENT_MM(level));
 	const availableTw = restAddOptions?.maxTableWidth ?? STANDARD_PAGE_WIDTH;
@@ -51,6 +59,7 @@ export const listItemWordLayout: WordBlockChild = async ({ state, tag, addOption
 		listContinuationLevel: level,
 	};
 
+	// biome-ignore lint/suspicious/noExplicitAny: docx components are dynamically imported (@dynamicImports/docx) and untyped — matches wrapWithListContinuationBookmark
 	const wrapIfContinuation = async (nodes: any[], shouldWrap: boolean) => {
 		if (!shouldWrap) return nodes;
 		const wrapped = await wrapWithListContinuationBookmark(nodes, level);
@@ -62,6 +71,7 @@ export const listItemWordLayout: WordBlockChild = async ({ state, tag, addOption
 
 		const isFirstParaOfItem = !numberConsumed;
 
+		// biome-ignore lint/suspicious/noExplicitAny: docx IParagraphOptions is dynamically imported and untyped here
 		const paraOpts: any = {
 			children: paragraph.flat(),
 			...continuationOptions,

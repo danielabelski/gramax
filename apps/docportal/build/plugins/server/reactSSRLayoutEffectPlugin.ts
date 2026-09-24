@@ -45,7 +45,7 @@ export function reactSSRLayoutEffectPlugin(): BunPlugin {
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 `;
-					const importMatches = [...code.matchAll(/^import .*$/gm)];
+					const importMatches = [...code.matchAll(/^import .*;$/gm)];
 					if (importMatches.length > 0) {
 						const last = importMatches[importMatches.length - 1];
 						const idx = (last.index ?? 0) + last[0].length;

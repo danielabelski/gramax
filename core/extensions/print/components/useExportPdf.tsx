@@ -53,6 +53,7 @@ export function useExportPdf({ onClose }: { onClose?: () => void }) {
 	const handleComplete = useCallback(() => {
 		isCancellingRef.current = false;
 		ModalToOpenService.resetValue();
+		ArticleViewService.setDefaultBottomView();
 		setIsExporting(false);
 		setProgress(null);
 		cancelTaskRef.current = null;

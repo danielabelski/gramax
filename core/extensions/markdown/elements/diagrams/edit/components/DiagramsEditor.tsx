@@ -321,6 +321,9 @@ export default styled(DiagramsEditor)`
 		background-color: var(--color-diagram-bg);
 		border-radius: var(--radius-large);
 	}
+	.diagram-background-without-lightbox.openapi-preview {
+		background-color: var(--color-article-bg);
+	}
 
 	.modal-confirm {
 		z-index: var(--z-index-article-confirm-modal);

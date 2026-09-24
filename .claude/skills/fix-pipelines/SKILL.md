@@ -1,13 +1,14 @@
 ---
 name: fix-pipelines
-description: Use when CI jobs are red on a Gramax branch and need diagnosing/fixing — failed pipeline, broken build/tests, "почини пайплайн", "сломанные джобы", "failed CI jobs", "pipeline red", "fix the pipeline". Triages failed jobs, reproduces the harness locally, verifies a fix, lands it per branch policy.
+description: Use when CI jobs are red on a Gramax branch and need diagnosing/fixing — failed pipeline, broken build/tests, flaky jobs, a job that has been red for a while, "почини пайплайн", "почини все пайплайны", "сломанные джобы", "failed CI jobs", "pipeline red", "fix the pipeline".
 ---
 
 # Fixing Gramax CI pipelines
 
 Diagnose and repair red CI jobs on a branch of the Gramax product repo
-(`ics/doc-reader`, id `155`). Reproduce the failing harness locally, verify the
-fix by re-running it green, then land it per the branch policy below.
+(`ics/doc-reader`, id `155`). Sweep the branch's **recent pipeline history** —
+not just the newest pipeline — build a worklist of every distinct broken job,
+then fix them all in one run.
 
 Runs headless in CI (see the `ci` skill for the shared environment) or locally
 from the team workspace. Non-interactive when headless: decide and act.
@@ -23,58 +24,96 @@ reproducing anything.**
 
 ## Algorithm
 
-### 1. Triage — what failed, since when, why
+### 1. Sweep the pipeline history — build the worklist
+
+Scan the last **20 pipelines** on the branch (`$SWEEP_DEPTH`, default 20). One
+pipeline is not enough: a job can be red for weeks, be skipped by `rules:` in
+the newest run, or fail only intermittently. History is what tells those apart.
 
 ```sh
 BRANCH=${CI_COMMIT_BRANCH:-$(git -C gramax rev-parse --abbrev-ref HEAD)}
-# recent pipelines for the ref (spot the newest failed + last green)
-glab api "projects/155/pipelines?ref=$BRANCH&per_page=20" \
+DEPTH=${SWEEP_DEPTH:-20}
+
+# 1. recent pipelines for the ref
+glab api "projects/155/pipelines?ref=$BRANCH&per_page=$DEPTH" \
   | jq -r '.[]|"\(.id)\t\(.status)\t\(.updated_at)\t\(.sha[0:8])"'
-# failed jobs of a pipeline
-glab api "projects/155/pipelines/$PID/jobs?per_page=100" \
-  | jq -r '.[]|select(.status=="failed")|"\(.id)\t\(.name)\t\(.stage)"'
-# decisive error — tail of the trace
+
+# 2. every failed job across ALL of them — the raw sweep
+for PID in $(glab api "projects/155/pipelines?ref=$BRANCH&per_page=$DEPTH" | jq -r '.[].id'); do
+  glab api "projects/155/pipelines/$PID/jobs?per_page=100" \
+    | jq -r --arg p "$PID" '.[]|select(.status=="failed")|"\($p)\t\(.id)\t\(.name)\t\(.created_at)"'
+done | tee /tmp/failed-jobs.tsv
+
+# 3. per job name: how many pipelines it failed in (frequency = flaky signal)
+cut -f3 /tmp/failed-jobs.tsv | sort | uniq -c | sort -rn
+
+# 4. decisive error for one occurrence — newest first
 glab api "projects/155/jobs/$JOB_ID/trace" | tail -50
 ```
 
-Quote the shortest decisive error line. Compare against the last green pipeline
-to date the break and tie it to the commit that introduced it.
+**Group by job name, not by job id** — the same broken `next-e2e-pw` across 8
+pipelines is *one* worklist item, not eight. For each distinct job name record:
 
-**Classify each failure into one root cause:**
+- **Failure rate** over the swept window (`failed pipelines / pipelines that ran it`).
+- **First bad pipeline** — the oldest consecutive failure; the commit between it
+  and the preceding green one is the suspect.
+- **Decisive error line**, read from the newest occurrence.
+- **Root cause class** (below). Different error signatures under the same job
+  name = separate worklist items.
+
+**Classify each into one root cause:**
 
 - **code bug** — an app-source change broke the build or a test.
 - **test bug** — the test is wrong/stale; product code is fine.
 - **runner infra** — OOM, timeout, native-module rebuild failure, image/tag
   mismatch, external-dependency outage.
-- **flaky** — non-deterministic; passes on re-run.
+- **flaky** — fails intermittently across the window while the same commit also
+  passed. History proves this; a single pipeline never can.
 
-### 2. Reproduce locally
+Then order the worklist: **persistent breaks before flaky ones, oldest break
+first.** Report the full worklist before starting — an item you skip must be
+named with a reason, never dropped silently.
 
-Follow the `REFERENCE.md` recipe for the failing harness. It documents the
-preflight (`install-deps.sh`, native `better-sqlite3` rebuild, the
-`gramax-core.node` addon) and the exact run command per suite. **Confirm you see
-the same failure locally before touching code** — can't reproduce → report the
-env gap, don't guess a fix.
+### 2. Work the list — reproduce, fix, verify (per item)
 
-### 3. Propose fix + verify
+For **each** worklist item, in order:
 
-Apply the **narrowest** fix for the cause class (targeted guard at the call
-site, not a global/config change). Re-run that harness locally and confirm it
-goes green before landing.
+1. **Reproduce.** Follow the `REFERENCE.md` recipe for that harness — it
+   documents the preflight (`install-deps.sh`, native `better-sqlite3` rebuild,
+   the `gramax-core.node` addon) and the exact run command. **Confirm the same
+   failure locally before touching code.** Can't reproduce → mark the item
+   `unreproducible`, report the env gap, move to the next item. Don't guess.
+2. **Fix.** Apply the **narrowest** change for the cause class (targeted guard
+   at the call site, not a global/config change).
+3. **Verify.** Re-run that harness locally, confirm green. Not green → the item
+   is unfixed; say so, don't count it as done.
 
-### 4. Land the fix
+Finish the whole list before landing anything. One hard item does not cancel the
+easy ones — a blocked item is reported, the rest still ship.
 
-| Target branch          | CI / test fix | App-code fix |
-| ---------------------- | ------------- | ------------ |
-| `release/*`, `develop` | push direct   | open MR      |
-| any other branch       | push direct   | push direct  |
+### 3. Land all fixes in ONE commit
 
-- **App-code fix on `release/*`/`develop`** → open an MR (title English, body
-  Russian, `## Notes`; use the `merge-request` skill). Everything else → push
-  straight to the branch.
+**All verified fixes from the run go into a single commit** — not one per item.
+
+| Target branch          | CI / test fixes only | Batch contains any app-code fix |
+| ---------------------- | -------------------- | ------------------------------- |
+| `release/*`, `develop` | push direct          | whole batch → one MR            |
+| any other branch       | push direct          | push direct                     |
+
+The batch is atomic: one app-code fix on `release/*`/`develop` sends **the whole
+commit** through an MR (title English, body Russian, `## Notes`; use the
+`merge-request` skill). Never split the batch to route parts differently.
+
+Commit message lists every fixed job by name, one line each, plus the items left
+unfixed and why.
+
 - All writes bot-authored (`GITLAB_CLAUDE_ACCESS_TOKEN`) + initiator credit
   (`.claude/scripts/gitlab-initiator` → `Co-Authored-By: <Full Name> <Email>`).
-- Footer every commit/MR/comment with `Assisted-By: <model display name>`.
+
+### 4. Report
+
+Final output = the worklist with an outcome per item: `fixed` / `unreproducible`
+/ `flaky, not patched` / `external, not ours`. Nothing disappears from the list.
 
 ## Cause → action
 
@@ -82,12 +121,16 @@ goes green before landing.
 | --- | --- |
 | code bug | fix source; land per table (MR on release/develop) |
 | test bug | fix/adjust the test; it's a CI/test fix → push direct |
-| flaky | retry the job first; patch only if it recurs; note it, don't guess a code change |
+| flaky | history already shows whether it recurs — intermittent across the window and never reproducible locally → report it, don't patch product code on a guess |
 | runner infra (ours) | fix CI config/resources (timeout, memory, native rebuild) → push direct |
 | runner infra (external outage) | report, do not patch — nothing to fix in our code |
 
 ## Red flags — stop
 
+- Looking at only the newest pipeline. Sweep the window — that's the point.
+- Stopping after the first fixed item while the worklist still has entries.
+- Dropping an item from the report because it was hard. Name it + say why.
+- One commit per fix, or splitting a mixed batch across a push and an MR.
 - Pushing a fix you never reproduced/verified locally.
 - Patching product code for a flaky failure.
 - A broad global/config change to silence one job — prefer the narrowest layer.

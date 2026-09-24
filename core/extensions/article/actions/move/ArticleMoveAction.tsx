@@ -31,7 +31,7 @@ const ArticleMoveError = ({ text }: { text: string }) => {
 					{t("article.move.to-workspace")}
 				</DropdownMenuItem>
 			</TooltipTrigger>
-			<TooltipContent>{text}</TooltipContent>
+			<TooltipContent side="right">{text}</TooltipContent>
 		</Tooltip>
 	);
 };

@@ -3,6 +3,7 @@ import NetworkApiErrorComponent from "@ext/errorHandlers/network/components/Netw
 import { NetworkApiErrorCode } from "@ext/errorHandlers/network/NetworkApiError";
 import getMergeRequestErrors from "@ext/git/core/GitMergeRequest/errors/getMergeRequestErrors";
 import getStorageErrors from "@ext/storage/components/getStorageErrors";
+import getWorkspaceErrors from "@ext/workspace/error/getWorkspaceErrors";
 import { DialogContent } from "@ui-kit/Dialog";
 import type { ReactNode } from "react";
 import getFileStructueErrors from "../../../logic/FileStructue/error/logic/getFileStructueErrors";
@@ -24,6 +25,7 @@ const getComponents = (): {
 	...getStorageErrors(),
 	...getMergeRequestErrors(),
 	...getEnterpriseErrors(),
+	...getWorkspaceErrors(),
 	[NetworkApiErrorCode]: NetworkApiErrorComponent,
 });
 

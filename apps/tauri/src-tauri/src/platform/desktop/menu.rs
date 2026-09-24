@@ -50,6 +50,8 @@ pub enum MenuItemId {
 	ExportLogs7d,
 	ExportLogsAll,
 	Unknown,
+	#[cfg(target_os = "macos")]
+	PasteAndMatchStyle,
 	#[cfg(target_family = "unix")]
 	ZoomIn,
 	#[cfg(target_family = "unix")]
@@ -76,6 +78,8 @@ impl MenuItemId {
 			#[cfg(target_family = "unix")]
 			MenuItemId::ActualSize => t!("menu.view.actual-size"),
 			MenuItemId::ToggleSpellcheck => t!("menu.edit.toggle-spellcheck"),
+			#[cfg(target_os = "macos")]
+			MenuItemId::PasteAndMatchStyle => t!("menu.edit.paste-and-match-style"),
 			MenuItemId::ExportLogs => t!("menu.help.export-logs.title"),
 			MenuItemId::ExportLogsSession => t!("menu.help.export-logs.session"),
 			MenuItemId::ExportLogsToday => t!("menu.help.export-logs.today"),
@@ -168,6 +172,24 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
 		}
 		Id::ToggleSpellcheck => {
 			app.emit("on_toggle_spellcheck", ()).unwrap();
+		}
+		#[cfg(target_os = "macos")]
+		Id::PasteAndMatchStyle => {
+			if let Some(focused) = app.get_focused_webview() {
+				_ = focused.with_webview(|wv| unsafe {
+					use objc2::runtime::NSObjectProtocol;
+
+					let wv: &objc2_web_kit::WKWebView = &*wv.inner().cast();
+					// WKWebView answers the AppKit editing selector, but objc2-web-kit doesn't declare it.
+					// A future WebKit may drop it — then do nothing, as before this menu item existed.
+					if !wv.respondsToSelector(objc2::sel!(pasteAsPlainText:)) {
+						return;
+					}
+
+					let sender: Option<&objc2::runtime::AnyObject> = None;
+					let _: () = objc2::msg_send![wv, pasteAsPlainText: sender];
+				});
+			}
 		}
 		Id::CloseWindow => {
 			std::thread::spawn(move || app.get_focused_webview().map(|w| w.close()));
@@ -286,6 +308,8 @@ fn make_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>> {
 		&PredefinedMenuItem::cut(app, Some(&t!("menu.edit.cut")))?,
 		&PredefinedMenuItem::copy(app, Some(&t!("menu.edit.copy")))?,
 		&PredefinedMenuItem::paste(app, Some(&t!("menu.edit.paste")))?,
+		#[cfg(target_os = "macos")]
+		&build_item(Id::PasteAndMatchStyle, Some("CmdOrControl+Shift+V"))?,
 		&PredefinedMenuItem::select_all(app, Some(&t!("menu.edit.select-all")))?,
 		&CheckMenuItemBuilder::with_id(Id::ToggleSpellcheck.as_ref(), &t!("menu.edit.spellcheck"))
 			.checked(*SPELLCHECK_ENABLED.lock().unwrap())

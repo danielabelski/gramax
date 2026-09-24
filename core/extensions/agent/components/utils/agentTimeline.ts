@@ -63,6 +63,7 @@ export type AgentTimelineEntry =
 			ts: number;
 			streaming?: boolean;
 			attachments?: AgentAttachment[];
+			quotedText?: string;
 	  }
 	| {
 			kind: "tool_call";
@@ -84,6 +85,7 @@ export type AgentTimelineEntry =
 	  }
 	| { kind: "error"; ts: number; message: string; errorType: AgentErrorType }
 	| { kind: "cancelled"; ts: number }
+	| { kind: "context_compacted"; ts: number; turnId: string; visible: boolean }
 	| { kind: "turn_duration"; ts: number };
 
 export type AgentChatViewModel = {
@@ -103,6 +105,7 @@ const buildChatMessage = (entry: AgentTimelineEntry, id: string): ChatMessage | 
 					ts: entry.ts,
 					userText: entry.content,
 					attachments: entry.attachments,
+					quotedText: entry.quotedText,
 				};
 			}
 			return {
@@ -152,6 +155,9 @@ const buildChatMessage = (entry: AgentTimelineEntry, id: string): ChatMessage | 
 			};
 		case "cancelled":
 			return { id, kind: "cancelled", ts: entry.ts };
+		case "context_compacted":
+			if (!entry.visible) return null;
+			return { id, kind: "context_compacted", ts: entry.ts };
 		case "turn_duration":
 			return { id, kind: "turn_duration", ts: entry.ts };
 		default:

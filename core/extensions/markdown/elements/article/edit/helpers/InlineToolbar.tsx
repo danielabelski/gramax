@@ -1,3 +1,12 @@
+import { ARTICLE_CONTENT_WRAPPER_WIDTH_ATTRIBUTE } from "@components/Layouts/CatalogLayout/ArticleLayout/consts";
+import { useArticleWidthStyle } from "@components/Layouts/CatalogLayout/ArticleLayout/useArticleDimensions";
+import useMediaQuery from "@core-ui/hooks/useMediaQuery";
+import { cssMedia } from "@core-ui/utils/cssUtils";
+import {
+	ARTICLE_POPOVER_PADDING,
+	getArticlePopoverBoundary,
+	getArticlePopoverContainer,
+} from "@ext/markdown/core/edit/logic/articlePopover";
 import InlineEditPanel, {
 	type InlineToolbarButtons,
 } from "@ext/markdown/elements/article/edit/helpers/InlineEditPanel";
@@ -5,10 +14,10 @@ import { CustomBubbleMenu } from "@ext/markdown/elements/customBubbleMenu/edit/c
 import type { Editor } from "@tiptap/react";
 import { CellSelection, isInTable } from "prosemirror-tables";
 import { memo, type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import "tippy.js/animations/shift-toward.css";
-import useMediaQuery from "@core-ui/hooks/useMediaQuery";
-import { cssMedia } from "@core-ui/utils/cssUtils";
+import { flushSync } from "react-dom";
 import type { Instance, Props } from "tippy.js";
+
+const INLINE_TOOLBAR_Z_INDEX = 49;
 
 interface InlineToolbarProps {
 	editor: Editor;
@@ -25,11 +34,14 @@ export interface InlineToolbarOptions {
 
 export const InlineToolbar = memo(({ editor, pluginKey, buttons, shouldShow, boundaryRef }: InlineToolbarProps) => {
 	const isMobile = useMediaQuery(cssMedia.JSnarrow);
+	const articleWidthStyle = useArticleWidthStyle();
+	const [isPanelMounted, setIsPanelMounted] = useState(false);
+	const isPanelMountedRef = useRef(false);
 
-	const [options, setOptions] = useState<InlineToolbarOptions>({
-		isInTable: false,
-		isCellSelection: false,
-	});
+	const [options, setOptions] = useState<InlineToolbarOptions>(() => ({
+		isInTable: isInTable(editor.state),
+		isCellSelection: editor.state.selection instanceof CellSelection,
+	}));
 	const tippyInstanceRef = useRef<Instance<Props>>(null);
 
 	useEffect(() => {
@@ -71,34 +83,81 @@ export const InlineToolbar = memo(({ editor, pluginKey, buttons, shouldShow, bou
 		editor.commands.focus();
 	}, [editor]);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
+	const onHidden = useCallback(() => {
+		isPanelMountedRef.current = false;
+		setIsPanelMounted(false);
+	}, []);
+
+	const handleShouldShow = useCallback(
+		(props: Parameters<typeof shouldShow>[0]) => {
+			const show = shouldShow(props);
+			if (!show || isPanelMountedRef.current) return show;
+
+			flushSync(() => {
+				isPanelMountedRef.current = true;
+				setIsPanelMounted(true);
+			});
+			return true;
+		},
+		[shouldShow],
+	);
+
 	const appendTo = useCallback(() => {
-		return boundaryRef?.current ?? editor.view.dom.parentElement;
-	}, [editor]);
+		return getArticlePopoverContainer(editor, boundaryRef?.current);
+	}, [boundaryRef, editor]);
+
+	const getTippyOptions = useCallback((): Partial<Props> => {
+		const boundary = getArticlePopoverBoundary(editor, boundaryRef?.current, "viewport");
+
+		return {
+			maxWidth: "unset",
+			appendTo,
+			interactive: true,
+			arrow: false,
+			sticky: true,
+			offset: [0, 8],
+			zIndex: INLINE_TOOLBAR_Z_INDEX,
+			placement: "top-start",
+			duration: [220, 200],
+			animation: "article-popover",
+			moveTransition: "transform 0.150s ease-in-out",
+			onShow,
+			onHide,
+			onHidden,
+			popperOptions: {
+				modifiers: [
+					{
+						name: "preventOverflow",
+						options: { boundary, padding: ARTICLE_POPOVER_PADDING },
+					},
+				],
+			},
+		};
+	}, [appendTo, boundaryRef, editor, onHide, onHidden, onShow]);
 
 	return (
 		<CustomBubbleMenu
 			editor={editor}
 			pluginKey={pluginKey || "inline-toolbar"}
-			shouldShow={shouldShow}
-			tippyOptions={{
-				maxWidth: "unset",
-				appendTo,
-				interactive: true,
-				arrow: false,
-				sticky: true,
-				offset: [0, 8],
-				zIndex: 50,
-				placement: "top-start",
-				duration: [150, 150],
-				animation: "shift-toward",
-				moveTransition: "transform 0.150s ease-in-out",
-				onShow,
-				onHide,
-			}}
+			shouldShow={handleShouldShow}
+			tippyOptions={getTippyOptions}
 		>
-			<div className="lg:shadow-hard-base rounded-lg sm:[&>div]:rounded-lg">
-				<InlineEditPanel buttons={buttons} closeHandler={closeHandler} editor={editor} {...options} />
+			<div
+				className="article-popover article-popover-stagger rounded-lg sm:[&>div]:rounded-full"
+				style={{
+					...articleWidthStyle,
+					maxWidth: `var(${ARTICLE_CONTENT_WRAPPER_WIDTH_ATTRIBUTE})`,
+				}}
+			>
+				{isPanelMounted && (
+					<InlineEditPanel
+						buttons={buttons}
+						className="shadow-glass-xl"
+						closeHandler={closeHandler}
+						editor={editor}
+						{...options}
+					/>
+				)}
 			</div>
 		</CustomBubbleMenu>
 	);

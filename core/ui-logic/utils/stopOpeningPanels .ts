@@ -4,9 +4,10 @@ import debounceFunction from "../debounceFunction";
 
 export default (id: symbol, view: EditorView, excludeManySelection: boolean = false) => {
 	const isManySelection = view?.state.selection.from !== view?.state.selection.to;
-	const panels = [RIGHT_NAV_CLASS, LEFT_NAV_CLASS].map((className) =>
-		document.querySelector<HTMLElement>(`.${className}`),
-	);
+	// Левая навигация на мобильном рендерится как Sheet и в DOM отсутствует, пока закрыта.
+	const panels = [RIGHT_NAV_CLASS, LEFT_NAV_CLASS]
+		.map((className) => document.querySelector<HTMLElement>(`.${className}`))
+		.filter(Boolean);
 
 	if (excludeManySelection || isManySelection) panels.map((panel) => (panel.style.pointerEvents = "none"));
 

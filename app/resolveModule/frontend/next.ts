@@ -23,15 +23,16 @@ const getNextModules = (): DynamicModules => {
 		FileInput: FileInputCdn,
 		DiffFileInput: DiffFileInputCdn,
 		httpFetch: () => undefined,
+		mailFetch: () => undefined,
 		setBadge: () => undefined,
 		openInExplorer: () => undefined,
 		openWindowWithUrl: () => undefined,
 		gesCloudLogin: () => undefined,
+		gesCloudPaymentMethodBinding: () => Promise.resolve(),
 		openInWeb: (url: string) => (typeof window === "undefined" ? undefined : window.open(url)),
 		getPdfjs,
 		updateCheck: () => undefined,
 		updateInstallFromCache: () => undefined,
-		updateAccept: () => undefined,
 	};
 };
 

@@ -1,7 +1,9 @@
+import { AgentChatButton } from "@components/Layouts/CatalogLayout/RightNavigation/AgentChatButton";
 import PageDataContext from "@core-ui/ContextServices/PageDataContext";
 import useMediaQuery from "@core-ui/hooks/useMediaQuery";
 import { cn } from "@core-ui/utils/cn";
 import { cssMedia } from "@core-ui/utils/cssUtils";
+import { useAgentChatVisibility } from "@ext/agent/components/hooks/useAgentChatVisibility";
 import TranscribeButton from "@ext/ai/components/Audio/Buttons/TranscribeMenuButton";
 import { useIsRevision } from "@ext/git/actions/Revisions/logic/hooks/useIsRevision";
 import { ToolbarDiffToggle } from "@ext/git/core/Diff/components/ToolbarDiffToggle";
@@ -16,7 +18,7 @@ import { LinkMenuMobilePopover } from "@ext/markdown/elements/link/edit/componen
 import getSelectedText from "@ext/markdown/elementsUtils/getSelectedText";
 import { ToolbarToggleReview } from "@ext/review/components/Toolbar/ToolbarToggleReview";
 import type { Editor } from "@tiptap/core";
-import { Toolbar, ToolbarSeparator } from "@ui-kit/Toolbar";
+import { GlassToolbar, GlassToolbarGroup, GlassToolbarSeparator } from "@ui-kit/GlassToolbar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 import { CellSelection, isInTable } from "prosemirror-tables";
 import { memo, useEffect, useState } from "react";
@@ -24,6 +26,7 @@ import AnyMenuGroup from "../Groups/Any";
 import HeadersMenuGroup from "../Groups/Headers";
 import ListMenuGroup from "../Groups/List";
 import TextMenuGroup from "../Groups/Text";
+import { MainToolbarLayout, MainToolbarScrollViewport } from "./MainToolbarLayout";
 
 export interface ToolbarMenuProps {
 	includeResources?: boolean;
@@ -42,45 +45,58 @@ interface MainToolbarMenuProps extends ToolbarMenuProps {
 type ToolbarButtonsVariant = "inline" | "main";
 const MainToolbarButtons = (props: MainToolbarMenuProps) => {
 	const { editor, includeResources = true, fileName, isSmallEditor, isGramaxAiEnabled, isDefaultMode } = props;
+	const { showToggle: isAgentChatEnabled } = useAgentChatVisibility();
+	// ges-ai tools are deprecated by the agent chat — hide them where the chat is available
+	const hasGesAi = isGramaxAiEnabled && !isAgentChatEnabled;
 
 	return (
-		<Toolbar className="md:rounded-lg" data-qa="qa-edit-menu-button" data-testid="editor-toolbar">
-			<div
-				className={cn(
-					"contents",
-					!isDefaultMode &&
-						"[&>div]:opacity-50 [&>button]:opacity-50 [&>div]:pointer-events-none [&>button]:pointer-events-none",
-				)}
-				data-toolbar-modes="default"
-			>
-				<HeadersMenuGroup editor={editor} />
-				<ToolbarSeparator />
-				<TextMenuGroup editor={editor} />
-				<ListMenuGroup editor={editor} />
-				<ToolbarSeparator />
-				<AnyMenuGroup
-					editor={editor}
-					fileName={fileName}
-					includeResources={includeResources}
-					isSmallEditor={isSmallEditor}
-				/>
-				{isGramaxAiEnabled && (
+		<GlassToolbar
+			className="min-w-0 max-w-full overflow-visible rounded-full"
+			data-qa="qa-edit-menu-button"
+			data-testid="editor-toolbar"
+		>
+			<MainToolbarScrollViewport>
+				<div
+					className={cn(
+						"contents",
+						!isDefaultMode &&
+							"[&>div]:opacity-50 [&>button]:opacity-50 [&>div]:pointer-events-none [&>button]:pointer-events-none",
+					)}
+					data-toolbar-modes="default"
+				>
+					<HeadersMenuGroup editor={editor} />
+					<GlassToolbarSeparator />
+					<TextMenuGroup editor={editor} />
+					<ListMenuGroup editor={editor} />
+					<GlassToolbarSeparator />
+					<AnyMenuGroup
+						editor={editor}
+						fileName={fileName}
+						includeResources={includeResources}
+						isSmallEditor={isSmallEditor}
+					/>
+					{hasGesAi && (
+						<>
+							<GlassToolbarSeparator />
+							<GlassToolbarGroup>
+								<TranscribeButton editor={editor} />
+								<AIGroup editor={editor} />
+							</GlassToolbarGroup>
+						</>
+					)}
+				</div>
+				{!isSmallEditor && (
 					<>
-						<ToolbarSeparator />
-						<TranscribeButton editor={editor} />
-						<AIGroup editor={editor} />
+						<GlassToolbarSeparator />
+						<GlassToolbarGroup>
+							<ToolbarMarkdownModeToggle />
+							<ToolbarDiffToggle />
+							<ToolbarToggleReview />
+						</GlassToolbarGroup>
 					</>
 				)}
-			</div>
-			{!isSmallEditor && (
-				<>
-					<ToolbarSeparator />
-					<ToolbarMarkdownModeToggle />
-					<ToolbarToggleReview />
-					<ToolbarDiffToggle />
-				</>
-			)}
-		</Toolbar>
+			</MainToolbarScrollViewport>
+		</GlassToolbar>
 	);
 };
 
@@ -146,7 +162,7 @@ const ToolbarMenu = (props: MainToolbarMenuProps) => {
 
 	const Component = variant === "main" ? MainToolbarButtons : InlineToolbarButtons;
 
-	const Content = (
+	const EditorContent = (
 		<>
 			<Component
 				editor={editor}
@@ -164,18 +180,24 @@ const ToolbarMenu = (props: MainToolbarMenuProps) => {
 
 	const isDiffView = useIsDiffView();
 
-	if ((isReadOnly && !isDiffView) || isRevision)
-		return (
+	const content =
+		(isReadOnly && !isDiffView) || isRevision ? (
 			<Tooltip>
 				<TooltipTrigger asChild>
 					<div className={isDiffView || isRevision ? undefined : "[&>div]:pointer-events-none"}>
-						{Content}
+						{EditorContent}
 					</div>
 				</TooltipTrigger>
 				<TooltipContent>{t("editor.at-revision")}</TooltipContent>
 			</Tooltip>
+		) : (
+			EditorContent
 		);
 
-	return Content;
+	if (variant === "main" && !isSmallEditor) {
+		return <MainToolbarLayout agentButton={<AgentChatButton />}>{content}</MainToolbarLayout>;
+	}
+
+	return content;
 };
 export default memo(ToolbarMenu);

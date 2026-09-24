@@ -28,7 +28,7 @@ export interface CommitFilterOptions {
   authors: Array<string> | null
   beforeDate: string | null
   afterDate: string | null
-  paths: Array<string> | null
+  pathspecs: Array<string> | null
 }
 
 export interface CommitInfoOpts {
@@ -82,9 +82,11 @@ export interface GcOptions {
 
 export declare function get_all_cancel_tokens(spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
 
-export declare function get_all_commit_authors(repoPath: string, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
+export declare function get_commit_authors(repoPath: string, pathspecs?: Array<string> | undefined | null, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
 
 export declare function get_commit_info(repoPath: string, oid: string, opts: CommitInfoOpts, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
+
+export declare function get_commit_range(repoPath: string, pathspecs?: Array<string> | undefined | null, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
 
 export declare function get_config_val(repoPath: string, name: string, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
 
@@ -205,11 +207,21 @@ export declare function set_config_val(repoPath: string, name: string, val: Conf
 
 export declare function set_head(repoPath: string, refname: string, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
 
-export declare function stash(repoPath: string, creds: AccessTokenCreds, message?: string | undefined | null, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
+/**
+ * Runtime otel level switch from JS — same Gramax scale as the Tauri `set_otel_level` command.
+ * Crate-scoped `RUST_LOG` directives (`crate=level`) are preserved; only the global level is replaced.
+ */
+export declare function set_otel_level(level: string): void
+
+export declare function stash(repoPath: string, message?: string | undefined | null, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
 
 export declare function stash_apply(repoPath: string, oid: string, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
 
 export declare function stash_delete(repoPath: string, oid: string, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
+
+export declare function stash_list(repoPath: string, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
+
+export declare function stash_restore(repoPath: string, oid: string, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
 
 export declare function status(repoPath: string, index: boolean, spanId?: string | undefined | null, traceId?: string | undefined | null): Promise<unknown>
 

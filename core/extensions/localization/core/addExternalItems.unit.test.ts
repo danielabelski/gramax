@@ -11,7 +11,7 @@ import { addExternalItems } from "./addExternalItems";
 type MockItem = {
 	logicPath: string;
 	type: ItemType;
-	props: { order?: number; private?: boolean };
+	props: ItemProps;
 	items?: MockItem[];
 	ref?: unknown;
 	save: () => Promise<void>;
@@ -39,11 +39,11 @@ const makeRoot = (logicPath: string, filePath: string, items: MockItem[]): MockI
 // Records what would hit the disk. Items addExternalItems creates itself are real `Article`s,
 // so their save() goes through `FileStructure.saveArticle` — that is where the data loss shows up.
 const makeFs = () => {
-	const saved: { path: string; content: string }[] = [];
+	const saved: { path: string; content: string; props: ItemProps }[] = [];
 	const fs = {
 		fp: { getItemRef: (path: Path) => ({ path, storageId: null }) },
-		saveArticle: async (path: Path, content: string, _props: ItemProps) => {
-			saved.push({ path: path.value, content });
+		saveArticle: async (path: Path, content: string, props: ItemProps) => {
+			saved.push({ path: path.value, content, props });
 		},
 	};
 	return { fs: fs as unknown as FileStructure, saved };
@@ -109,5 +109,25 @@ describe("addExternalItems: удаление осиротевших элемен
 		expect(saved).toEqual([]);
 		expect(items.map((i) => i.logicPath)).toEqual(["docs/en/article/editor/diagrams"]);
 		expect(items[0]).toBe(translated);
+	});
+
+	test("не клонирует aliases владельца в заглушку непереведённой статьи", async () => {
+		// Алиас — это заявка на один URL. Заглушка живёт на другом URL, и если скопировать
+		// `aliases`, на путь владельца начинают претендовать два элемента: alias-индекс
+		// сообщает об этом как о `duplicate`, и защиту от этого пользователь не создавал.
+		const owner = makeItem("from/setup", ItemType.article, "from/setup.md");
+		owner.props.title = "Setup";
+		owner.props.aliases = [{ path: "install", moved: "2026-01-01T00:00:00Z" }];
+		const toRoot = makeRoot("to", "to", []);
+		const fromRoot = makeRoot("from", "from", [owner]);
+		const { fs, saved } = makeFs();
+
+		await call(fromRoot, toRoot, "from", "to", fs);
+
+		expect(saved.map((s) => s.path)).toEqual(["to/setup.md"]);
+		expect(saved[0].props.aliases).toBeUndefined();
+		// остальные свойства заглушки не меняются: заголовок владельца уезжает в `external`
+		expect(saved[0].props.external).toBe("Setup");
+		expect(owner.props.aliases).toEqual([{ path: "install", moved: "2026-01-01T00:00:00Z" }]);
 	});
 });

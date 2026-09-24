@@ -7,7 +7,7 @@ import { useDragLayer } from "react-dnd";
 const layerStyles: CSSProperties = {
 	position: "fixed",
 	pointerEvents: "none",
-	zIndex: 100,
+	zIndex: 49,
 	left: 0,
 	top: 0,
 	width: "100%",

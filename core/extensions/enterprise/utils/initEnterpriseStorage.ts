@@ -1,11 +1,11 @@
 import type Context from "@core/Context/Context";
 import EnterpriseApi from "@ext/enterprise/EnterpriseApi";
+import EnterpriseClientAuthManager from "@ext/enterprise/EnterpriseClientAuthManager";
 import type EnterpriseUser from "@ext/enterprise/EnterpriseUser";
 import DefaultError from "@ext/errorHandlers/logic/DefaultError";
 import type GitStorageData from "@ext/git/core/model/GitStorageData";
 import t from "@ext/localization/locale/translate";
 import type AuthManager from "@ext/security/logic/AuthManager";
-import ClientAuthManager from "@ext/security/logic/ClientAuthManager";
 import SourceType from "@ext/storage/logic/SourceDataProvider/model/SourceType";
 import type StorageData from "@ext/storage/models/StorageData";
 
@@ -31,7 +31,7 @@ export const initEnterpriseStorage = async (
 
 	if (ctx.user.type === "enterprise") {
 		const enterpriseUser = ctx.user as EnterpriseUser;
-		if (!(am instanceof ClientAuthManager)) return;
+		if (!(am instanceof EnterpriseClientAuthManager)) return;
 		await am.forceUpdateEnterpriseUser(ctx.cookie, enterpriseUser);
 	}
 };

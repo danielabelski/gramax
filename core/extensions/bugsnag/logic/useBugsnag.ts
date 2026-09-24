@@ -11,10 +11,20 @@ import { getRecentSpans } from "@ext/loggers/opentelemetry";
 import type { JSONContent } from "@tiptap/core";
 import { useCallback } from "react";
 
+type BugsnagDetails = {
+	replacedArticle?: JSONContent;
+	context?: Omit<PageDataContext, "conf" | "user"> & {
+		conf: { branch: boolean; version: string };
+		sourceDatas: null;
+		user: Omit<PageDataContext["user"], "info"> & { info: null };
+	};
+};
+
 export const useBugsnag = (itemLogicPath: string) => {
 	const apiUrlCreator = ApiUrlCreator.value;
 	const pageDataContext = PageDataContextService.value;
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: context service values can change between renders
 	const getPageData = useCallback(async (): Promise<JSONContent> => {
 		const res = await FetchService.fetch(apiUrlCreator.getPageData(itemLogicPath));
 		if (!res.ok) return;
@@ -24,23 +34,25 @@ export const useBugsnag = (itemLogicPath: string) => {
 
 	const getDetails = useCallback((props: { editTree: JSONContent; context?: PageDataContext }) => {
 		const { editTree, context } = props;
-		const result: { replacedArticle?: JSONContent; context?: any; gitLogs?: any } = {};
+		const result: BugsnagDetails = {};
 
 		if (editTree) result.replacedArticle = parseContent(editTree);
 
-		if (context && context.conf) {
-			const conf = { branch: context.conf?.isRelease, version: context.conf?.version };
-			result.context = { ...context, sourceDatas: null, userInfo: null, conf };
+		if (context?.conf) {
+			const conf = { branch: context.conf.isRelease, version: context.conf.version };
+			result.context = { ...context, sourceDatas: null, user: { ...context.user, info: null }, conf };
 		}
 
 		return result;
 	}, []);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: context service values can change between renders
 	const getTechDetails = useCallback(async () => {
 		const editTree = await getPageData();
 		return getDetails({ editTree, context: pageDataContext });
 	}, [getPageData, getDetails, pageDataContext]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: context service values can change between renders
 	const sendLogsHandler = useCallback(
 		async (comment: string, editTree: JSONContent) => {
 			const details = getDetails({ editTree, context: pageDataContext });

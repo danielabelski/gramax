@@ -28,6 +28,13 @@ pub enum UpdaterError {
 	#[error("install failed: {0}")]
 	InstallFailed(E),
 
+	/// The updater could not be built at startup, so there is nothing to check or install with. The
+	/// app runs without auto-update rather than not running: the editor is the product, updating is
+	/// a convenience. The usual cause is a binary started through a symlink — `/tmp` on macOS is one —
+	/// which tauri refuses to update in place, since the link could be pointed at another file.
+	#[error("updater is unavailable in this session")]
+	Unavailable,
+
 	#[error("failed to verify signature: {0}")]
 	SignatureMismatch(String),
 

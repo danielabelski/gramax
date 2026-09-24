@@ -28,7 +28,9 @@ const PlusActions = (props: PlusActionsProps) => {
 
 	const preOnMouseEnter = () => {
 		const table = tableRef.current;
-		const firstRow = table.querySelector(":scope > tbody > tr:first-of-type");
+		const firstRow = table?.querySelector(":scope > tbody > tr:first-of-type");
+		if (!table || !firstRow) return;
+
 		const top = firstRow.getBoundingClientRect().top;
 		const bottom = table.getBoundingClientRect().bottom;
 		const hoveredData = {
@@ -74,7 +76,7 @@ const PlusActions = (props: PlusActionsProps) => {
 				/>
 			)}
 			<div
-				className="z-[1000] hidden h-0 w-0 cursor-pointer items-center justify-center rounded-[var(--radius-full)] border border-[var(--color-table-plus-border)] bg-[var(--color-table-plus-bg)] p-[0.44rem] text-[var(--color-article-text)] [stroke-width:2rem] pointer-events-none group-hover:!flex group-hover:pointer-events-auto"
+				className="z-[1] hidden h-0 w-0 cursor-pointer items-center justify-center rounded-[var(--radius-full)] border border-[var(--color-table-plus-border)] bg-[var(--color-table-plus-bg)] p-[0.44rem] text-[var(--color-article-text)] [stroke-width:2rem] pointer-events-none group-hover:!flex group-hover:pointer-events-auto"
 				onClick={preOnClick}
 			>
 				<Icon code="plus" />

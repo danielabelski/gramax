@@ -57,8 +57,15 @@ ol[data-sonner-toaster] {
 	font-weight: 400;
 }
 
+@supports (-webkit-touch-callout: none) {
+	/* Safari samples fixed overlays for its toolbar background instead of the sidebar. */
+	[data-state]:has(+ [data-sidebar="sidebar"][data-mobile="true"]) {
+		position: absolute;
+	}
+}
+
 [data-upper-error] {
-	z-index: 1005;
+	z-index: 49;
 }
 
 input::-webkit-outer-spin-button,

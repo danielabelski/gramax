@@ -29,7 +29,9 @@ import { useIsDoublePanel } from "@ext/git/core/Diff/components/store/DiffViewMo
 import { useEditorExtensions } from "@ext/git/core/Diff/components/store/EditorExtensionsStore";
 import useDiff from "@ext/git/core/Diff/logic/hooks/useDiff";
 import { useDiffExtensions } from "@ext/git/core/Diff/logic/hooks/useDiffExtensions";
+import matchesDiffArticle from "@ext/git/core/Diff/logic/matchesDiffArticle";
 import type { TreeReadScope } from "@ext/git/core/GitCommands/model/GitCommandsModel";
+import { addEvent, Level, traced } from "@ext/loggers/opentelemetry";
 import ArticleMat from "@ext/markdown/core/edit/components/ArticleMat";
 import useContentEditorHooks from "@ext/markdown/core/edit/components/UseContentEditorHooks";
 import getExtensions, { getTemplateExtensions } from "@ext/markdown/core/edit/logic/getExtensions";
@@ -129,15 +131,30 @@ const DiffModeViewInternal = (props: DiffModeViewProps) => {
 
 	const isTemplateInstance = articleProps.template?.length > 0;
 
+	const contextArticlePath = Path.join(catalogProps?.name, articlePath);
+
 	const { start: onUpdateDebounce } = useDebounce((editor: Editor) => {
-		void editorOnUpdate({ editor, apiUrlCreator, articleProps });
-		if (articleProps.title !== editor.state.doc.firstChild.textContent) {
-			void editorTitleOnUpdate(
-				{ apiUrlCreator, articleProps, propertyService },
-				router,
-				editor.state.doc.firstChild.textContent,
-			);
-		}
+		void traced("diff-editor-save", { level: Level.Commands, omitArgs: true, omitResult: true }, async () => {
+			// The document in the editor belongs to `articlePath`; every write URL is built from
+			// `articleProps.ref.path`. If they drifted apart, this save would put this article's body
+			// into another article's file — drop it instead of corrupting the other file.
+			if (!matchesDiffArticle(articleProps?.ref?.path, contextArticlePath)) {
+				addEvent("article-mismatch", Level.Commands, {
+					loaded: articleProps?.ref?.path ?? "",
+					target: contextArticlePath,
+				});
+				return;
+			}
+
+			await editorOnUpdate({ editor, apiUrlCreator, articleProps });
+			if (articleProps.title !== editor.state.doc.firstChild.textContent) {
+				await editorTitleOnUpdate(
+					{ apiUrlCreator, articleProps, propertyService },
+					router,
+					editor.state.doc.firstChild.textContent,
+				);
+			}
+		});
 	}, 500);
 
 	const apiUrlCreator = ApiUrlCreatorService.value;
@@ -161,7 +178,7 @@ const DiffModeViewInternal = (props: DiffModeViewProps) => {
 		type: "new",
 		oldContent,
 		newContent,
-		isPin: { left: true, right: true },
+		isLeftPinned: true,
 		oldScope,
 		newScope,
 		articlePath: oldContextArticlePath,
@@ -247,7 +264,7 @@ const DiffModeViewInternal = (props: DiffModeViewProps) => {
 		type: "old",
 		oldContent,
 		newContent,
-		isPin: { left: true, right: true },
+		isLeftPinned: true,
 		oldScope,
 		newScope,
 		articlePath: oldContextArticlePath,

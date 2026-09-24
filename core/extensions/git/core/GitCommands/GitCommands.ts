@@ -8,8 +8,10 @@ import GitErrorCode from "@ext/git/core/GitCommands/errors/model/GitErrorCode";
 import LibGit2Commands from "@ext/git/core/GitCommands/LibGit2Commands";
 import type {
 	CommitAuthorInfo,
+	CommitRangeInfo,
 	ConfigValue,
 	MergeResult,
+	StashInfo,
 	UpstreamCountFileChanges,
 } from "@ext/git/core/GitCommands/LibGit2IntermediateCommands";
 import getUrlFromGitStorageData from "@ext/git/core/GitStorage/utils/getUrlFromGitStorageData";
@@ -254,8 +256,13 @@ export class GitCommands {
 	}
 
 	@trace({ level: Level.Full })
-	async getCommitAuthors(): Promise<CommitAuthorInfo[]> {
-		return this._impl.getCommitAuthors();
+	async getCommitAuthors(pathspecs?: string[]): Promise<CommitAuthorInfo[]> {
+		return this._impl.getCommitAuthors(pathspecs);
+	}
+
+	@trace({ level: Level.Full })
+	async getCommitRange(pathspecs?: string[]): Promise<CommitRangeInfo | null> {
+		return this._impl.getCommitRange(pathspecs);
 	}
 
 	@trace({ level: Level.Internal })
@@ -395,14 +402,16 @@ export class GitCommands {
 	}
 
 	@trace({ level: Level.Internal })
-	async stash(data: SourceData): Promise<GitStash> {
-		const res = await this._impl.stash(data);
+	async stash(): Promise<GitStash> {
+		const res = await this._impl.stash();
 		return res && new GitStash(res);
 	}
 
 	@trace({ level: Level.Internal })
-	async applyStash(stashOid: GitStash): Promise<MergeResult> {
-		const res = await this._impl.applyStash(stashOid.toString());
+	async applyStash(stashOid: GitStash, againstIndex = false): Promise<MergeResult> {
+		const res = againstIndex
+			? await this._impl.restoreStash(stashOid.toString())
+			: await this._impl.applyStash(stashOid.toString());
 
 		const fixedConflict = await fixConflictLibgit2(
 			res,
@@ -414,6 +423,11 @@ export class GitCommands {
 		);
 
 		return await this._autoMerger.merge(fixedConflict);
+	}
+
+	@trace({ level: Level.Internal })
+	async listStashes(): Promise<StashInfo[]> {
+		return this._impl.listStashes();
 	}
 
 	@trace({ level: Level.Internal })
@@ -434,16 +448,21 @@ export class GitCommands {
 		}
 	}
 
+	@trace({ level: Level.Full })
+	async getUpstreamRef(): Promise<string> {
+		const remoteBranchName = (await this.getCurrentBranch()).getData().remoteName?.replace("origin/", "");
+		if (!remoteBranchName) return null;
+		return `${await this.getRemoteName()}/${remoteBranchName}`;
+	}
+
 	@trace({ level: Level.Internal })
-	async pull(data: GitSourceData) {
+	async pull(data: GitSourceData): Promise<MergeResult> {
 		try {
 			await this.fetch(data);
-			const remoteBranchName = (await this.getCurrentBranch()).getData().remoteName?.replace("origin/", "");
-			if (!remoteBranchName) return;
+			const upstreamRef = await this.getUpstreamRef();
+			if (!upstreamRef) return [];
 
-			const remoteWithRemoteBranchName = `${await this.getRemoteName()}/${remoteBranchName}`;
-
-			await this.merge(data, { theirs: remoteWithRemoteBranchName });
+			return await this.merge(data, { theirs: upstreamRef });
 		} catch (e) {
 			throw e.props ? e : getGitError(e, { repositoryPath: this._repoPath.value }, "pull");
 		}
@@ -475,9 +494,10 @@ export class GitCommands {
 		assert(opts, "merge opts is required");
 		assert(opts.theirs, "opts.theirs is required");
 
-		const head = await this.getCurrentBranch();
+		// No checkout after a clean merge: the merge writes out the paths it changed itself
+		// (`crates/git/src/actions/merge.rs`). The forced checkout that used to stand here rewrote the
+		// whole catalog to deliver the same result, and paid a full pass over the working copy for it.
 		const mergeResult = await this._impl.merge(data, opts);
-		if (!mergeResult.length) await this.checkout(data, head, { force: true });
 
 		const fixedConflict = await fixConflictLibgit2(
 			mergeResult,

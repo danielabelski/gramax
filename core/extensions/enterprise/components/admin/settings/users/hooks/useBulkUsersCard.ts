@@ -9,7 +9,6 @@ import {
 	type BulkLinkedRow,
 	useBulkLinkedDraft,
 } from "@ext/enterprise/components/admin/settings/members/hooks/useBulkLinkedDraft";
-import { useEditorSheet } from "@ext/enterprise/components/admin/settings/members/hooks/useEditorSheet";
 import type { AccessChange } from "@ext/enterprise/components/admin/settings/members/model/AccessChange";
 import {
 	emailKey,
@@ -33,6 +32,7 @@ import { repoColumn, repoColumnId } from "@ext/enterprise/components/admin/setti
 import { buildBulkUserChanges } from "@ext/enterprise/components/admin/settings/users/model/buildBulkUserChanges";
 import { useRowSelectionWithData } from "@ext/enterprise/components/admin/ui-kit/table/useRowSelection";
 import { deepEqual } from "@ext/enterprise/utils/deepEqual";
+import { useEditorSheet } from "@ext/enterpriseCommon/hooks/useEditorSheet";
 import type { ColumnDef } from "@ui-kit/DataTable";
 import { useCallback, useMemo, useState } from "react";
 

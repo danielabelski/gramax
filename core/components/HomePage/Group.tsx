@@ -1,35 +1,35 @@
-import Card from "@components/HomePage/Card";
-import Folder from "@components/HomePage/Folder";
-import type { Sections } from "@core/SitePresenter/SitePresenter";
 import type { CatalogLink } from "@ext/navigation/NavigationLinks";
-import type { Dispatch, SetStateAction } from "react";
+import GroupHeader from "./sections/GroupHeader";
+import GroupItems from "./sections/GroupItems";
+import type { RenameState, SectionDragHandleProps, SectionEditActions } from "./sections/sectionTypes";
+import type { HomeItem } from "./utils/homeLayoutTypes";
 
 interface GroupProps {
 	catalogLinks: CatalogLink[];
-	setIsAnyCardLoading: Dispatch<SetStateAction<boolean>>;
 	title?: string;
-	className?: string;
-	sections?: Sections;
+	containerKey?: string;
+	items?: HomeItem[];
+	dragHandleProps?: SectionDragHandleProps;
+	editActions?: SectionEditActions;
+	renameState?: RenameState;
 }
 
-const Group = ({ title, catalogLinks, setIsAnyCardLoading, sections }: GroupProps) => {
-	const sectionKeys = Object.keys(sections || {});
+const Group = ({ title, catalogLinks, containerKey, items, dragHandleProps, editActions, renameState }: GroupProps) => {
+	// the uncategorized section has neither a title nor anything to do with itself: its label is the divider above it
+	const hasHeader = Boolean(title || editActions);
+
 	return (
 		<div className="flex flex-col gap-6">
-			{title && <h3 className="text-2xl text-center font-semibold text-primary-fg">{title}</h3>}
-			<div className="group-container">
-				{sectionKeys.length !== 0 && (
-					<div className="group-content">
-						{sectionKeys.map((sectionKey) => {
-							return <Folder key={sectionKey} section={sections[sectionKey]} sectionKey={sectionKey} />;
-						})}
-					</div>
-				)}
-				<div className="group-content">
-					{catalogLinks.map((link) => (
-						<Card key={link.name} link={link} name={link.name} onClick={() => setIsAnyCardLoading(true)} />
-					))}
-				</div>
+			{hasHeader && (
+				<GroupHeader
+					dragHandleProps={dragHandleProps}
+					editActions={editActions}
+					renameState={renameState}
+					title={title}
+				/>
+			)}
+			<div className="flex flex-col group-container">
+				<GroupItems catalogLinks={catalogLinks} containerKey={containerKey} items={items} />
 			</div>
 		</div>
 	);

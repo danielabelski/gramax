@@ -1,53 +1,22 @@
+import { RightNavigationTop } from "@components/Layouts/CatalogLayout/RightNavigation/RightNavigaitonTop";
 import RightNavigation from "@components/Layouts/CatalogLayout/RightNavigation/RightNavigation";
+import { RightNavigationBottom } from "@components/Layouts/CatalogLayout/RightNavigation/RightNavigationBottom";
 import RightNavigationLayout from "@components/Layouts/CatalogLayout/RightNavigation/RightNavigationLayout";
-import SidebarsIsOpenService from "@core-ui/ContextServices/Sidebars/SidebarsIsOpenContext";
-import SidebarsIsPinService from "@core-ui/ContextServices/Sidebars/SidebarsIsPin";
-import useMediaQuery from "@core-ui/hooks/useMediaQuery";
-import { cssMedia } from "@core-ui/utils/cssUtils";
-import { useEffect, useRef } from "react";
+import { EXPANDED_RIGHT_NAVIGATION_CLASS_NAME } from "./constants";
 
-interface RightNavigationComponentProps {
-	delay?: number;
-}
-
-const RightNavigationComponent = (props: RightNavigationComponentProps) => {
-	const { delay } = props;
-
-	const prevIsSidebarRightPin = useRef<boolean>(null);
-	const { right: isSidebarRightPin } = SidebarsIsPinService.value;
-	const isNarrowLayout = useMediaQuery(cssMedia.JSmedium);
-
-	const isRightNavHover = useRef(false);
-
-	// React Warning with useWatch: Cannot update a component (`bound Init`) while rendering a different component.
-	// To locate the bad setState() call inside
-	useEffect(() => {
-		if (prevIsSidebarRightPin.current && !isSidebarRightPin) {
-			SidebarsIsOpenService.value = { right: false };
-		}
-		prevIsSidebarRightPin.current = isSidebarRightPin;
-	}, [isSidebarRightPin]);
-
-	const onRightNavMouseEnterHandler = () => {
-		isRightNavHover.current = true;
-		setTimeout(() => {
-			if (isRightNavHover.current && !isSidebarRightPin) {
-				SidebarsIsOpenService.value = { right: true };
-			}
-		}, delay);
-	};
-
-	const onRightNavMouseLeaveHandler = () => {
-		isRightNavHover.current = false;
-	};
-
+const RightNavigationComponent = () => {
 	return (
-		<RightNavigationLayout
-			onPointerLeave={onRightNavMouseLeaveHandler}
-			onPointerUp={isNarrowLayout ? undefined : onRightNavMouseEnterHandler}
-			onTouchEnd={isNarrowLayout ? undefined : onRightNavMouseEnterHandler}
-			rightNavigationContent={<RightNavigation />}
-		/>
+		<>
+			<RightNavigationTop />
+			<div className={`${EXPANDED_RIGHT_NAVIGATION_CLASS_NAME} h-full`}>
+				<RightNavigationLayout>
+					<div className="pointer-events-auto flex min-h-0 flex-1 flex-col">
+						<RightNavigation />
+					</div>
+				</RightNavigationLayout>
+			</div>
+			<RightNavigationBottom />
+		</>
 	);
 };
 

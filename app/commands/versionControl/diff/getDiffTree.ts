@@ -7,7 +7,8 @@ import DiffTreeCreator from "@ext/git/core/Diff/logic/DiffTreeCreator";
 import type { TreeReadScope } from "@ext/git/core/GitCommands/model/GitCommandsModel";
 import type { DiffTree } from "@ext/git/core/GitDiffItemCreator/RevisionDiffPresenter";
 import type { WithMergeBase } from "@ext/VersionControl/model/Diff";
-import assert from "assert";
+
+const emptyDiffTree: WithMergeBase<DiffTree> = { data: [], overview: {}, mergeBase: "" };
 
 const getDiffTree: Command<
 	{ catalogName: string; ctx: Context; oldScope: TreeReadScope; newScope?: TreeReadScope },
@@ -23,8 +24,11 @@ const getDiffTree: Command<
 		const { sitePresenterFactory, wm, parser, parserContextFactory } = this._app;
 		const workspace = wm.current();
 
+		// catalogName can arrive null when the caller (e.g. a still-mounted revisions-compare
+		// view) fires this after navigating to a page whose catalog no longer resolves — return
+		// an empty diff instead of asserting, matching the `statuses` command's convention.
 		const catalog = await workspace.getContextlessCatalog(catalogName);
-		assert(catalog);
+		if (!catalog) return emptyDiffTree;
 
 		const fs = workspace.getFileStructure();
 		const articleParser = new ArticleParser(ctx, parser, parserContextFactory);

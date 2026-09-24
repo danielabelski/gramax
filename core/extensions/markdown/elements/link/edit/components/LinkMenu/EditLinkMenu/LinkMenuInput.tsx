@@ -21,9 +21,9 @@ export const LinkMenuInput = ({ value, onValueChange, setMode, isSearchCatalogs,
 	}, []);
 
 	return (
-		<div className="flex items-center border-b border-inverse-border pl-2 pr-1">
+		<div className="flex items-center border-b border-secondary-border pl-2 pr-1">
 			<input
-				className="flex h-9 w-full rounded-md bg-transparent py-1 pl-1 text-sm outline-none placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-50 text-xs"
+				className="flex h-9 w-full rounded-md bg-transparent py-1 pl-1 outline-none placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-50 text-xs"
 				onBlur={onConfirm}
 				onInput={onValueChange}
 				placeholder={isSearchCatalogs ? `${t("list.search-catalogs")}...` : `${t("list.search-articles")}...`}
@@ -37,6 +37,7 @@ export const LinkMenuInput = ({ value, onValueChange, setMode, isSearchCatalogs,
 				iconClassName="flex-shrink-0"
 				onPointerDown={() => setMode("view")}
 				size="lg"
+				variant="outline"
 			/>
 		</div>
 	);

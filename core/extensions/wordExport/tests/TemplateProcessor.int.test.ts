@@ -165,6 +165,32 @@ describe("TemplateProcessor private methods", () => {
 			expect(placeholders.size).toBe(1);
 		});
 
+		// gh#919: "taskListChecked" must not be shadowed by the "taskList" branch of the placeholder
+		// regex — an unresolved placeholder would stay in w:numId and break the exported docx.
+		test("_extractPlaceholders finds the checked task-list placeholder", () => {
+			const xml = `
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p><w:pPr><w:numPr><w:numId w:val="{taskList-0}"/></w:numPr></w:pPr></w:p>
+        <w:p><w:pPr><w:numPr><w:numId w:val="{taskListChecked-0}"/></w:numPr></w:pPr></w:p>
+      </w:document>
+    `;
+			const placeholders = (processor as any)._extractPlaceholders(xml);
+			expect(placeholders.has("{taskList-0}")).toBe(true);
+			expect(placeholders.has("{taskListChecked-0}")).toBe(true);
+		});
+
+		test("_generateNumberingEntries resolves the checked task-list placeholder via the TaskList style", () => {
+			const placeholders = new Set(["{taskListChecked-0}"]);
+			const templateMap = new Map([["TaskList", '<w:abstractNum w:abstractNumId="3"></w:abstractNum>']]);
+			const result = (processor as any)._generateNumberingEntries({
+				placeholders,
+				templateAbstractNums: templateMap,
+				startAbstractId: 10,
+				startNumId: 20,
+			});
+			expect(result.placeholderToNewId.get("{taskListChecked-0}")).toBe("20");
+		});
+
 		test("_generateNumberingEntries produces replacements", () => {
 			const placeholders = new Set(["{orderedList-0}"]);
 			const templateMap = new Map([

@@ -1,7 +1,9 @@
 import type { Page } from "@playwright/test";
+import { evaluateOnApp } from "@utils/app";
 
 export async function catalogItemExists(page: Page, catalogName: string, itemPath: string): Promise<boolean> {
-	return page.evaluate(
+	return evaluateOnApp(
+		page,
 		async ({ catalogName, itemPath }) => {
 			const app = await window.app!;
 			await app.wm.current().refreshCatalog(catalogName);
@@ -19,7 +21,8 @@ export async function catalogItemExists(page: Page, catalogName: string, itemPat
 }
 
 export async function getArticleContent(page: Page, catalogName: string, itemPath: string): Promise<string | null> {
-	return page.evaluate(
+	return evaluateOnApp(
+		page,
 		async ({ catalogName, itemPath }) => {
 			const app = await window.app!;
 			await app.wm.current().refreshCatalog(catalogName);
@@ -27,7 +30,7 @@ export async function getArticleContent(page: Page, catalogName: string, itemPat
 			try {
 				const fullPath = window.debug.intoPath(`${catalogName}/${itemPath}`);
 				const item = catalog.findItemByItemPath(fullPath);
-				if (!item || item.type !== "article") return null;
+				if (item?.type !== "article") return null;
 				const article = catalog.findArticleByItemRef(item.ref);
 				return article.content;
 			} catch {

@@ -1,14 +1,17 @@
+import { cn } from "@core-ui/utils/cn";
 import t from "@ext/localization/locale/translate";
 import { useReviewAuthors } from "@ext/review/logic/hooks/useReviewAuthors";
 import { Checkbox, type CheckedState } from "@ui-kit/Checkbox";
 import { Icon } from "@ui-kit/Icon";
-import { TextInput } from "@ui-kit/Input";
+import { PopoverInput } from "@ui-kit/Input";
+import { Label } from "@ui-kit/Label";
 import { MenuItem } from "@ui-kit/MenuItem";
 import { ScrollShadowContainer } from "@ui-kit/ScrollShadowContainer";
+import { Skeleton } from "@ui-kit/Skeleton";
 import { type HTMLAttributes, useCallback, useMemo, useState } from "react";
 
 interface ReviewAuthorsFilterProps {
-	selectedEmails: string[];
+	selectedEmails: string[] | null;
 	onChange: (emails: string[]) => void;
 }
 
@@ -21,26 +24,32 @@ interface CustomFilterItemProps extends HTMLAttributes<HTMLDivElement> {
 	checked: CheckedState;
 }
 
-const CustomFilterItem = ({ checked, children, ...props }: CustomFilterItemProps) => {
+const CustomFilterItem = ({ checked, className, children, ...props }: CustomFilterItemProps) => {
 	return (
-		<MenuItem {...props}>
+		<MenuItem
+			className={cn("!bg-transparent hover:!bg-secondary-bg-hover focus:!bg-secondary-bg-hover", className)}
+			{...props}
+		>
 			<Checkbox checked={checked} />
-			<span className="font-normal text-primary-fg text-xs">{children}</span>
+			<span className="font-normal text-sm">{children}</span>
 		</MenuItem>
 	);
 };
 
-const FilterItem = ({ checked, name, ...props }: FilterItemProps) => {
+const FilterItem = ({ checked, className, name, ...props }: FilterItemProps) => {
 	return (
-		<MenuItem {...props}>
+		<MenuItem
+			className={cn("!bg-transparent hover:!bg-secondary-bg-hover focus:!bg-secondary-bg-hover", className)}
+			{...props}
+		>
 			<Checkbox checked={checked} />
-			<span className="font-normal text-primary-fg text-xs">{name}</span>
+			<span className="font-normal text-sm">{name}</span>
 		</MenuItem>
 	);
 };
 
 export const ReviewAuthorsFilter = ({ selectedEmails, onChange }: ReviewAuthorsFilterProps) => {
-	const authors = useReviewAuthors();
+	const { authors, isLoading } = useReviewAuthors();
 	const [search, setSearch] = useState("");
 
 	const filtered = useMemo(() => {
@@ -49,8 +58,6 @@ export const ReviewAuthorsFilter = ({ selectedEmails, onChange }: ReviewAuthorsF
 			? authors.filter((a) => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q))
 			: authors;
 	}, [authors, search]);
-
-	const allSelected = selectedEmails === null ? true : selectedEmails.length === 0 ? false : "indeterminate";
 
 	const toggleAuthor = useCallback(
 		(email: string) => {
@@ -62,39 +69,48 @@ export const ReviewAuthorsFilter = ({ selectedEmails, onChange }: ReviewAuthorsF
 		[selectedEmails, authors, onChange],
 	);
 
+	const allSelected = selectedEmails === null ? true : selectedEmails.length === 0 ? false : "indeterminate";
+
 	const handleSelectAll = useCallback(() => {
 		onChange(selectedEmails !== null ? null : []);
 	}, [onChange, selectedEmails]);
 
 	return (
-		<div className="space-y-2">
-			<div className="flex items-center justify-between">
-				<span className="text-xs font-normal uppercase text-muted tracking-wide">
-					{t("editor.modes.filters.authors.title")}
-				</span>
+		<div className="space-y-1.5">
+			<div>
+				<Label className="text-xs text-muted ml-2">{t("editor.modes.filters.authors.title")}</Label>
+				<PopoverInput
+					className="h-8 text-sm"
+					onChange={(value) => setSearch(value)}
+					placeholder={t("editor.modes.filters.authors.placeholder")}
+					startIcon={<Icon className="text-muted" icon="search" />}
+					value={search}
+				/>
 			</div>
-			<TextInput
-				className="h-8 text-sm"
-				onChange={(value) => setSearch(value)}
-				placeholder={t("editor.modes.filters.authors.placeholder")}
-				startIcon={<Icon className="text-muted" icon="search" />}
-				value={search}
-			/>
 			<ScrollShadowContainer className="max-h-48 space-y-0.5">
-				<CustomFilterItem checked={allSelected} onClick={handleSelectAll}>
+				<CustomFilterItem checked={allSelected} className="!text-muted" onClick={handleSelectAll}>
 					({t("select-all").toLowerCase()})
 				</CustomFilterItem>
-				{filtered.map((author) => {
-					const isSelected = selectedEmails === null || selectedEmails.includes(author.email);
-					return (
-						<FilterItem
-							checked={isSelected}
-							key={author.email}
-							name={author.name}
-							onClick={() => toggleAuthor(author.email)}
-						/>
-					);
-				})}
+
+				{isLoading ? (
+					<>
+						<Skeleton className="h-8 w-full rounded-md" />
+						<Skeleton className="h-8 w-full rounded-md" />
+					</>
+				) : (
+					filtered.map((author) => {
+						const isSelected = selectedEmails === null || selectedEmails.includes(author.email);
+						return (
+							<FilterItem
+								checked={isSelected}
+								className="text-primary-fg"
+								key={author.email}
+								name={author.name}
+								onClick={() => toggleAuthor(author.email)}
+							/>
+						);
+					})
+				)}
 			</ScrollShadowContainer>
 		</div>
 	);

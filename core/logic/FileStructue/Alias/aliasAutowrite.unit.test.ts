@@ -1,5 +1,5 @@
 import type { ItemProps } from "@core/FileStructue/Item/Item";
-import { dropAutoAlias, hasManualAlias, nowMoved, recordMoveAlias } from "./aliasAutowrite";
+import { canonicalMoved, dropAutoAlias, hasManualAlias, nowMoved, recordMoveAlias } from "./aliasAutowrite";
 
 const MOVED = "2026-07-14T10:00:00Z";
 
@@ -79,5 +79,31 @@ describe("aliasAutowrite", () => {
 
 	test("nowMoved emits UTC ISO 8601 at second precision", () => {
 		expect(nowMoved()).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+	});
+
+	describe("canonicalMoved", () => {
+		test("keeps a value that is already canonical", () => {
+			expect(canonicalMoved(MOVED)).toBe(MOVED);
+		});
+
+		test("folds a client JSON round trip back to second precision", () => {
+			// SitePresenter -> JSON -> props editor -> updateProps turns any Date into this
+			expect(canonicalMoved("2026-07-14T10:00:00.000Z")).toBe(MOVED);
+		});
+
+		test("folds a Date, which is what gray-matter makes of an unquoted timestamp", () => {
+			expect(canonicalMoved(new Date("2026-07-14T10:00:00Z"))).toBe(MOVED);
+		});
+
+		test("shifts a non-UTC offset to UTC", () => {
+			expect(canonicalMoved("2026-07-14T13:00:00+03:00")).toBe(MOVED);
+		});
+
+		test("unparseable, empty and absent values yield undefined so no moved is written", () => {
+			expect(canonicalMoved("not a date")).toBeUndefined();
+			expect(canonicalMoved("")).toBeUndefined();
+			expect(canonicalMoved(undefined)).toBeUndefined();
+			expect(canonicalMoved(null)).toBeUndefined();
+		});
 	});
 });

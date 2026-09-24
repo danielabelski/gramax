@@ -8,7 +8,7 @@ COPY . .
 
 RUN rm -rf services
 
-RUN ["./install-deps.sh", "--ci"]
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc ./install-deps.sh --ci
 
 ARG BUGSNAG_API_KEY
 ARG PRODUCTION
@@ -24,6 +24,9 @@ RUN [ "npm", "--prefix", "apps/web", "run", "build" ]
 FROM gitlab.ics-it.ru:4567/ics/doc-reader/spa:${USE_IMAGE_TAG:-latest-dev} AS run
 
 WORKDIR /app
+
+RUN apt-get update && apt-get upgrade -y && \
+	rm -rf /var/lib/apt/lists/*
 
 ENV PORT=80
 

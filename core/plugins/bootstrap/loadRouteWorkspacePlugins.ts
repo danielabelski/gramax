@@ -5,6 +5,7 @@ import { addEvent, Level, span } from "@ext/loggers/opentelemetry";
 import type { WorkspacePath } from "@ext/workspace/WorkspaceConfig";
 import type { PluginProps } from "@gramax/sdk";
 import { clearAllPlugins, getPluginIsReady, loadPlugins, makePluginReady } from "@plugins/store";
+import type { PluginLoadIssue, PluginLoadResult } from "@plugins/store/PluginStore";
 import type { PluginConfig } from "@plugins/types";
 import { ensureWorkspacePluginsLoaded } from "./WorkspacePluginBootstrap";
 
@@ -12,6 +13,7 @@ export interface RouteWorkspacePluginPreload<TArgs> {
 	getRoute: (args: TArgs) => string | undefined;
 	getProps?: (args: TArgs) => PluginProps | undefined;
 	onPluginLoadError?: (pluginName: string) => void;
+	onPluginCompatibilityIssue?: (issue: PluginLoadIssue) => void;
 	onError?: (error: unknown) => void;
 }
 
@@ -27,10 +29,11 @@ interface LoadRouteWorkspacePluginsOptions {
 	force?: boolean;
 	// Override store ops to use server-side ALS state instead of the Zustand default.
 	clearAllPlugins?: () => void;
-	loadPlugins?: (plugins: PluginConfig[], props?: PluginProps, app?: unknown) => Promise<void>;
+	loadPlugins?: (plugins: PluginConfig[], props?: PluginProps, app?: unknown) => Promise<PluginLoadResult>;
 	makePluginReady?: () => void;
 	getPluginIsReady?: () => boolean;
 	onPluginLoadError?: (pluginName: string) => void;
+	onPluginCompatibilityIssue?: (issue: PluginLoadIssue) => void;
 	onError?: (error: unknown) => void;
 }
 
@@ -54,6 +57,7 @@ export const loadRouteWorkspacePlugins = async ({
 	makePluginReady: MakePluginReady = makePluginReady,
 	getPluginIsReady: GetPluginIsReady = getPluginIsReady,
 	onPluginLoadError,
+	onPluginCompatibilityIssue,
 	onError,
 }: LoadRouteWorkspacePluginsOptions) => {
 	const workspacePath = await resolveRouteWorkspacePath(route, app);
@@ -69,6 +73,7 @@ export const loadRouteWorkspacePlugins = async ({
 		makePluginReady: MakePluginReady,
 		getPluginIsReady: GetPluginIsReady,
 		onPluginLoadError,
+		onPluginCompatibilityIssue,
 		onError,
 	});
 };

@@ -11,6 +11,10 @@ export default class ModulithChatBotSearcher implements ChatBotSearcher {
 		private readonly _wm: WorkspaceManager,
 	) {}
 
+	async checkConnection(): Promise<boolean> {
+		return await this._searcher.checkConnection();
+	}
+
 	async search(args: SearchArgs): Promise<ChatBotSearchItem[]>;
 	async search(args: SearchStreamArgs): Promise<ChatBotSearchStream>;
 	async search(args: SearchArgs | SearchStreamArgs): Promise<ChatBotSearchItem[] | ChatBotSearchStream> {

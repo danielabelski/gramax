@@ -22,7 +22,7 @@ import { isExternalLink } from "@core-ui/hooks/useExternalLink";
 import { useCatalogPropsStore } from "@core-ui/stores/CatalogPropsStore/CatalogPropsStore.provider";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-type ResourceCallback = (buffer: Buffer, error?: ResourceError) => void | Promise<void>;
+type ResourceCallback = (buffer: Buffer, error?: ResourceError, signal?: AbortSignal) => void | Promise<void>;
 
 type UseGetResource = (
 	callback: ResourceCallback,
@@ -33,9 +33,23 @@ type UseGetResource = (
 	skipLoad?: boolean,
 ) => void;
 
-const loadingSrcByStore = new WeakMap<object, Map<string, Promise<{ error: ResourceLoadError }>>>();
+type ResourceLoadResult = { error?: ResourceError } | undefined;
 
-function getLoadingSrcForStore(store: object | undefined): Map<string, Promise<{ error: ResourceLoadError }>> {
+interface LoadingEntry {
+	cacheVersion: number;
+	controller: AbortController;
+	promise: Promise<ResourceLoadResult>;
+}
+
+interface PrintWait {
+	token: symbol;
+	promise: Promise<void>;
+	resolve: () => void;
+}
+
+const loadingSrcByStore = new WeakMap<object, Map<string, LoadingEntry>>();
+
+function getLoadingSrcForStore(store: object | undefined): Map<string, LoadingEntry> {
 	if (!store) return new Map();
 	if (!loadingSrcByStore.has(store)) {
 		loadingSrcByStore.set(store, new Map());
@@ -46,72 +60,89 @@ function getLoadingSrcForStore(store: object | undefined): Map<string, Promise<{
 export const useGetResource: UseGetResource = (callback, src, content?, haveParentPath = true, isPrint?, skipLoad?) => {
 	const store = useResourceStoreContext();
 	const loadingPromises = useMemo(() => getLoadingSrcForStore(store), [store]);
-	const resolvePromiseRef = useRef<() => void>(null);
-	const promiseRef = useRef<Promise<void>>(null);
-	const { data, id, provider, update } = useResourceStore(
-		(state) => ({ data: state.data, id: state.id, provider: state.provider, update: state.update }),
+	const printWaitRef = useRef<PrintWait>(null);
+	const callbackRef = useRef(callback);
+	const callbackAbortControllerRef = useRef<AbortController>(null);
+	const { id, provider, update } = useResourceStore(
+		(state) => ({ id: state.id, provider: state.provider, update: state.update }),
 		"shallow",
 	);
 	const apiUrlCreator = ApiUrlCreator.value;
 	const catalogName = useCatalogPropsStore((state) => state.data?.name);
 
-	useEffect(() => {
+	const beginPrintWait = useCallback((): symbol | undefined => {
 		if (!isPrint) return;
-		promiseRef.current = new Promise<void>((resolve) => {
-			resolvePromiseRef.current = resolve;
+		const previousWait = printWaitRef.current;
+		const token = Symbol("resource-load");
+		let resolve: () => void;
+		const promise = new Promise<void>((promiseResolve) => {
+			resolve = promiseResolve;
 		});
-		ResourceService._loadingPromises.add(promiseRef.current);
-		promiseRef.current.finally(() => ResourceService._loadingPromises.delete(promiseRef.current));
-
-		return () => {
-			resolvePromiseRef.current?.();
-		};
+		printWaitRef.current = { token, promise, resolve };
+		ResourceService._loadingPromises.add(promise);
+		void promise.finally(() => ResourceService._loadingPromises.delete(promise));
+		previousWait?.resolve();
+		return token;
 	}, [isPrint]);
 
+	const finishPrintWait = useCallback((token?: symbol) => {
+		const wait = printWaitRef.current;
+		if (!wait || (token && wait.token !== token)) return;
+		printWaitRef.current = null;
+		wait.resolve();
+	}, []);
+
 	const loadInternalDataCallback = useCallback(
-		async (src: string): Promise<ResourceFetchResult> =>
-			loadInternalData({ src, apiUrlCreator, catalogName, id, provider }),
+		async (src: string, signal: AbortSignal): Promise<ResourceFetchResult> =>
+			loadInternalData({ src, apiUrlCreator, catalogName, id, provider, signal }),
 		[id, provider, catalogName],
 	);
 
 	const wrappedCallback = useCallback(
 		async (buffer: Buffer | undefined, error?: ResourceError) => {
+			callbackAbortControllerRef.current?.abort();
+			const controller = new AbortController();
+			const printWaitToken = printWaitRef.current?.token;
+			callbackAbortControllerRef.current = controller;
 			try {
-				await Promise.resolve(callback(buffer, error));
+				await Promise.resolve(callbackRef.current(buffer, error, controller.signal));
 			} finally {
-				resolvePromiseRef.current?.();
+				if (callbackAbortControllerRef.current === controller) {
+					callbackAbortControllerRef.current = null;
+					finishPrintWait(printWaitToken);
+				}
 			}
 		},
-		[callback],
+		[finishPrintWait],
 	);
 
 	const setError = useCallback(
-		(result: { error: ResourceLoadError }) => {
+		(result: ResourceLoadResult) => {
 			if (!result?.error) return;
-			wrappedCallback(undefined, result.error);
+			void wrappedCallback(undefined, result.error);
 		},
 		[wrappedCallback],
 	);
 
 	const tryLoadResource = useCallback(
-		async (src: string) => {
+		async (src: string, cacheVersion: number, signal: AbortSignal) => {
 			let result: { buffer?: Buffer; error?: ResourceError };
 			try {
 				if (!haveParentPath) {
-					result = await getNoParentResource(new Path(src), apiUrlCreator);
+					result = await getNoParentResource(new Path(src), apiUrlCreator, signal);
 				} else {
 					result = isExternalLink(src).isUrl
-						? await loadExternalData(src)
-						: await loadInternalDataCallback(src);
+						? await loadExternalData(src, signal)
+						: await loadInternalDataCallback(src, signal);
 				}
 			} catch (e) {
+				if (signal.aborted) return;
 				const error = new ResourceLoadError(src, e instanceof Error ? e : undefined);
 				if (isPrint) return { error };
 				throw e;
-			} finally {
-				loadingPromises.delete(src);
 			}
 
+			if (signal.aborted) return;
 			if (result.error) {
 				return { error: result.error };
 			}
@@ -124,44 +155,94 @@ export const useGetResource: UseGetResource = (callback, src, content?, havePare
 				return { error: new ResourceEmptyError(src) };
 			}
 
+			if (store?.getState().cacheVersion !== cacheVersion) return;
 			update(src, result.buffer);
 		},
-		[update, haveParentPath, isPrint, loadInternalDataCallback, loadingPromises],
+		[update, haveParentPath, isPrint, loadInternalDataCallback, store],
 	);
 
 	const loadData = useCallback(
-		async (src: string) => {
-			if (!loadingPromises.has(src)) {
-				const promise = tryLoadResource(src);
-
-				loadingPromises.set(src, promise);
+		async (src: string, cacheVersion: number) => {
+			let loadingEntry = loadingPromises.get(src);
+			if (!loadingEntry || loadingEntry.cacheVersion !== cacheVersion) {
+				loadingEntry?.controller.abort();
+				const controller = new AbortController();
+				loadingEntry = {
+					cacheVersion,
+					controller,
+					promise: tryLoadResource(src, cacheVersion, controller.signal),
+				};
+				loadingPromises.set(src, loadingEntry);
 			}
 
-			const result = await loadingPromises.get(src);
+			const result = await loadingEntry.promise;
+			if (loadingPromises.get(src) === loadingEntry) loadingPromises.delete(src);
+			if (loadingEntry.controller.signal.aborted) return;
+			if (store?.getState().cacheVersion !== cacheVersion) return;
 			setError(result);
 		},
-		[tryLoadResource, setError, loadingPromises],
+		[tryLoadResource, setError, loadingPromises, store],
 	);
+	const loadDataRef = useRef(loadData);
+
+	callbackRef.current = callback;
+	loadDataRef.current = loadData;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	useEffect(() => {
-		if (skipLoad) return;
+		const printWaitToken = beginPrintWait();
+		if (skipLoad) {
+			finishPrintWait(printWaitToken);
+			return;
+		}
 		if (content) {
-			wrappedCallback(Buffer.from(content));
-			return;
+			void wrappedCallback(Buffer.from(content));
+			return () => {
+				callbackAbortControllerRef.current?.abort();
+				finishPrintWait();
+			};
 		}
 
-		if (data?.[src]) {
-			const buffer = data[src];
+		let hasDelivered = false;
+		const deliver = (buffer: Buffer) => {
+			hasDelivered = true;
 			const lfsError = checkLfsPointer(buffer, src);
-			if (lfsError) {
-				wrappedCallback(undefined, lfsError);
-			} else {
-				wrappedCallback(buffer);
-			}
-			return;
-		}
+			void wrappedCallback(lfsError ? undefined : buffer, lfsError);
+		};
 
-		loadData(src);
-	}, [src, data?.[src], content, skipLoad]);
+		const unsubscribe = store?.subscribe((state, previousState) => {
+			if (state.id !== previousState.id || state.provider !== previousState.provider) {
+				beginPrintWait();
+				callbackAbortControllerRef.current?.abort();
+				return;
+			}
+			if (state.cacheVersion !== previousState.cacheVersion) {
+				beginPrintWait();
+				callbackAbortControllerRef.current?.abort();
+				void loadDataRef.current(src, state.cacheVersion);
+				return;
+			}
+
+			const buffer = state.data?.[src];
+			const resourceChanged = state.resourceVersions[src] !== previousState.resourceVersions[src];
+			const restoredForPrint = isPrint && hasDelivered && !previousState.data?.[src] && !!buffer;
+			if (!resourceChanged && !restoredForPrint && (!buffer || hasDelivered)) return;
+			if (buffer) {
+				deliver(buffer);
+				return;
+			}
+			void loadDataRef.current(src, state.cacheVersion);
+		});
+
+		const state = store?.getState();
+		const cached = state?.data?.[src];
+		if (cached) deliver(cached);
+		else void loadDataRef.current(src, state?.cacheVersion ?? 0);
+
+		return () => {
+			callbackAbortControllerRef.current?.abort();
+			finishPrintWait();
+			unsubscribe?.();
+		};
+	}, [src, content, skipLoad, store, id, provider, isPrint, beginPrintWait, finishPrintWait]);
 };

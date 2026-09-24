@@ -17,37 +17,47 @@ declare global {
 
 type Callback<T, U> = (value: T, index: number, array: T[]) => Promise<U>;
 
-Array.prototype.mapAsync = async function <T, U>(
+/**
+ * Added the way the built-in array methods are: not enumerable.
+ *
+ * A plain assignment to `Array.prototype` is enumerable, so every `for...in` over an array in the test
+ * process yields these names along with the indices. Libraries check for exactly that and refuse to run —
+ * pdf.js throws "Array.prototype contains unexpected enumerable property" before it reads a byte.
+ */
+const defineArrayMethod = (name: string, method: (...args: never[]) => unknown) =>
+	Object.defineProperty(Array.prototype, name, { value: method, writable: true, configurable: true });
+
+defineArrayMethod("mapAsync", async function <T, U>(
 	this: T[],
 	callback: Callback<T, U>,
 	concurrencyLimit: number = 5,
 ): Promise<U[]> {
 	return asyncUtils.mapAsync(this, callback, concurrencyLimit);
-};
+} as never);
 
-Array.prototype.forEachAsync = async function <T>(
+defineArrayMethod("forEachAsync", async function <T>(
 	this: T[],
 	callback: Callback<T, void>,
 	concurrencyLimit: number = 5,
 ): Promise<void> {
 	return asyncUtils.forEachConcurrent(this, callback, concurrencyLimit);
-};
+} as never);
 
-Array.prototype.waitAll = async function <T>(this: Promise<T>[]): Promise<T[]> {
+defineArrayMethod("waitAll", async function <T>(this: Promise<T>[]): Promise<T[]> {
 	return Promise.all(this);
-};
+} as never);
 
-Array.prototype.waitAllSettled = async function <T>(this: Promise<T>[]): Promise<PromiseSettledResult<T>[]> {
+defineArrayMethod("waitAllSettled", async function <T>(this: Promise<T>[]): Promise<PromiseSettledResult<T>[]> {
 	return Promise.allSettled(this);
-};
+} as never);
 
-Array.prototype.waitAny = async function <T>(this: Promise<T>[]): Promise<T> {
+defineArrayMethod("waitAny", async function <T>(this: Promise<T>[]): Promise<T> {
 	return Promise.any(this);
-};
+} as never);
 
-Array.prototype.waitRace = async function <T>(this: Promise<T>[]): Promise<T> {
+defineArrayMethod("waitRace", async function <T>(this: Promise<T>[]): Promise<T> {
 	return Promise.race(this);
-};
+} as never);
 
 export const asyncUtils = {
 	mapSeq: async <T, U>(array: T[], callback: Callback<T, U>): Promise<U[]> => {

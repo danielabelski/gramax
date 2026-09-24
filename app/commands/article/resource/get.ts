@@ -26,7 +26,7 @@ const get: Command<
 	kind: ResponseKind.blob,
 
 	async do({ src, mimeType, catalogName, articlePath, ifNotExistsErrorText, ctx, providerType }) {
-		const { parser, parserContextFactory, wm, healthcheckRegistry } = this._app;
+		const { parser, parserContextFactory, wm } = this._app;
 		const workspace = wm.current();
 		const mime = mimeType ?? MimeTypes?.[src.extension] ?? `application/${src.extension}`;
 		const catalog = await workspace.getCatalog(catalogName, ctx);
@@ -54,7 +54,7 @@ const get: Command<
 		const hashItem = await article.parsedContent.read((p) => {
 			const rm = p.parsedContext?.getResourceManager();
 			if (!rm) return null;
-			return new HashResourceManager(src, rm, ctx, healthcheckRegistry);
+			return new HashResourceManager(src, rm, ctx);
 		});
 
 		return { hashItem, mime };

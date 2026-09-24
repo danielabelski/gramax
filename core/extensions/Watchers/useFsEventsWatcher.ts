@@ -1,5 +1,6 @@
 import ArticleUpdaterService from "@components/Article/ArticleUpdater/ArticleUpdaterService";
 import { useRouter } from "@core/Api/useRouter";
+import type { ClientItemRef } from "@core/SitePresenter/SitePresenter";
 import FetchService from "@core-ui/ApiServices/FetchService";
 import MimeTypes from "@core-ui/ApiServices/Types/MimeTypes";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
@@ -21,7 +22,7 @@ type FsHandleResult = {
 	navChanged: boolean;
 	itemLinks: ItemLink[] | null;
 	currentArticleRedirectTo: string | null;
-	modifiedArticleProps?: { path: string; props: Partial<ItemLink> }[];
+	modifiedArticleProps?: { ref: ClientItemRef; props: Partial<ItemLink> }[];
 };
 
 const useFsEventsWatcher = (): void => {

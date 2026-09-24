@@ -20,7 +20,7 @@ const logout = async (serverContext: ServerContext) => {
 		});
 	}
 
-	await app.am.logout(ctx.cookie, req, res);
+	await app.amp.current().logout(ctx.cookie, req, res);
 };
 
 export default logout;

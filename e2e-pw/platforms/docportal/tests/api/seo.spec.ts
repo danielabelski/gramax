@@ -1,5 +1,6 @@
 import { baseTest as test } from "@docportal/fixtures/base.fixture";
 import { expect } from "@playwright/test";
+import { getTestRepoInfoFromEnv } from "@utils/source";
 import { parseStringPromise } from "xml2js";
 
 test.use({ source: "env", user: "env" });
@@ -23,7 +24,8 @@ interface Sitemap {
 	};
 }
 
-const TEST_CATALOG_NAME = "test-catalog";
+// Matches the cloned repository name, not a fixed catalog name.
+const TEST_CATALOG_NAME = getTestRepoInfoFromEnv().testRepo;
 
 test.describe("SEO API", () => {
 	test.describe("Sitemaps", () => {

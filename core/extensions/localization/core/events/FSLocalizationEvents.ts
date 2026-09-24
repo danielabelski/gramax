@@ -9,6 +9,7 @@ import type { Item } from "@core/FileStructue/Item/Item";
 import type { ItemRef } from "@core/FileStructue/Item/ItemRef";
 import { ItemType } from "@core/FileStructue/Item/ItemType";
 import { addExternalItems } from "@ext/localization/core/addExternalItems";
+import { hideUntranslatedItems } from "@ext/localization/core/hideUntranslatedItems";
 import { markUntranslatedItems } from "@ext/localization/core/markUntranslatedItems";
 import assert from "assert";
 import type FileStructure from "../../../../logic/FileStructue/FileStructure";
@@ -45,9 +46,15 @@ export default class FSLocalizationEvents implements EventHandlerCollection {
 		);
 	}
 
+	// Editors are an authoring surface: an untranslated article has to stay visible there, that is
+	// where the translation gets written. Every other environment renders a published catalog.
+	private _isEditor = () => {
+		const environment = getExecutingEnvironment();
+		return environment === "web" || environment === "tauri";
+	};
+
 	private _onItemFilter = ({ catalogProps, item }: EventArgs<FSEvents, "item-filter">) => {
-		if (!catalogProps.language || getExecutingEnvironment() === "web" || getExecutingEnvironment() === "tauri")
-			return true;
+		if (!catalogProps.language || this._isEditor()) return true;
 
 		if (item.props.external && item.type === ItemType.article) return false;
 		if (item.props.external && item.type === ItemType.category) {
@@ -74,6 +81,10 @@ export default class FSLocalizationEvents implements EventHandlerCollection {
 		// read-only provider, and they are exactly the readers that never build the `external` marker
 		// themselves (see markUntranslatedItems).
 		markUntranslatedItems(catalog);
+
+		// `item-filter` runs during hydration, before the marker above exists, so the items it was
+		// meant to drop are already in the tree by now — prune them here instead (#859).
+		if (!this._isEditor()) hideUntranslatedItems(catalog);
 
 		if (catalog.isFpReadOnly) return;
 

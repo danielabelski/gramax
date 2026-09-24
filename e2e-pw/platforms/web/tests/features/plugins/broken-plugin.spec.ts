@@ -11,7 +11,7 @@ catalogTest.use({
 		...CATALOG,
 		...workspacePlugins({
 			"broken-plugin": {
-				"_metadata.json": meta("broken-plugin"),
+				"manifest.json": meta("broken-plugin"),
 				// intentionally no "broken-plugin.js" — missing script triggers onPluginLoadError
 			},
 		}),

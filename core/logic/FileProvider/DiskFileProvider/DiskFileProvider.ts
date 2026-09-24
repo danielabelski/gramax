@@ -1,6 +1,7 @@
 import { getExecutingEnvironment } from "@app/resolveModule/env";
 import { EventEmitter } from "@core/Event/EventEmitter";
 import { moveToTrash, RustFs } from "@core/FileProvider/DiskFileProvider/DFPIntermediateCommands";
+import { isPermissionDenied } from "@core/FileProvider/DiskFileProvider/DFPIOError";
 import type CompressOptions from "@core/FileProvider/model/CompressOptions";
 import type FileInfo from "@core/FileProvider/model/FileInfo";
 import type FileProvider from "@core/FileProvider/model/FileProvider";
@@ -67,7 +68,10 @@ export default class DiskFileProvider implements FileProvider {
 					path: path.join(new Path(stat.name)),
 				} as FileInfo),
 			);
-		} catch {
+		} catch (e) {
+			// An unreadable folder is not an empty folder — reporting it as empty is what makes
+			// a catalog silently vanish from the tree instead of asking for access.
+			if (isPermissionDenied(e)) throw e;
 			return [];
 		}
 	}
@@ -176,7 +180,7 @@ export default class DiskFileProvider implements FileProvider {
 		return (await this._backend().readFile(this._rel(path))).toString();
 	}
 
-	@trace({ level: Level.Full })
+	@trace({ level: Level.Full, omitResult: true })
 	async readAsBinary(path: Path): Promise<Buffer> {
 		try {
 			return await this._backend().readFile(this._rel(path));
@@ -241,6 +245,9 @@ export default class DiskFileProvider implements FileProvider {
 				err?.code === "NotFound"
 			)
 				return false;
+			// A folder we are not allowed to read is not a folder that is gone. Let the refusal
+			// through under its own name so the workspace layer can offer System Settings.
+			if (isPermissionDenied(e)) throw e;
 			throw new Error(`Root path ${this._rootPath.value} not exist`, { cause: e });
 		}
 	}

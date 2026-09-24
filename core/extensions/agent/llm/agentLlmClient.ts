@@ -1,6 +1,7 @@
 import type { AgentLlmAdapter } from "./agentLlmAdapter";
 import { AgentLlmAdapter as AgentLlmAdapterClass } from "./agentLlmAdapter";
 import { AgentLlmChat } from "./agentLlmChat";
+import type { AgentLlmEndpoint } from "./agentLlmEndpoint";
 import { AgentLlmEventMapper } from "./agentLlmEventMapper";
 
 export class AgentLlmClient {
@@ -14,11 +15,7 @@ export class AgentLlmClient {
 		this.chat = chat;
 	}
 
-	static create(apiUrl: string, apiKey: string): AgentLlmClient {
-		return new AgentLlmClient(
-			new AgentLlmAdapterClass(apiUrl, apiKey),
-			new AgentLlmEventMapper(),
-			new AgentLlmChat(),
-		);
+	static create(endpoint: AgentLlmEndpoint): AgentLlmClient {
+		return new AgentLlmClient(new AgentLlmAdapterClass(endpoint), new AgentLlmEventMapper(), new AgentLlmChat());
 	}
 }

@@ -8,6 +8,9 @@ CVE-2025-68121 # crypto/tls: Unexpected session resumption in crypto/tls
 
 CVE-2025-14087 # glib: GLib: Buffer underflow in GVariant parser leads to heap corruption
 
+# next
+CVE-2026-75604 # Windows-only RCE; production image runs on Debian
+GHSA-2xp9-vwfh-vxw4 # AVIF Image Optimization API is not used
 
 # openssl
 CVE-2025-15467

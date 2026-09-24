@@ -24,7 +24,7 @@ const NavigationDropdown: FC<NavigationDropdownProps> = (props) => {
 	};
 
 	return (
-		<DropdownMenu onOpenChange={handleOpenChange}>
+		<DropdownMenu modal={false} onOpenChange={handleOpenChange}>
 			<DropdownMenuTrigger asChild>
 				<div className={className} data-qa={dataQa} data-testid={dataTestId} style={style}>
 					<Tooltip>

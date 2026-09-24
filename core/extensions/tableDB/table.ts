@@ -52,13 +52,11 @@ export interface Link {
 export class TableDB {
 	private _wm: WorkspaceManager;
 	private _tables: Map<string, Table[]> = new Map();
-	private _parseToHtml: (content: string) => Promise<string>;
 
-	constructor(parser: MarkdownParser) {
-		this._parseToHtml = parser.parseToHtml.bind(parser);
-	}
+	constructor(private _parser: MarkdownParser) {}
 
-	@trace({ level: Level.Important })
+	// the manager reaches AppConfig through its fields — never serialize it into a span
+	@trace({ level: Level.Important, omitArgs: true })
 	mountWorkspaceManager(wm: WorkspaceManager): void {
 		this._wm = wm;
 		this._wm.onCatalogChange(this._onChange.bind(this));
@@ -200,7 +198,9 @@ export class TableDB {
 	}
 
 	private async _parseToMd(str: string): Promise<string> {
-		return str ? String(await this._parseToHtml(str)) : str;
+		if (!str) return str;
+		const content = await this._parser.parse(str);
+		return this._parser.getHtml(content.renderTree);
 	}
 
 	private async _parseTableToMd(table: Table): Promise<void> {

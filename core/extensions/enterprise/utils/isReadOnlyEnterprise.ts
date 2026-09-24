@@ -1,30 +1,21 @@
 import { getExecutingEnvironment } from "@app/resolveModule/env";
 import type { ReadonlyCatalog } from "@core/FileStructue/Catalog/ReadonlyCatalog";
 import type EnterpriseUser from "@ext/enterprise/EnterpriseUser";
-import { editCatalogContentPermission, editCatalogPermission } from "@ext/security/logic/Permission/Permissions";
 import type User from "@ext/security/logic/User/User";
+import {
+	isReadOnlyBranchByPermissions,
+	isReadOnlyCatalogByPermissions,
+} from "../../enterpriseCommon/logic/Catalog/IsCatalogReadonly";
 
-const isReadOnlyCatalog = async (user: User, catalog: ReadonlyCatalog) => {
-	if (!(await catalog?.repo?.gvc?.isInit())) return false;
+const isReadOnlyCatalog = (user: User, catalog: ReadonlyCatalog) => {
 	const enterpriseInfo = (user as EnterpriseUser).getEnterpriseInfo();
-	const containsEditPermission = enterpriseInfo.catalogPermission.enough(catalog.name, editCatalogContentPermission);
-	return !containsEditPermission;
+	return isReadOnlyCatalogByPermissions(catalog, enterpriseInfo.catalogPermission);
 };
 
-const isReadOnlyBranch = async (user: User, catalog: ReadonlyCatalog) => {
+const isReadOnlyBranch = (user: User, catalog: ReadonlyCatalog) => {
 	const enterpriseInfo = (user as EnterpriseUser).getEnterpriseInfo();
 	const props = enterpriseInfo.catalogsProps;
-	const allowedBranches = props?.[catalog?.name]?.branches ?? [];
-
-	try {
-		const branch = await catalog?.repo?.gvc?.getCurrentBranch?.();
-		if (!branch) return false;
-		const branchStr = branch.toString();
-		if (enterpriseInfo.catalogPermission.enough(catalog.name, editCatalogPermission)) return false;
-		return !allowedBranches.includes(branchStr);
-	} catch {
-		return false;
-	}
+	return isReadOnlyBranchByPermissions(catalog, enterpriseInfo.catalogPermission, props);
 };
 
 const isReadOnlyEnterprise = async (user: User, catalog: ReadonlyCatalog) => {

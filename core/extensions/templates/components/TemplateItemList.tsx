@@ -1,42 +1,42 @@
 import Icon from "@components/Atoms/Icon";
-import SpinnerLoader from "@components/Atoms/SpinnerLoader";
-import NavigationTabsService from "@components/Layouts/LeftNavigationTabs/NavigationTabsService";
-import { LeftNavigationTab } from "@components/Layouts/StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
 import type { ClientArticleProps } from "@core/SitePresenter/SitePresenter";
 import FetchService from "@core-ui/ApiServices/FetchService";
 import MimeTypes from "@core-ui/ApiServices/Types/MimeTypes";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import ModalToOpenService from "@core-ui/ContextServices/ModalToOpenService/ModalToOpenService";
 import ModalToOpen from "@core-ui/ContextServices/ModalToOpenService/model/ModalsToOpen";
-import { useApi } from "@core-ui/hooks/useApi";
+import { RequestStatus, useApi } from "@core-ui/hooks/useApi";
+import useMediaQuery from "@core-ui/hooks/useMediaQuery";
+import { cssMedia } from "@core-ui/utils/cssUtils";
 import type { ProviderItemProps } from "@ext/articleProvider/models/types";
 import t from "@ext/localization/locale/translate";
 import type { TemplateContentWarningProps } from "@ext/templates/components/TemplateContentWarning";
-import TemplateService from "@ext/templates/components/TemplateService";
+import { TEMPLATES_PANEL_ID } from "@ext/templates/components/TemplatesPanel/types/constants";
 import {
+	DropdownEmpty,
 	DropdownMenuItem,
+	DropdownMenuSearchItem,
 	DropdownMenuSeparator,
 	DropdownMenuSub,
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
+	useSearchableMenu,
 } from "@ui-kit/Dropdown";
-import { useCallback, useState } from "react";
+import { usePanelToggle } from "@ui-kit/FloatingPanel";
+import { Loader } from "@ui-kit/Loader";
+import { TextOverflowTooltip } from "@ui-kit/Tooltip";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 const TemplateItemList = ({ itemRefPath }: { itemRefPath: string }) => {
 	const [list, setList] = useState<ProviderItemProps[]>([]);
-	const [isApiRequest, setIsApiRequest] = useState(false);
+	const triggerRef = useRef<HTMLDivElement>(null);
+	const { toggle } = usePanelToggle(TEMPLATES_PANEL_ID, triggerRef);
+	const isMobile = useMediaQuery(cssMedia.JSnarrow);
 
-	const { call: fetchTemplateItems } = useApi<ProviderItemProps[]>({
+	const { call: fetchTemplateItems, status } = useApi<ProviderItemProps[]>({
 		url: (api) => api.getArticleListInGramaxDir("template"),
-		onStart: () => {
-			setIsApiRequest(true);
-		},
-		onDone: (data) => {
-			setList(data);
-		},
-		onFinally: () => {
-			setIsApiRequest(false);
-		},
+		onDone: (data) => setList(data),
+		parse: "json",
 	});
 
 	const { call: getArticleContent } = useApi<string>({
@@ -71,7 +71,7 @@ const TemplateItemList = ({ itemRefPath }: { itemRefPath: string }) => {
 			ModalToOpenService.resetValue();
 			await refreshPage();
 		},
-		[itemRefPath, apiUrlCreator, getItemProps, setModalLoader],
+		[itemRefPath, getItemProps, setModalLoader],
 	);
 
 	const onSelectHandler = useCallback(
@@ -84,7 +84,7 @@ const TemplateItemList = ({ itemRefPath }: { itemRefPath: string }) => {
 					initialIsOpen: true,
 					templateName: item.title,
 					action: () => {
-						setAsTemplate(item);
+						void setAsTemplate(item);
 					},
 					onClose: () => {
 						ModalToOpenService.resetValue();
@@ -97,49 +97,86 @@ const TemplateItemList = ({ itemRefPath }: { itemRefPath: string }) => {
 		[getArticleContent, setAsTemplate],
 	);
 
-	const items = isApiRequest
-		? [
-				<DropdownMenuItem disabled key={0}>
-					<SpinnerLoader height={14} width={14} />
-					{t("loading")}
-				</DropdownMenuItem>,
-			]
-		: list.map((item) => (
-				<DropdownMenuItem key={item.id} onSelect={() => onSelectHandler(item)}>
-					{item.title.length ? item.title : t("article.no-name")}
-				</DropdownMenuItem>
-			));
+	const { search, setSearch, contentRef, inputRef, handleContentKeyDown, handleInputKeyDown, filterItems } =
+		useSearchableMenu();
+
+	const filteredTemplates = useMemo(
+		() => filterItems(list.map((template) => ({ ...template, label: template.title ?? "" }))),
+		[list, filterItems],
+	);
 
 	const onOpen = useCallback(
 		(open: boolean) => {
-			if (open) fetchTemplateItems();
-			else {
-				setList([]);
-				setIsApiRequest(true);
-			}
+			if (!open) return setSearch("");
+			if (status !== RequestStatus.Loading) fetchTemplateItems();
 		},
-		[fetchTemplateItems],
+		[fetchTemplateItems, setSearch, status],
 	);
 
-	const onNewTemplate = useCallback(async () => {
-		NavigationTabsService.setTop(LeftNavigationTab.Template);
-		const newTemplate = await TemplateService.addNewTemplate(apiUrlCreator);
-		TemplateService.openItem(newTemplate);
-	}, [apiUrlCreator]);
+	const isReady = status === RequestStatus.Ready;
+	const hasTemplates = list.length > 0;
 
 	return (
 		<DropdownMenuSub onOpenChange={onOpen}>
 			<DropdownMenuSubTrigger>
-				<Icon code="layout-template" />
-				{t("template.choose-template")}
+				<div className="flex items-center gap-2" data-testid="templates-menu">
+					<Icon code="layout-template" />
+					{t("template.choose-template")}
+				</div>
 			</DropdownMenuSubTrigger>
-			<DropdownMenuSubContent>
-				{items.length ? items : <DropdownMenuItem disabled>{t("template.no-templates")}</DropdownMenuItem>}
+			<DropdownMenuSubContent
+				alignOffset={!isMobile ? -18 : 0}
+				className="max-w-[min(20rem,var(--radix-dropdown-menu-content-available-width,100%))]"
+				onKeyDown={handleContentKeyDown}
+				ref={contentRef}
+				sideOffset={!isMobile ? 2 : 6}
+			>
+				<DropdownMenuSearchItem
+					onChange={(event) => setSearch(event.target.value)}
+					onClick={(event) => event.stopPropagation()}
+					onKeyDown={handleInputKeyDown}
+					placeholder={`${t("find2")} ${t("template.name").toLowerCase()}`}
+					ref={inputRef}
+					value={search}
+				/>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem onSelect={onNewTemplate}>
-					<Icon code="plus" />
-					{t("template.new-template")}
-				</DropdownMenuItem>
+				<div className="flex-1 max-h-44 overflow-y-auto">
+					{!isReady ? (
+						<DropdownMenuItem disabled>
+							<div className="flex items-center gap-2">
+								<Loader size="sm" />
+								{t("loading")}
+							</div>
+						</DropdownMenuItem>
+					) : hasTemplates ? (
+						filteredTemplates.length === 0 ? (
+							<DropdownEmpty>{t("list.no-results-found")}</DropdownEmpty>
+						) : (
+							filteredTemplates.map((item) => (
+								<DropdownMenuItem
+									key={item.id}
+									onSelect={() => void onSelectHandler(item)}
+									textValue={item.title ?? ""}
+								>
+									<TextOverflowTooltip className="block w-full min-w-0 flex-1">
+										{item.title || t("article.no-name")}
+									</TextOverflowTooltip>
+								</DropdownMenuItem>
+							))
+						)
+					) : (
+						<DropdownMenuItem disabled>{t("template.no-templates")}</DropdownMenuItem>
+					)}
+				</div>
+				<div className="mt-auto">
+					<DropdownMenuSeparator />
+					<DropdownMenuItem onSelect={toggle} textValue="manage-templates">
+						<div className="flex items-center gap-2" data-testid="manage-templates" ref={triggerRef}>
+							<Icon code="layout-template" />
+							{t("templates-panel-manage")}
+						</div>
+					</DropdownMenuItem>
+				</div>
 			</DropdownMenuSubContent>
 		</DropdownMenuSub>
 	);

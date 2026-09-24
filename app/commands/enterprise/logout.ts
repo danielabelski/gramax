@@ -38,7 +38,7 @@ const logout: Command<{ ctx: Context; id: WorkspacePath }, void> = Command.creat
 		}
 
 		await this._commands.ai.server.removeAiData.do({ ctx, workspacePath: id });
-		await this._app.am.logout(ctx.cookie);
+		await this._app.amp.current().logout(ctx.cookie);
 	},
 
 	params(ctx, q) {

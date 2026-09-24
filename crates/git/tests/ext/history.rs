@@ -6,11 +6,7 @@ use std::fs;
 use test_utils::git::*;
 use test_utils::*;
 
-fn commit_at(repo: &Repo<TestCreds>, sandbox: &TempDir, content: &str, timestamp: i64) -> Result<Oid> {
-	let filename = format!("file_{}", content.replace(' ', "_"));
-	fs::write(sandbox.path().join(&filename), content)?;
-	repo.add(&filename)?;
-
+fn commit_all_at(repo: &Repo<TestCreds>, message: &str, timestamp: i64) -> Result<Oid> {
 	let sig = Signature::new("test-user", "test@email.com", &git2::Time::new(timestamp, 0))?;
 	let mut index = repo.repo().index()?;
 	index.add_all(["."].iter(), git2::IndexAddOption::DEFAULT, None)?;
@@ -21,8 +17,31 @@ fn commit_at(repo: &Repo<TestCreds>, sandbox: &TempDir, content: &str, timestamp
 	let head = repo.repo().head().ok().and_then(|h| h.peel_to_commit().ok());
 	let parents: Vec<_> = head.iter().collect();
 
-	let oid = repo.repo().commit(Some("HEAD"), &sig, &sig, content, &tree, &parents)?;
+	let oid = repo.repo().commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)?;
 	Ok(oid)
+}
+
+fn commit_at(repo: &Repo<TestCreds>, sandbox: &TempDir, content: &str, timestamp: i64) -> Result<Oid> {
+	let filename = format!("file_{}", content.replace(' ', "_"));
+	fs::write(sandbox.path().join(&filename), content)?;
+	repo.add(&filename)?;
+
+	commit_all_at(repo, content, timestamp)
+}
+
+fn commit_by(repo: &Repo<TestCreds>, name: &str, email: &str, message: &str) -> Result<Oid> {
+	let sig = Signature::now(name, email)?;
+
+	let mut index = repo.repo().index()?;
+	index.add_all(["."].iter(), git2::IndexAddOption::DEFAULT, None)?;
+	let tree_oid = index.write_tree()?;
+	index.write()?;
+	let tree = repo.repo().find_tree(tree_oid)?;
+
+	let head = repo.repo().head().ok().and_then(|h| h.peel_to_commit().ok());
+	let parents: Vec<_> = head.iter().collect();
+
+	Ok(repo.repo().commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)?)
 }
 
 #[rstest]
@@ -252,7 +271,7 @@ fn get_commit_info_filter_by_date(sandbox: TempDir, #[with(&sandbox)] repo: Repo
 				authors: None,
 				after_date: Some("2024-01-01T00:00:00Z".to_string()),
 				before_date: Some("2024-03-01T00:00:00Z".to_string()),
-				paths: None,
+				pathspecs: None,
 			}),
 			include_changed_files: None,
 		},
@@ -292,7 +311,7 @@ fn get_commit_info_filter_by_author(sandbox: TempDir, #[with(&sandbox)] repo: Re
 				authors: Some(vec!["test@email.com".to_string()]),
 				after_date: None,
 				before_date: None,
-				paths: None,
+				pathspecs: None,
 			}),
 			include_changed_files: None,
 		},
@@ -321,7 +340,7 @@ fn get_commit_info_filter_after_date_stops_early(sandbox: TempDir, #[with(&sandb
 				authors: None,
 				after_date: Some("2024-02-01T00:00:00Z".to_string()),
 				before_date: None,
-				paths: None,
+				pathspecs: None,
 			}),
 			include_changed_files: None,
 		},
@@ -335,7 +354,7 @@ fn get_commit_info_filter_after_date_stops_early(sandbox: TempDir, #[with(&sandb
 }
 
 #[rstest]
-fn get_commit_info_filter_by_paths(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+fn get_commit_info_filter_by_pathspecs(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	// commit touching "alpha"
 	fs::write(sandbox.path().join("alpha"), "v1")?;
 	repo.add_all()?;
@@ -362,7 +381,7 @@ fn get_commit_info_filter_by_paths(sandbox: TempDir, #[with(&sandbox)] repo: Rep
 				authors: None,
 				after_date: None,
 				before_date: None,
-				paths: Some(vec!["alpha".to_string()]),
+				pathspecs: Some(vec!["alpha".to_string()]),
 			}),
 			include_changed_files: None,
 		},
@@ -375,7 +394,7 @@ fn get_commit_info_filter_by_paths(sandbox: TempDir, #[with(&sandbox)] repo: Rep
 }
 
 #[rstest]
-fn get_commit_info_filter_by_paths_multiple(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+fn get_commit_info_filter_by_pathspecs_multiple(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	fs::write(sandbox.path().join("alpha"), "v1")?;
 	repo.add_all()?;
 	repo.commit_debug()?;
@@ -399,7 +418,7 @@ fn get_commit_info_filter_by_paths_multiple(sandbox: TempDir, #[with(&sandbox)] 
 				authors: None,
 				after_date: None,
 				before_date: None,
-				paths: Some(vec!["alpha".to_string(), "beta".to_string()]),
+				pathspecs: Some(vec!["alpha".to_string(), "beta".to_string()]),
 			}),
 			include_changed_files: None,
 		},
@@ -411,7 +430,240 @@ fn get_commit_info_filter_by_paths_multiple(sandbox: TempDir, #[with(&sandbox)] 
 }
 
 #[rstest]
-fn get_commit_info_filter_by_paths_empty_paths_returns_all(
+fn get_commit_info_filter_by_pathspecs_looks_past_merges(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+	fs::write(sandbox.path().join("alpha"), "line1\nline2\nv1\n")?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+
+	// alpha is edited on a side branch, master only touches an unrelated file
+	repo.new_branch("feature")?;
+	fs::write(sandbox.path().join("alpha"), "line1\nline2\nv2\n")?;
+	repo.add_all()?;
+	let (edit, edit_summary) = repo.commit_debug()?;
+
+	repo.checkout("master", true)?;
+	fs::write(sandbox.path().join("beta"), "unrelated\n")?;
+	repo.add_all()?;
+	let (unrelated, _) = repo.commit_debug()?;
+
+	fs::write(sandbox.path().join("alpha"), "line1\nline2\nv2\n")?;
+	let sig = Signature::now("test-user", "test@email.com")?;
+	let mut index = repo.repo().index()?;
+	index.add_all(["."].iter(), git2::IndexAddOption::DEFAULT, None)?;
+	let tree = repo.repo().find_tree(index.write_tree()?)?;
+	index.write()?;
+	let parents = [repo.repo().find_commit(unrelated)?, repo.repo().find_commit(edit)?];
+	let merge =
+		repo.repo().commit(Some("HEAD"), &sig, &sig, "merge feature", &tree, &[&parents[0], &parents[1]])?;
+
+	let result = repo.get_commit_info(
+		merge,
+		CommitInfoOpts {
+			depth: 10,
+			simplify: true,
+			filters: Some(CommitFilterOptions {
+				authors: None,
+				after_date: None,
+				before_date: None,
+				pathspecs: Some(vec!["alpha".to_string()]),
+			}),
+			include_changed_files: None,
+		},
+	)?;
+
+	let summaries: Vec<_> = result.iter().map(|c| c.summary.as_str()).collect();
+
+	assert!(summaries.contains(&edit_summary.as_str()), "the commit merged in is the one that edited alpha");
+	assert!(!summaries.contains(&"merge feature"), "the merge itself changed nothing");
+
+	Ok(())
+}
+
+#[rstest]
+fn get_commit_authors_of_the_whole_catalog(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+	fs::write(sandbox.path().join("alpha"), "v1")?;
+	commit_by(&repo, "alpha-author", "alpha@email.com", "alpha")?;
+
+	fs::write(sandbox.path().join("beta"), "v1")?;
+	commit_by(&repo, "beta-author", "beta@email.com", "beta")?;
+
+	let authors = repo.get_commit_authors(None)?;
+	let emails: Vec<_> = authors.iter().map(|a| a.author.email.as_str()).collect();
+
+	assert!(emails.contains(&"alpha@email.com"));
+	assert!(emails.contains(&"beta@email.com"));
+
+	Ok(())
+}
+
+#[rstest]
+fn get_commit_authors_of_pathspecs_follows_renames(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+	fs::write(sandbox.path().join("alpha"), "line1\nline2\nline3\nline4\nv1\n")?;
+	commit_by(&repo, "alpha-author", "alpha@email.com", "alpha")?;
+
+	fs::write(sandbox.path().join("beta"), "v1")?;
+	commit_by(&repo, "beta-author", "beta@email.com", "beta")?;
+
+	fs::create_dir_all(sandbox.path().join("moved"))?;
+	fs::write(sandbox.path().join("moved/alpha"), "line1\nline2\nline3\nline4\nv1\n")?;
+	fs::remove_file(sandbox.path().join("alpha"))?;
+	commit_by(&repo, "mover", "mover@email.com", "move alpha")?;
+
+	let authors = repo.get_commit_authors(Some(vec!["moved/alpha".to_string()]))?;
+	let emails: Vec<_> = authors.iter().map(|a| a.author.email.as_str()).collect();
+
+	assert!(emails.contains(&"alpha@email.com"), "author from before the move should be kept");
+	assert!(emails.contains(&"mover@email.com"), "author of the move itself should be kept");
+	assert!(!emails.contains(&"beta@email.com"), "author of an unrelated file should be dropped");
+
+	Ok(())
+}
+
+#[rstest]
+fn get_commit_range_of_the_whole_catalog(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+	// the commit the fixture starts the repo with is dated now, so it stays the newest one
+	let init = repo.repo().head()?.peel_to_commit()?.id();
+
+	let jan = commit_at(&repo, &sandbox, "jan commit", JAN_1)?;
+	commit_at(&repo, &sandbox, "feb commit", FEB_1)?;
+	commit_at(&repo, &sandbox, "mar commit", MAR_1)?;
+
+	let range = repo.get_commit_range(None)?.expect("the catalog has commits");
+
+	assert_eq!(range.start.date, JAN_1 * 1000, "the range starts at the oldest commit");
+	assert_eq!(range.start.oid, jan.short_info()?);
+	assert_eq!(range.end.oid, init.short_info()?, "the ends are picked by date, not by walk order");
+
+	Ok(())
+}
+
+#[rstest]
+fn get_commit_range_of_pathspecs_follows_renames(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+	fs::write(sandbox.path().join("alpha"), "line1\nline2\nline3\nline4\nv1\n")?;
+	let created = commit_all_at(&repo, "create alpha", JAN_1)?;
+
+	fs::write(sandbox.path().join("beta"), "v1")?;
+	commit_all_at(&repo, "unrelated file", MAR_1)?;
+
+	fs::create_dir_all(sandbox.path().join("moved"))?;
+	fs::write(sandbox.path().join("moved/alpha"), "line1\nline2\nline3\nline4\nv1\n")?;
+	fs::remove_file(sandbox.path().join("alpha"))?;
+	let moved = commit_all_at(&repo, "move alpha", FEB_1)?;
+
+	let range = repo.get_commit_range(Some(vec!["moved/alpha".to_string()]))?.expect("the path has commits");
+
+	assert_eq!(range.start.oid, created.short_info()?, "the range starts before the move");
+	assert_eq!(range.end.oid, moved.short_info()?, "the commit of an unrelated file stays out of the range");
+
+	Ok(())
+}
+
+#[rstest]
+fn get_commit_range_is_none_for_an_unknown_path(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+	fs::write(sandbox.path().join("alpha"), "v1")?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+
+	assert!(repo.get_commit_range(Some(vec!["never/committed".to_string()]))?.is_none());
+
+	Ok(())
+}
+
+#[rstest]
+fn file_history_resolves_a_merge_into_the_commit_behind_it(
+	sandbox: TempDir,
+	#[with(&sandbox)] repo: Repo<TestCreds>,
+) -> Result {
+	fs::write(sandbox.path().join("alpha"), "line1\nline2\nv1\n")?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+
+	// alpha is edited on a side branch, master only touches an unrelated file
+	repo.new_branch("feature")?;
+	fs::write(sandbox.path().join("alpha"), "line1\nline2\nv2\n")?;
+	repo.add_all()?;
+	let (edit, _) = repo.commit_debug()?;
+
+	repo.checkout("master", true)?;
+	fs::write(sandbox.path().join("beta"), "unrelated\n")?;
+	repo.add_all()?;
+	let (unrelated, _) = repo.commit_debug()?;
+
+	fs::write(sandbox.path().join("alpha"), "line1\nline2\nv2\n")?;
+	let sig = Signature::now("test-user", "test@email.com")?;
+	let mut index = repo.repo().index()?;
+	index.add_all(["."].iter(), git2::IndexAddOption::DEFAULT, None)?;
+	let tree = repo.repo().find_tree(index.write_tree()?)?;
+	index.write()?;
+	let parents = [repo.repo().find_commit(unrelated)?, repo.repo().find_commit(edit)?];
+	repo.repo().commit(Some("HEAD"), &sig, &sig, "merge feature", &tree, &[&parents[0], &parents[1]])?;
+
+	let history = repo.history("alpha", 0, 10)?;
+	let commits: Vec<_> = history.iter().map(|d| d.commit_oid()).collect();
+
+	assert!(commits.contains(&edit.to_string().as_str()), "the commit merged in is the one that edited alpha");
+	assert_eq!(history.len(), 2, "the merge itself changed nothing, so only the edit and the creation are left");
+
+	Ok(())
+}
+
+#[rstest]
+fn get_commit_info_filter_by_pathspecs_follows_renames(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+	let content = |last: &str| format!("line1\nline2\nline3\nline4\n{last}\n");
+
+	fs::write(sandbox.path().join("alpha"), content("v1"))?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+
+	fs::write(sandbox.path().join("alpha"), content("v2"))?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+
+	// commit touching an unrelated file
+	fs::write(sandbox.path().join("beta"), "beta")?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+
+	// move alpha -> moved/alpha
+	fs::create_dir_all(sandbox.path().join("moved"))?;
+	fs::write(sandbox.path().join("moved/alpha"), content("v2"))?;
+	fs::remove_file(sandbox.path().join("alpha"))?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+
+	fs::write(sandbox.path().join("moved/alpha"), content("v3"))?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+
+	let head = repo.repo().head()?.peel_to_commit()?;
+
+	let result = repo.get_commit_info(
+		head.id(),
+		CommitInfoOpts {
+			depth: 10,
+			simplify: false,
+			filters: Some(CommitFilterOptions {
+				authors: None,
+				after_date: None,
+				before_date: None,
+				pathspecs: Some(vec!["moved/alpha".to_string()]),
+			}),
+			include_changed_files: Some(true),
+		},
+	)?;
+
+	assert_eq!(result.len(), 4, "should return commits from before and after the move");
+
+	let move_commit = &result[1];
+	let changed: Vec<_> = move_commit.stat.changed_files.as_ref().unwrap().iter().map(|f| f.path.as_str()).collect();
+	assert!(changed.contains(&"moved/alpha"), "move commit should list the new path");
+	assert!(changed.contains(&"alpha"), "move commit should list the old path");
+
+	Ok(())
+}
+
+#[rstest]
+fn get_commit_info_filter_by_pathspecs_empty_returns_all(
 	sandbox: TempDir,
 	#[with(&sandbox)] repo: Repo<TestCreds>,
 ) -> Result {
@@ -432,13 +684,13 @@ fn get_commit_info_filter_by_paths_empty_paths_returns_all(
 				authors: None,
 				after_date: None,
 				before_date: None,
-				paths: Some(vec![]),
+				pathspecs: Some(vec![]),
 			}),
 			include_changed_files: None,
 		},
 	)?;
 
-	assert!(result.len() >= 3, "empty paths filter should not exclude any commits");
+	assert!(result.len() >= 3, "empty pathspecs filter should not exclude any commits");
 
 	Ok(())
 }

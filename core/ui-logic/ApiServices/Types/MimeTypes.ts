@@ -11,6 +11,7 @@ enum MimeTypes {
 	js = "text/javascript",
 	css = "text/css",
 	gif = "image/gif",
+	webp = "image/webp",
 	yaml = "application/yaml",
 	pdf = "application/pdf",
 	xls = "application/vnd.ms-excel",

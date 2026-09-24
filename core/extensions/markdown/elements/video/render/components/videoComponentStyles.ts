@@ -14,7 +14,6 @@ const videoComponentStyles = tv({
 		"has-[iframe]:h-full",
 		"has-[iframe]:mb-2",
 		"has-[iframe]:[&>div]:h-full",
-		"[&_.error-text-parent]:overflow-hidden",
 		"[&_iframe]:flex",
 		"[&_iframe]:h-full",
 		"[&_iframe]:w-full",

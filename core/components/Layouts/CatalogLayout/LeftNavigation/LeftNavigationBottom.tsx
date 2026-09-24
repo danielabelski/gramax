@@ -1,76 +1,90 @@
-import type { ArticlePageData } from "@core/SitePresenter/types/ArticlePage";
-import SidebarsIsOpenService from "@core-ui/ContextServices/Sidebars/SidebarsIsOpenContext";
-import WorkspaceService from "@core-ui/ContextServices/Workspace";
-import useMediaQuery from "@core-ui/hooks/useMediaQuery";
+import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
 import { usePlatform } from "@core-ui/hooks/usePlatform";
 import { useCatalogPropsStore } from "@core-ui/stores/CatalogPropsStore/CatalogPropsStore.provider";
-import { useItemLinksStore } from "@core-ui/stores/ItemLinksStore/ItemLinksStore.provider";
-import { cssMedia } from "@core-ui/utils/cssUtils";
-import CreateArticle from "@ext/article/actions/CreateArticle";
-import PermissionService from "@ext/security/logic/Permission/components/PermissionService";
+import ConnectStorage from "@ext/catalog/actions/ConnectStorage";
+import useIsOffline from "@ext/errorHandlers/hooks/useIsOffline";
+import RepositoryBroken from "@ext/git/actions/RepositoryBroken";
+import getCommitOidFromPathname from "@ext/git/actions/Revisions/logic/utils/getCommitOidFromPathname";
+import Sync from "@ext/git/actions/Sync/components/Sync";
+import t from "@ext/localization/locale/translate";
+import { useIsStorageConnected } from "@ext/storage/logic/utils/useStorage";
 import {
-	configureCatalogPermission,
-	editCatalogContentPermission,
-	readPermission,
-} from "@ext/security/logic/Permission/Permissions";
-import ExtensionBarLayout from "../../ExtensionBarLayout";
-import ArticleStatusBar from "../../StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
-import PinToggleArrowIcon from "./PinToggleArrowIcon";
+	GlassToolbar,
+	GlassToolbarButton,
+	GlassToolbarIcon,
+	GlassToolbarSeparator,
+	GlassToolbarText,
+} from "@ui-kit/GlassToolbar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
+import { OfflineButton } from "./OfflineButton";
+import PublishButton from "./PublishButton";
 
-const LeftNavigationBottom = ({ data, closeNavigation }: { data: ArticlePageData; closeNavigation?: () => void }) => {
-	const lastRootItem = useItemLinksStore((state) => state?.itemLinks?.at(-1));
-	const { catalogName, sourceName, resolvedVersion } = useCatalogPropsStore(
-		(state) => ({
-			catalogName: state.data?.name,
-			sourceName: state.data?.sourceName,
-			resolvedVersion: state.data?.resolvedVersion,
-		}),
+const LeftNavigationBottom = () => {
+	const isOffline = useIsOffline();
+	const { isNext } = usePlatform();
+	const { isReadOnly } = PageDataContextService.value.conf;
+	const isStorageConnected = useIsStorageConnected();
+	const { catalogName, repositoryError } = useCatalogPropsStore(
+		(state) => ({ catalogName: state.data?.name, repositoryError: state.data?.repositoryError }),
 		"shallow",
 	);
-	const isCatalogExist = !!catalogName;
-	const leftNavIsOpen = SidebarsIsOpenService.value.left;
-	const mediumMedia = useMediaQuery(cssMedia.JSmedium);
-	const workspacePath = WorkspaceService.current().path;
-	const { isNext, isStatic, isStaticCli } = usePlatform();
-	const isStaticOrStaticCli = isStatic || isStaticCli;
-
-	const canConfigureCatalog = PermissionService.useCheckPermission(configureCatalogPermission, workspacePath);
-	const canEditContentCatalog = PermissionService.useCheckPermission(
-		editCatalogContentPermission,
-		workspacePath,
-		catalogName,
+	const isRevision = !!getCommitOidFromPathname(catalogName);
+	const isPublishDisabled = isOffline || (!isNext && isReadOnly);
+	const publishDisabledReason = isRevision ? t("git.publish.error.at-revision") : t("git.publish.error.main-branch");
+	const actionsToolbar = (
+		<GlassToolbar className="w-fit pr-1">
+			<Sync disable={isOffline} />
+			{!isNext && (
+				<>
+					<GlassToolbarSeparator />
+					<PublishButton
+						disable={isPublishDisabled}
+						disabledReason={!isNext && isReadOnly ? publishDisabledReason : undefined}
+					/>
+				</>
+			)}
+		</GlassToolbar>
 	);
-	const canReadContentCatalog = PermissionService.useCheckPermission(readPermission, workspacePath, catalogName);
-	const canSeeStatusBar =
-		!isStaticOrStaticCli &&
-		((isNext && canConfigureCatalog) ||
-			(!isNext && (canEditContentCatalog || canReadContentCatalog || !sourceName))) &&
-		!resolvedVersion;
 
 	return (
-		<div data-qa="qa-status-bar">
-			<ExtensionBarLayout
-				height={34}
-				leftExtensions={
-					isCatalogExist
-						? [
-								<CreateArticle
-									after={lastRootItem}
-									key={0}
-									onCreate={closeNavigation}
-									root={data.rootRef}
-								/>,
-							]
-						: null
-				}
-				padding={{
-					left: leftNavIsOpen ? "14px" : "0",
-					right: leftNavIsOpen ? "14px" : "6px",
-					bottom: "0px",
-				}}
-				rightExtensions={mediumMedia ? null : [<PinToggleArrowIcon key={1} />]}
-			/>
-			{canSeeStatusBar && isCatalogExist && <ArticleStatusBar padding={"0 6px"} />}
+		<div className="flex items-center gap-2" data-qa="qa-status-bar" data-testid="left-navigation-bottom">
+			{!isStorageConnected ? (
+				<GlassToolbar className="w-fit px-1">
+					<ConnectStorage
+						trigger={
+							<GlassToolbarButton data-qa="qa-connect-storage" focusable>
+								<GlassToolbarIcon icon="cloud-off" />
+								<GlassToolbarText className="text-xs font-medium">
+									{t("connect-storage")}
+								</GlassToolbarText>
+							</GlassToolbarButton>
+						}
+					/>
+				</GlassToolbar>
+			) : repositoryError ? (
+				<GlassToolbar className="w-fit px-1">
+					<RepositoryBroken
+						error={repositoryError}
+						trigger={
+							<GlassToolbarButton aria-label={t("git.error.broken.tooltip")} focusable>
+								<GlassToolbarIcon icon="cloud-alert" />
+							</GlassToolbarButton>
+						}
+					/>
+				</GlassToolbar>
+			) : isRevision ? (
+				<Tooltip>
+					<TooltipTrigger asChild>{actionsToolbar}</TooltipTrigger>
+					<TooltipContent>{t("git.sync.error.at-revision")}</TooltipContent>
+				</Tooltip>
+			) : (
+				actionsToolbar
+			)}
+			{isOffline && !isNext && (
+				<GlassToolbar variant="single">
+					<OfflineButton />
+				</GlassToolbar>
+			)}
 		</div>
 	);
 };

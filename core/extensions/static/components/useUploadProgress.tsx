@@ -1,37 +1,64 @@
 import FetchService from "@core-ui/ApiServices/FetchService";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
-import useWatch from "@core-ui/hooks/useWatch";
+import { Level, traced } from "@ext/loggers/opentelemetry";
 import type { UploadStatus } from "@ext/static/logic/CloudUploadStatus";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const useUploadProgress = (startUploading: boolean, setError?) => {
+const POLL_INTERVAL_MS = 500;
+
+const useUploadProgress = (startUploading: boolean, setError?: (error: string) => void) => {
 	const [data, setData] = useState<UploadStatus>({ status: null });
-	const [isUploading, setIsUploading] = useState(false);
 	const apiUrlCreator = ApiUrlCreatorService.value;
 
-	useWatch(() => {
-		if (startUploading) setIsUploading(true);
-	}, [startUploading]);
+	// biome-ignore lint/correctness/useExhaustiveDependencies(setError): колбэк только вызывается; в зависимостях инлайновая функция перезапускала бы поллинг на каждый рендер
+	useEffect(() => {
+		if (!startUploading) return;
 
-	useWatch(() => {
-		if (!isUploading) return;
+		setData({ status: null });
 
-		const intervalIdx = setInterval(async () => {
-			const res = await FetchService.fetch<UploadStatus>(apiUrlCreator.getUploadStatus());
-			if (!res.ok) return;
+		let cancelled = false;
+		// Статус живёт на сервере только пока идёт публикация: на фазе сборки его ещё нет,
+		// а по завершении upload-команда удаляет его в finally. Поэтому пустой ответ —
+		// признак завершения только после того, как статус хотя бы раз пришёл.
+		let statusSeen = false;
+		let intervalIdx: ReturnType<typeof setInterval>;
 
-			const data = await res.json();
-			data && setData(data);
+		const stop = () => {
+			cancelled = true;
+			clearInterval(intervalIdx);
+		};
 
-			if (data?.status === "error") {
-				setIsUploading(false);
-				clearInterval(intervalIdx);
-				setError(data.error);
+		const poll = async () => {
+			try {
+				await traced("cloud-upload-status-poll", { level: Level.Internal }, async () => {
+					const res = await FetchService.fetch<UploadStatus>(apiUrlCreator.getUploadStatus());
+					if (cancelled || !res.ok) return;
+
+					const status = await res.json();
+					if (cancelled) return;
+
+					if (!status) {
+						if (statusSeen) stop();
+						return;
+					}
+
+					statusSeen = true;
+					setData(status);
+
+					if (status.status === "error") {
+						stop();
+						setError?.(status.error);
+					}
+				});
+			} catch {
+				// Колбэк интервала асинхронный: реджект здесь стал бы unhandled rejection.
+				// Исключение уже записано в span внутри traced.
 			}
+		};
 
-			return () => clearInterval(intervalIdx);
-		}, 500);
-	}, [isUploading]);
+		intervalIdx = setInterval(poll, POLL_INTERVAL_MS);
+		return stop;
+	}, [startUploading]);
 
 	return data;
 };

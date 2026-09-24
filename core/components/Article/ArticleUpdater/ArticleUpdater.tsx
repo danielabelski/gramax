@@ -24,6 +24,10 @@ const ArticleUpdater = ({ children }: { children: JSX.Element }) => {
 			if (newData.itemLinks) setItemLinks(newData.itemLinks);
 			resourceService.clear();
 			const editor = getEditorStore().editor;
+			// isDestroyed, not just null: tiptap's destroy() nulls commandManager and schema, so
+			// chain() below would throw on a destroyed instance. The store can still hold one —
+			// switching the article view (ArticleViewService.setLoadingView) unmounts the editor
+			// while this update is already in flight.
 			if (!editor || editor.isDestroyed) return;
 			const parsed = parseArticleContent(newData.content);
 			if (!parsed) return;
@@ -33,8 +37,11 @@ const ArticleUpdater = ({ children }: { children: JSX.Element }) => {
 			// landing article echoes back here; a genuine external edit yields a different doc
 			// and still applies).
 			if (isUnchangedContent(editor, parsed)) return;
-			// Clear history to avoid nodes with resources don't be error on undo/redo
-			editor.chain().clearHistory().setContent(parsed).run();
+			// Clear history to avoid nodes with resources don't be error on undo/redo.
+			// `emitUpdate: false`: this content came from a page read, so it is already on disk —
+			// an emitted update would look like typing and save it back, over whatever the write
+			// that prompted the read had put there. `articleProps` above carries the fresh tocItems.
+			editor.chain().clearHistory().setContent(parsed, { emitUpdate: false }).run();
 		},
 		[updateArticleProps, setItemLinks],
 	);

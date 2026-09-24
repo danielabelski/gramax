@@ -97,7 +97,7 @@ export default class TemplateProvider extends ArticleProvider {
 
 		const markdown = await formatter.render({ type: "doc", content }, context);
 
-		const props = { ...article.props, logicPath: article.logicPath };
+		const props = { ...article.props };
 
 		const fields = props.fields || [];
 		const existField = fields.findIndex((f) => f.name === field);
@@ -109,7 +109,7 @@ export default class TemplateProvider extends ArticleProvider {
 
 		props.fields = fields;
 
-		await this._catalog.updateItemProps(props, resourceUpdaterFactory.withContext(ctx));
+		await this._catalog.updateItemProps(article, props, resourceUpdaterFactory.withContext(ctx));
 		await article.parsedContent.write(() => parser.parse(markdown, context));
 	}
 
@@ -122,7 +122,7 @@ export default class TemplateProvider extends ArticleProvider {
 		const article = this._catalog.findItemByItemPath<Article>(new Path(articlePath));
 		assert(article, `article ${articlePath} (field: ${field}) not found`);
 
-		const props = { ...article.props, logicPath: article.logicPath };
+		const props = { ...article.props };
 		if (!props.fields) return;
 
 		const existField = props.fields.findIndex((f) => f.name === field);
@@ -130,7 +130,7 @@ export default class TemplateProvider extends ArticleProvider {
 		if (existField === -1) return;
 
 		props.fields.splice(existField, 1);
-		await this._catalog.updateItemProps(props, resourceUpdaterFactory.withContext(ctx));
+		await this._catalog.updateItemProps(article, props, resourceUpdaterFactory.withContext(ctx));
 	}
 
 	private _findTemplate(id: ItemID) {

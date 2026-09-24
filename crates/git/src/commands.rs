@@ -335,9 +335,24 @@ pub fn commit(repo: &Path, creds: AccessTokenCreds, opts: CommitOptions) -> Resu
 
 #[tracing::instrument(target = TAG, fields(repo = %repo.short()), err)]
 pub fn count_changed_files(repo: &Path, search_in: &Path) -> Result<UpstreamCountChangedFiles> {
-	Repo::run_read(repo, DummyCreds, |repo| {
-		Ok(repo.count_changed_files(search_in).healthcheck_if_odb_error(&repo)?)
-	})
+	let count = || {
+		Repo::run_read(repo, DummyCreds, |repo| {
+			Ok(repo.count_changed_files(search_in).healthcheck_if_odb_error(&repo)?)
+		})
+	};
+
+	match count() {
+		// This runs on a timer while the user works, and it reads the index without taking the write
+		// lock. Writing an index is a replace — write a temporary file, rename it into place — so a read
+		// that lands inside that moment finds nothing there and libgit2 says the index no longer exists.
+		// The count is worth one more try rather than an error dialog over a file that exists again by
+		// the time it is read.
+		Err(error) if error.message.contains("failed to read index") => {
+			warn!(target: TAG, "index was being replaced while counting changes; retrying once");
+			count()
+		}
+		result => result,
+	}
 }
 
 #[tracing::instrument(target = TAG, fields(repo = %repo.short()), ret)]
@@ -392,8 +407,8 @@ pub fn get_remote(repo: &Path) -> Result<Option<String>> {
 }
 
 #[tracing::instrument(target = TAG, fields(repo = %repo.short()), ret)]
-pub fn stash(repo: &Path, message: Option<&str>, creds: AccessTokenCreds) -> Result<Option<String>> {
-	Repo::run_write(repo, creds, "stash", |mut repo| {
+pub fn stash(repo: &Path, message: Option<&str>) -> Result<Option<String>> {
+	Repo::run_write(repo, DummyCreds, "stash", |mut repo| {
 		let oid = repo.stash(message).healthcheck_if_odb_error(&repo)?;
 		Ok(oid.map(|oid| oid.to_string()))
 	})
@@ -405,6 +420,19 @@ pub fn stash_apply(repo: &Path, oid: &str) -> Result<MergeResult> {
 		let oid = Oid::from_str(oid).map_err(Error::from)?;
 		Ok(repo.stash_apply(oid).healthcheck_if_odb_error(&repo)?)
 	})
+}
+
+#[tracing::instrument(target = TAG, fields(repo = %repo.short()), ret)]
+pub fn stash_restore(repo: &Path, oid: &str) -> Result<MergeResult> {
+	Repo::run_write(repo, DummyCreds, "stash_restore", |mut repo| {
+		let oid = Oid::from_str(oid).map_err(Error::from)?;
+		Ok(repo.stash_restore(oid).healthcheck_if_odb_error(&repo)?)
+	})
+}
+
+#[tracing::instrument(target = TAG, fields(repo = %repo.short()), ret)]
+pub fn stash_list(repo: &Path) -> Result<Vec<StashInfo>> {
+	Repo::run_read(repo, DummyCreds, |repo| Ok(repo.stash_list()?))
 }
 
 #[tracing::instrument(target = TAG, fields(repo = %repo.short()), err)]
@@ -474,8 +502,13 @@ pub fn get_draft_merge_request(repo: &Path) -> Result<Option<MergeRequest>> {
 }
 
 #[tracing::instrument(target = TAG, fields(repo = %repo.short()), err)]
-pub fn get_all_commit_authors(repo: &Path) -> Result<Vec<CommitAuthorInfo>> {
-	Repo::run_read(repo, DummyCreds, |repo| Ok(repo.get_all_authors()?))
+pub fn get_commit_authors(repo: &Path, pathspecs: Option<Vec<String>>) -> Result<Vec<CommitAuthorInfo>> {
+	Repo::run_read(repo, DummyCreds, |repo| Ok(repo.get_commit_authors(pathspecs)?))
+}
+
+#[tracing::instrument(target = TAG, fields(repo = %repo.short()), err)]
+pub fn get_commit_range(repo: &Path, pathspecs: Option<Vec<String>>) -> Result<Option<CommitRangeInfo>> {
+	Repo::run_read(repo, DummyCreds, |repo| Ok(repo.get_commit_range(pathspecs)?))
 }
 
 #[tracing::instrument(target = TAG, fields(repo = %repo.short()), err)]

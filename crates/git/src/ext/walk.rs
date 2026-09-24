@@ -6,6 +6,7 @@ use std::fmt::Display;
 use git2::*;
 use itertools::Itertools;
 
+use crate::actions::stash::GRAMAX_STASH_MESSAGE;
 use crate::creds::Creds;
 use crate::error::OrUtf8Err;
 use crate::error::Result;
@@ -410,7 +411,7 @@ impl<C: Creds> Repo<'_, C> {
 
 				self.visit_objects_tree(tree, opts, ctx)?;
 
-				let is_gx_stash = commit.message().or_utf8_err()?.starts_with("gx-stash");
+				let is_gx_stash = commit.message().or_utf8_err()?.ends_with(GRAMAX_STASH_MESSAGE);
 
 				let parent_count = commit.parent_count();
 				for i in 0..parent_count {

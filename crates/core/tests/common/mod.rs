@@ -12,7 +12,6 @@ pub fn opts() -> ScanOpts {
 		docroot_filenames: vec!["docroot.yaml".into()],
 		workspace_config_filename: "workspace.yaml".into(),
 		docroot_search_depth: 5,
-		optional_category_index: false,
 		max_concurrency: 8,
 		follow_symlinks: false,
 		known_workspace_paths: Vec::new(),

@@ -49,3 +49,20 @@ describe("LibGit2Error.fromRaw — disk-full classification (#806)", () => {
 		);
 	});
 });
+
+describe("LibGit2Error.fromRaw — unreachable git server (#gx-network)", () => {
+	// Rust subset 5 = Error::Network (crates/git/src/error.rs), code = the http status
+	// post.ts recorded. 999 is the synthetic status it assigns when XHR reports 0 —
+	// the request never reached the server (DNS failure, offline, CORS rejection).
+	test("a synthetic 999 network status is a connectivity error, not a generic http error", () => {
+		const message =
+			"Failed to send request to 'https://gitlab.example.com/g/r.git': domain 'gitlab.example.com' unreachable or CORS headers incorrect";
+		expect(fromRaw(5, undefined, 999, message, "clone")).toBe(GitErrorCode.NetworkConntectionError);
+	});
+
+	test("real http statuses keep their existing classification", () => {
+		expect(fromRaw(5, undefined, 500, "internal server error")).toBe(GitErrorCode.HttpError);
+		expect(fromRaw(5, undefined, 403, "denied")).toBe(GitErrorCode.NotAuthorizedError);
+		expect(fromRaw(5, undefined, 404, "no repo")).toBe(GitErrorCode.RemoteRepositoryNotFoundError);
+	});
+});

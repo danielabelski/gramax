@@ -1,6 +1,6 @@
 export type GitRevisionsFilter = {
 	authors?: string[];
-	paths?: string[];
+	pathspecs?: string[];
 	beforeDate?: string;
 	afterDate?: string;
 };

@@ -65,7 +65,7 @@ const getFetchSelf =
 				}
 			});
 
-		const req: ApiRequest = { headers: {}, query: url.query, body: parseBody(body) };
+		const req: ApiRequest = { headers: {}, query: url.query, body: parseBody(body), clientAbortSignal: signal };
 
 		const process: Middleware = new ApiMiddleware(async (req, res) => {
 			const ctx = await app.contextFactory.fromWeb({

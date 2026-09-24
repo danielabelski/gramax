@@ -1,82 +1,151 @@
 import Path from "@core/FileProvider/Path/Path";
-import { ItemType } from "@core/FileStructue/Item/ItemType";
 import { CatalogItemLookup } from "./catalogPaths";
 
-describe("catalogPaths utils", () => {
-	test("normalizePath trims, removes leading slashes and normalizes separators", () => {
-		expect(new CatalogItemLookup("", "  /docs\\section\\a.md  ").itemPath).toBe("docs/section/a.md");
+describe("CatalogItemLookup", () => {
+	test("normalizePath trims, strips leading slashes and normalizes separators", () => {
+		expect(CatalogItemLookup.normalizePath("  /docs\\section\\a.md  ")).toBe("docs/section/a.md");
+		expect(CatalogItemLookup.normalizePath("")).toBe("");
+		expect(CatalogItemLookup.normalizePath("///\\\\")).toBe("");
+		expect(CatalogItemLookup.normalizePath("docs//section///a.md")).toBe("docs//section///a.md");
 	});
 
-	test("normalizePath handles empty and slash-only values", () => {
-		expect(new CatalogItemLookup("", "").itemPath).toBe("");
-		expect(new CatalogItemLookup("", "   ").itemPath).toBe("");
-		expect(new CatalogItemLookup("", "/").itemPath).toBe("");
-		expect(new CatalogItemLookup("", "\\").itemPath).toBe("");
-		expect(new CatalogItemLookup("", "///\\\\").itemPath).toBe("");
-	});
-
-	test("normalizePath keeps internal duplicate slashes as-is", () => {
-		expect(new CatalogItemLookup("", "docs//section///a.md").itemPath).toBe("docs//section///a.md");
-	});
-
-	test("buildPath concatenates normalized catalog and item paths", () => {
-		expect(new CatalogItemLookup("/docs", "\\section\\a.md").asPath()).toEqual(new Path("docs/section/a.md"));
-	});
-
-	test("buildPath handles empty catalog and item combinations", () => {
-		expect(new CatalogItemLookup("", "").asPath()).toEqual(new Path("/"));
-		expect(new CatalogItemLookup("docs", "").asPath()).toEqual(new Path("docs/"));
-		expect(new CatalogItemLookup("", "section/a.md").asPath()).toEqual(new Path("/section/a.md"));
-	});
-
-	test("buildCatalogItemLookup returns normalized values and full Path", () => {
-		const lookup = new CatalogItemLookup(" /docs ", " \\section\\a.md ");
-
+	test("constructor normalizes catalogName and gramax itemPath", () => {
+		const lookup = new CatalogItemLookup(" /docs ", " \\section\\a.md ", "Title");
 		expect(lookup.catalogName).toBe("docs");
 		expect(lookup.itemPath).toBe("section/a.md");
+		expect(lookup.title).toBe("Title");
 		expect(lookup.asPath()).toEqual(new Path("docs/section/a.md"));
 	});
 
-	test("buildCatalogItemLookup handles nested and mixed separator paths", () => {
-		const lookup = new CatalogItemLookup("\\team/docs\\", "guides\\api\\_index.md");
-
-		expect(lookup.catalogName).toBe("team/docs/");
-		expect(lookup.itemPath).toBe("guides/api/_index.md");
-		expect(lookup.asPath()).toEqual(new Path("team/docs//guides/api/_index.md"));
-	});
-
-	test("getTypeFromPath resolves article and category suffixes", () => {
-		expect(CatalogItemLookup.getTypeFromPath("section/a.md")).toBe(ItemType.article);
-		expect(CatalogItemLookup.getTypeFromPath("section/_index.md")).toBe(ItemType.category);
-		expect(CatalogItemLookup.getTypeFromPath("section/readme")).toBeNull();
-	});
-
-	test("fromCatalogItem builds lookup with editor pathname link", async () => {
-		const getPathname = jest.fn().mockResolvedValue("source/-/repo/branch/docs/section/a.md");
-		const catalog = {
+	test("fromCatalogItem + asAgentJSON maps article and category paths", () => {
+		const articleCatalog = {
 			name: "docs",
 			getRepositoryRelativePath: () => new Path("section/a.md"),
-			getPathname,
 		} as never;
-		const item = {
+		const article = {
 			ref: { path: new Path("docs/section/a.md") },
 			getTitle: () => "Article A",
 		} as never;
 
-		const lookup = await CatalogItemLookup.fromCatalogItem(catalog, item);
+		expect(CatalogItemLookup.fromCatalogItem(articleCatalog, article).asAgentJSON()).toEqual({
+			catalogName: "docs",
+			itemPath: "section/a",
+			title: "Article A",
+		});
 
-		expect(getPathname).toHaveBeenCalledWith(item);
-		expect(lookup).toMatchObject({
+		const categoryCatalog = {
+			name: "docs",
+			getRepositoryRelativePath: () => new Path("guides/_index.md"),
+		} as never;
+		const category = {
+			ref: { path: new Path("docs/guides/_index.md") },
+			getTitle: () => "Guides",
+		} as never;
+
+		expect(CatalogItemLookup.fromCatalogItem(categoryCatalog, category).asAgentJSON()).toEqual({
 			catalogName: "docs",
-			itemPath: "section/a.md",
-			title: "Article A",
-			link: "source/-/repo/branch/docs/section/a.md",
+			itemPath: "guides/",
+			title: "Guides",
 		});
-		expect(lookup.asJSON()).toEqual({
+	});
+
+	test("findItem resolves agent and gramax paths to the same item", () => {
+		const findItemByItemPath = jest.fn((path: Path) => {
+			if (path.value === "docs/guides/setup.md") return { ref: { path } } as never;
+			if (path.value === "docs/guides/_index.md") return { ref: { path } } as never;
+			return null;
+		});
+		const catalog = { name: "docs", findItemByItemPath } as never;
+
+		expect(CatalogItemLookup.findItem(catalog, "guides/setup")).toEqual({
+			ref: { path: new Path("docs/guides/setup.md") },
+		});
+		expect(CatalogItemLookup.findItem(catalog, "guides/setup.md")).toEqual({
+			ref: { path: new Path("docs/guides/setup.md") },
+		});
+		expect(findItemByItemPath).toHaveBeenCalledWith(new Path("docs/guides/setup.md"));
+
+		expect(CatalogItemLookup.findItem(catalog, "guides/")).toEqual({
+			ref: { path: new Path("docs/guides/_index.md") },
+		});
+		expect(CatalogItemLookup.findItem(catalog, "guides/_index.md")).toEqual({
+			ref: { path: new Path("docs/guides/_index.md") },
+		});
+		expect(findItemByItemPath).toHaveBeenCalledWith(new Path("docs/guides/_index.md"));
+	});
+
+	test("parseItemPath splits parent, fileName and type", () => {
+		expect(CatalogItemLookup.parseItemPath("guides/setup")).toEqual({
+			isCategory: false,
+			fileName: "setup",
+			parentAgentItemPath: "guides/",
+		});
+		expect(CatalogItemLookup.parseItemPath("guides/setup/")).toEqual({
+			isCategory: true,
+			fileName: "setup",
+			parentAgentItemPath: "guides/",
+		});
+		expect(CatalogItemLookup.parseItemPath("setup")).toEqual({
+			isCategory: false,
+			fileName: "setup",
+			parentAgentItemPath: "",
+		});
+	});
+
+	test("parseItemPath maps .md and _index.md to agent paths", () => {
+		expect(CatalogItemLookup.parseItemPath("guides/setup.md")).toEqual({
+			isCategory: false,
+			fileName: "setup",
+			parentAgentItemPath: "guides/",
+		});
+		expect(CatalogItemLookup.parseItemPath("guides/setup/_index.md")).toEqual({
+			isCategory: true,
+			fileName: "setup",
+			parentAgentItemPath: "guides/",
+		});
+	});
+
+	test("parseItemPath rejects empty path", () => {
+		expect(() => CatalogItemLookup.parseItemPath("")).toThrow("itemPath must not be empty");
+		expect(() => CatalogItemLookup.parseItemPath("///")).toThrow("itemPath must not be empty");
+	});
+
+	test("resolve returns skill article and virtual lookup", async () => {
+		const skillArticle = {
+			getTitle: () => "writing-mr",
+		};
+		const findItemByItemPath = jest.fn();
+		const catalog = {
+			findItemByItemPath,
+			customProviders: {
+				agentResourcesProvider: {
+					getSkillArticleByItemPath: jest.fn().mockResolvedValue(skillArticle),
+				},
+			},
+		} as never;
+
+		const resolved = await CatalogItemLookup.resolve(catalog, "docs", "@skills/writing-mr");
+
+		expect(resolved?.item).toBe(skillArticle);
+		expect(resolved?.lookup).toMatchObject({
 			catalogName: "docs",
-			itemPath: "section/a.md",
-			title: "Article A",
-			link: "source/-/repo/branch/docs/section/a.md",
+			itemPath: "@skills/writing-mr",
+			title: "writing-mr",
 		});
+		expect(resolved?.lookup.asAgentJSON()).toEqual({
+			catalogName: "docs",
+			itemPath: "@skills/writing-mr",
+			title: "writing-mr",
+		});
+		expect(findItemByItemPath).not.toHaveBeenCalled();
+	});
+
+	test("assertResolvedUnderPath accepts paths under base", () => {
+		const base = new Path("docs/guides");
+		expect(() => CatalogItemLookup.assertResolvedUnderPath(base, new Path("docs/guides/setup.md"))).not.toThrow();
+		expect(() => CatalogItemLookup.assertResolvedUnderPath(base, base)).not.toThrow();
+		expect(() => CatalogItemLookup.assertResolvedUnderPath(base, new Path("docs/other/x.md"))).toThrow(
+			"Path resolves outside base path",
+		);
 	});
 });

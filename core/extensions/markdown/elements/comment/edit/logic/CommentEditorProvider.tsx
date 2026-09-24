@@ -1,4 +1,5 @@
 import { createEventEmitter, type Event, type EventEmitter } from "@core/Event/EventEmitter";
+import type { ClientArticleProps } from "@core/SitePresenter/SitePresenter";
 import FetchService from "@core-ui/ApiServices/FetchService";
 import type { CommentBlock } from "@core-ui/CommentBlock";
 import ApiUrlCreator from "@core-ui/ContextServices/ApiUrlCreator";
@@ -10,11 +11,12 @@ import { useReviewStore } from "@ext/review/logic/store/ReviewStore";
 import { scrollToReviewItem } from "@ext/review/logic/utils/scrollToReviewItem";
 import type { Editor, Range } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
-import { createContext, memo, useCallback, useEffect, useState } from "react";
+import { createContext, memo, type RefObject, useCallback, useEffect, useState } from "react";
 
 interface CommentEditorProviderProps {
 	editor: Editor;
 	children: JSX.Element;
+	articlePropsRef?: RefObject<ClientArticleProps>;
 	onCommentSaved?: (id: string, comment: CommentBlock) => void;
 }
 
@@ -23,7 +25,7 @@ export type CommentEditorEvents = Event<"delete", { id: string }> & Event<"updat
 export const CommentEditorEventsContext = createContext<EventEmitter<CommentEditorEvents>>(null);
 
 const CommentEditorProvider = (props: CommentEditorProviderProps): JSX.Element => {
-	const { editor, children, onCommentSaved } = props;
+	const { editor, children, articlePropsRef, onCommentSaved } = props;
 	const [events, setEvents] = useState<EventEmitter<CommentEditorEvents>>(null);
 	const articleRef = ArticleRefService.value;
 	const { pendingItem, setPendingItem } = useReviewStore((s) => ({
@@ -31,7 +33,7 @@ const CommentEditorProvider = (props: CommentEditorProviderProps): JSX.Element =
 		setPendingItem: s.setPendingItem,
 	}));
 
-	useCommentsStorage(editor);
+	useCommentsStorage(editor, articlePropsRef?.current?.ref?.path);
 
 	useEffect(() => {
 		const eventEmmiter = createEventEmitter<CommentEditorEvents>();
@@ -56,12 +58,13 @@ const CommentEditorProvider = (props: CommentEditorProviderProps): JSX.Element =
 		selector: ({ editor }) => editor?.storage?.comment?.openedComment?.id ?? null,
 	});
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: articlePropsRef is stable; read current path when called
 	const loadComment = useCallback(
 		async (id: string) => {
 			const cached = editor.storage.comment.comments.get(id);
 			if (cached) return cached;
 
-			const url = apiUrlCreator.getComment(id);
+			const url = apiUrlCreator.getComment(id, articlePropsRef?.current?.ref?.path);
 			const res = await FetchService.fetch<CommentBlock>(url);
 			if (!res.ok) return;
 
@@ -72,12 +75,13 @@ const CommentEditorProvider = (props: CommentEditorProviderProps): JSX.Element =
 		[editor],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: articlePropsRef is stable; read current path when called
 	const saveComment = useCallback(
 		(id: string, comment: CommentBlock) => {
 			editor.storage.comment.comments.set(id, comment);
 			editor.storage.comment.deleted.delete(id);
 
-			const url = apiUrlCreator.updateComment(id);
+			const url = apiUrlCreator.updateComment(id, articlePropsRef?.current?.ref?.path);
 			FetchService.fetch(url, JSON.stringify(comment)).then((res) => {
 				if (!res.ok) return;
 				events.emit("update", { id });

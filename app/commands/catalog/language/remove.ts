@@ -25,22 +25,24 @@ const remove: Command<{ ctx: Context; code: ContentLanguage; catalogName: string
 		assert(catalog.props.language, `Catalog '${catalogName}' hasn't main language set`);
 		assert(catalog.props.supportedLanguages.includes(code), `Catalog ${catalogName} hasn't language ${code}`);
 
-		assert(catalog.props.language != code, "You can't delete main language");
+		assert(catalog.props.language !== code, "You can't delete main language");
 
-		catalog.props.supportedLanguages = catalog.props.supportedLanguages.filter((l) => l != code);
+		const props = {
+			...catalog.props,
+			supportedLanguages: catalog.props.supportedLanguages.filter((l) => l !== code),
+		};
 
-		const filter = (item: Item) => item.type == ItemType.category;
+		const filter = (item: Item) => item.type === ItemType.category;
 		const languageCategory = catalog.findArticle(`${catalogName}/${code}`, [filter]);
 
-		if (languageCategory) await catalog.deleteItem(languageCategory.ref, null, false);
+		if (languageCategory) await catalog.deleteItem(languageCategory.ref, null, true);
 
-		const props = catalog.props;
 		if (props.supportedLanguages?.length <= 1) {
 			props.language = null;
 			props.supportedLanguages = [];
 		}
 
-		await catalog.updateProps(catalog.props, resourceUpdaterFactory);
+		await catalog.updateProps(props, resourceUpdaterFactory);
 		await wm.current().refreshCatalog(catalogName);
 	},
 

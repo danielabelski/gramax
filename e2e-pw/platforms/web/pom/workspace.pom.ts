@@ -1,6 +1,7 @@
 import type { ClientWorkspaceConfig, WorkspaceConfig } from "@gramax/core/extensions/workspace/WorkspaceConfig";
 import { expect } from "@playwright/test";
 import type { PlaywrightPage } from "@shared-pom/page";
+import { evaluateOnApp } from "@utils/app";
 
 export type WorkspaceInfo = {
 	current: WorkspaceConfig;
@@ -32,18 +33,26 @@ export class WorkspacePom {
 	}
 
 	private async _catalogs(): Promise<string[]> {
-		return await this._page.evaluate(async () => {
-			const { wm } = await window.app!;
-			return Array.from(wm.current().getAllCatalogs().keys());
-		});
+		return await evaluateOnApp(
+			this._page,
+			async () => {
+				const { wm } = await window.app!;
+				return Array.from(wm.current().getAllCatalogs().keys());
+			},
+			undefined,
+		);
 	}
 
 	private async _info(): Promise<WorkspaceInfo> {
-		return await this._page.evaluate(async () => {
-			const { wm } = await window.app!;
-			const workspaces = wm.workspaces();
-			const current = await wm.current().config();
-			return { current, workspaces };
-		});
+		return await evaluateOnApp(
+			this._page,
+			async () => {
+				const { wm } = await window.app!;
+				const workspaces = wm.workspaces();
+				const current = await wm.current().config();
+				return { current, workspaces };
+			},
+			undefined,
+		);
 	}
 }

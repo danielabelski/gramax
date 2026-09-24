@@ -4,7 +4,6 @@ import { useAlertMessage } from "@ext/enterprise/components/admin/hooks/useAlert
 import { useOpenState } from "@ext/enterprise/components/admin/hooks/useOpenState";
 import { groupBadgesColumn } from "@ext/enterprise/components/admin/settings/members/config/groupBadgesColumn";
 import { groupColumn, groupColumnId } from "@ext/enterprise/components/admin/settings/members/config/groupColumn";
-import { useEditorSheet } from "@ext/enterprise/components/admin/settings/members/hooks/useEditorSheet";
 import { useLinkedItems } from "@ext/enterprise/components/admin/settings/members/hooks/useLinkedItems";
 import { useMemberAccessDraft } from "@ext/enterprise/components/admin/settings/members/hooks/useMemberAccessDraft";
 import type { AccessChange } from "@ext/enterprise/components/admin/settings/members/model/AccessChange";
@@ -21,6 +20,7 @@ import { useUserRoleRules } from "@ext/enterprise/components/admin/settings/memb
 import { repoColumnId } from "@ext/enterprise/components/admin/settings/resources/model/repoColumn";
 import { buildUserChanges } from "@ext/enterprise/components/admin/settings/users/model/buildUserChanges";
 import { useRowSelectionWithData } from "@ext/enterprise/components/admin/ui-kit/table/useRowSelection";
+import { useEditorSheet } from "@ext/enterpriseCommon/hooks/useEditorSheet";
 import t from "@ext/localization/locale/translate";
 import type { ColumnDef } from "@ui-kit/DataTable";
 import { useCallback, useEffect, useMemo, useState } from "react";

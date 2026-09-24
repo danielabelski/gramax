@@ -16,10 +16,11 @@ interface RepoCardProps {
 	aggregate: MemberAggregate;
 	onClose: () => void;
 	onApply: (changes: AccessChange[]) => Promise<void>;
+	showEnterpriseElements: boolean;
 }
 
 export function RepoCard(props: RepoCardProps) {
-	const { open } = props;
+	const { open, showEnterpriseElements } = props;
 	const { isAdd, form, repoFormState } = useRepoCard(props);
 
 	return (
@@ -46,7 +47,7 @@ export function RepoCard(props: RepoCardProps) {
 				connectionError={form.saveError}
 				isOpen={open}
 				onOpenChange={(next) => !next && form.requestClose()}
-				sheetContent={<RepoForm state={repoFormState} />}
+				sheetContent={<RepoForm showEnterpriseElements={showEnterpriseElements} state={repoFormState} />}
 				title={
 					isAdd ? (
 						t("enterprise.admin.resources.adding")

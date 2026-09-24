@@ -30,8 +30,9 @@ import tableNodeTransform from "@ext/markdown/elements/table/logic/tableNodeTran
 import tableTokenTransformer from "@ext/markdown/elements/table/logic/tableTokenTransformer";
 import unsupportedNodeTransformer from "@ext/markdown/elements/unsupported/logic/unsupportedNodeTransformer";
 import getTocItems, { getLevelTocItemsByRenderableTree } from "@ext/navigation/article/logic/createTocItems";
+import { getPluginParseSignature } from "@plugins/store";
 import type { JSONContent } from "@tiptap/core";
-import type { Node } from "prosemirror-model";
+import type { Node, Schema as ProsemirrorSchema } from "prosemirror-model";
 import { ProsemirrorMarkdownParser, ProsemirrorTransformer } from "../edit/logic/Prosemirror";
 import { getSchema } from "../edit/logic/Prosemirror/schema";
 import { getTokens } from "../edit/logic/Prosemirror/tokens";
@@ -52,6 +53,7 @@ import {
 } from "../render/logic/Markdoc";
 import MdParser from "./MdParser/MdParser";
 import type ParserContext from "./ParserContext/ParserContext";
+import { createParseScheduler, type ParseSchedule } from "./ParseScheduler";
 import preTransformTokens from "./Transformer/preTransformTokens";
 
 const katexPlugin = import("@traptitech/markdown-it-katex");
@@ -60,42 +62,39 @@ const katexPluginReady = katexPlugin.then((m) => {
 	resolvedKatexPlugin = m.default;
 });
 
-class GetHtmlValue {
-	private _html: string;
-
-	constructor(private _parseToHtml: () => Promise<string>) {}
-
-	async get() {
-		if (!this._html) this._html = await this._parseToHtml();
-		return this._html;
-	}
-}
-
 export type EditRenderableTreeNode = RenderableTreeNode | Node;
 
 export default class MarkdownParser {
 	private _events = createEventEmitter<ParserEvents>();
+	private _schema: ProsemirrorSchema;
+	private _schemaPluginSignature: string;
+	private _tokenizer: Tokenizer;
+	private _tokenizerSignature: string;
+	private readonly _parseScheduler = createParseScheduler();
 
 	get events() {
 		return this._events;
 	}
 
 	public async parse(content: string, context?: ParserContext, requestUrl?: string): Promise<Content> {
+		const scheduler = this._parseScheduler.start();
 		try {
 			const privateContext: PrivateParserContext = context ? createPrivateParserContext(context) : undefined;
+			const schema = this._getSchema();
 
 			await this._events.emit("before-parse", { mutable: { content }, context: privateContext, requestUrl });
 
 			const schemes = this._getSchemes(privateContext);
-			const tokens = await this._getTokens(content, schemes, privateContext);
-			const editTree = await this._editParser(tokens, schemes, privateContext);
-			const renderTree = editTreeToRenderTree(editTree, getSchema());
+			const tokens = await this._getTokens(content, scheduler, schemes, privateContext);
+			const editTree = await this._editParser(tokens, schemes, privateContext, schema, scheduler);
+			const renderTree = editTreeToRenderTree(editTree, schema);
+			const renderTreeYield = scheduler();
+			if (renderTreeYield) await renderTreeYield;
 			const tocItems = getTocItems(getLevelTocItemsByRenderableTree((renderTree as Tag)?.children ?? []));
 
 			const newContent = {
 				editTree,
 				renderTree,
-				getHtmlValue: new GetHtmlValue(async () => await this.parseToHtml(content, privateContext, requestUrl)),
 				tocItems,
 				parsedContext: privateContext,
 			};
@@ -109,22 +108,22 @@ export default class MarkdownParser {
 			return newContent;
 		} catch (e) {
 			throw new ParseError(e, content);
+		} finally {
+			this._parseScheduler.finish();
 		}
 	}
 
 	public async editParse(content: string, context?: PrivateParserContext): Promise<JSONContent> {
+		const scheduler = this._parseScheduler.start();
 		try {
 			const schemes = this._getSchemes(context);
-			const tokens = await this._getTokens(content, schemes, context);
-			return await this._editParser(tokens, schemes, context);
+			const tokens = await this._getTokens(content, scheduler, schemes, context);
+			return await this._editParser(tokens, schemes, context, this._getSchema(), scheduler);
 		} catch (e) {
 			throw new ParseError(e, content);
+		} finally {
+			this._parseScheduler.finish();
 		}
-	}
-
-	public async parseToHtml(content: string, context?: ParserContext, requestUrl?: string): Promise<string> {
-		const parsedContent = await this.parse(content, context);
-		return this.getHtml(parsedContent.renderTree, context, requestUrl);
 	}
 
 	public async parseRenderableTreeNode(
@@ -132,9 +131,23 @@ export default class MarkdownParser {
 		context?: PrivateParserContext,
 		parserOptions?: ParserOptions,
 	): Promise<RenderableTreeNodes> {
+		const scheduler = this._parseScheduler.start();
+		try {
+			return await this._parseRenderableTreeNode(content, scheduler, context, parserOptions);
+		} finally {
+			this._parseScheduler.finish();
+		}
+	}
+
+	private async _parseRenderableTreeNode(
+		content: string,
+		scheduler: ParseSchedule,
+		context?: PrivateParserContext,
+		parserOptions?: ParserOptions,
+	): Promise<RenderableTreeNodes> {
 		try {
 			const schemes = this._getSchemes(context);
-			const tokens = await this._getTokens(content, schemes, context);
+			const tokens = await this._getTokens(content, scheduler, schemes, context);
 			const renderTreeNode = await this._getRenderableTreeNode(tokens, schemes, context);
 			return parserOptions ? this._oneElementTransformer(renderTreeNode, parserOptions) : renderTreeNode;
 		} catch (e) {
@@ -148,9 +161,18 @@ export default class MarkdownParser {
 		});
 	}
 
+	private _getSchema(): ProsemirrorSchema {
+		const pluginSignature = getPluginParseSignature();
+		if (!this._schema || this._schemaPluginSignature !== pluginSignature) {
+			this._schema = getSchema();
+			this._schemaPluginSignature = pluginSignature;
+		}
+		return this._schema;
+	}
+
 	public async getRenderMarkdownIt(content: string): Promise<string> {
 		await katexPluginReady;
-		const tokenizer = this._getTokenizer();
+		const tokenizer = new Tokenizer({ linkify: false });
 		tokenizer.use(resolvedKatexPlugin, {
 			blockClass: "math-block",
 			errorColor: " #cc0000",
@@ -179,16 +201,40 @@ export default class MarkdownParser {
 		return { tags, nodes };
 	}
 
-	private async _getTokens(content: string, schemes?: Schemes, context?: PrivateParserContext): Promise<Token[]> {
+	private async _getTokens(
+		content: string,
+		scheduler: ParseSchedule,
+		schemes?: Schemes,
+		context?: PrivateParserContext,
+	): Promise<Token[]> {
 		const mdParser = new MdParser({ tags: schemes.tags });
 		const parseDoc = mdParser.preParse(content);
+		const preParseYield = scheduler();
+		if (preParseYield) await preParseYield;
 		const tokens = this._getTokenizer(schemes.tags).tokenize(parseDoc);
-		return await preTransformTokens({ tokens, context, parser: this });
+		const tokenizeYield = scheduler();
+		if (tokenizeYield) await tokenizeYield;
+		return await preTransformTokens({ tokens, context, parser: this, scheduler });
 	}
 
 	private _getTokenizer(tags?: Schemes["tags"]) {
-		const tokenizer = new Tokenizer({ linkify: false }, tags);
-		return tokenizer;
+		const pluginSignature = getPluginParseSignature();
+		const tokenizerSignature = JSON.stringify([pluginSignature, Object.keys(tags ?? {}).sort()]);
+		if (!this._tokenizer || this._tokenizerSignature !== tokenizerSignature) {
+			this._tokenizer = new Tokenizer({ linkify: false }, this._getTokenizerTags(tags));
+			this._tokenizerSignature = tokenizerSignature;
+		}
+		return this._tokenizer;
+	}
+
+	private _getTokenizerTags(tags?: Schemes["tags"]): Schemes["tags"] {
+		if (!tags) return undefined;
+		return Object.fromEntries(
+			Object.entries(tags).map(([name, tag]) => [
+				name,
+				{ render: tag.render, selfClosing: tag.selfClosing, attributes: tag.attributes },
+			]),
+		);
 	}
 	private async _getRenderableTreeNode(
 		tokens: Token[],
@@ -201,8 +247,14 @@ export default class MarkdownParser {
 		return transform(ast, config);
 	}
 
-	private async _editParser(tokens: Token[], schemes: Schemes, context?: PrivateParserContext): Promise<JSONContent> {
-		const prosemirrorParser = new ProsemirrorMarkdownParser(getSchema(), this._getTokenizer(), getTokens(context));
+	private async _editParser(
+		tokens: Token[],
+		schemes: Schemes,
+		context: PrivateParserContext,
+		schema: ProsemirrorSchema,
+		scheduler: ParseSchedule,
+	): Promise<JSONContent> {
+		const prosemirrorParser = new ProsemirrorMarkdownParser(schema, undefined, getTokens(context));
 
 		const nodeTransformers: NodeTransformerFunc[] = [
 			fileMarkTransformer,
@@ -241,17 +293,23 @@ export default class MarkdownParser {
 			nodeTransformers,
 			tokenTransformers,
 			context,
+			schema,
 		);
 
 		const transformTokens = transformer.transformToken(tokens);
+		const tokenTransformYield = scheduler();
+		if (tokenTransformYield) await tokenTransformYield;
 
 		const editTree = (await prosemirrorParser.parse(transformTokens)).toJSON();
+		const editTreeYield = scheduler();
+		if (editTreeYield) await editTreeYield;
 
 		const transformEditTree = await transformer.transformTree(editTree, null, null, 0);
+		const treeTransformYield = scheduler();
+		if (treeTransformYield) await treeTransformYield;
 
-		const finalEditTree = await transformer.transformMdComponents(
-			transformEditTree,
-			this.parseRenderableTreeNode.bind(this),
+		const finalEditTree = await transformer.transformMdComponents(transformEditTree, (content, context, options) =>
+			this._parseRenderableTreeNode(content, scheduler, context, options),
 		);
 
 		return finalEditTree;

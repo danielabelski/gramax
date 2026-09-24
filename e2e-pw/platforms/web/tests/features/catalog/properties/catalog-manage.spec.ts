@@ -112,7 +112,9 @@ catalogTest.describe("Managing catalog properties", () => {
 		const syItem = catalogPage.page.getByRole("menuitem", { name: "SY" });
 		await syItem.click();
 
-		await expect(sharedPage.getByTestId("property-tag").filter({ hasText: "SY" })).toBeVisible();
+		await expect(
+			sharedPage.locator('[data-testid="property-tag"]:visible').filter({ hasText: "SY" }),
+		).toBeVisible();
 	});
 
 	catalogTest("add flag property to article", async ({ catalogPage, sharedPage }) => {
@@ -124,7 +126,9 @@ catalogTest.describe("Managing catalog properties", () => {
 		const importantItem = await articleProperties.findItemByTitle("Important");
 		await importantItem.click();
 
-		await expect(sharedPage.getByTestId("property-tag").filter({ hasText: "Important" })).toBeVisible();
+		await expect(
+			sharedPage.locator('[data-testid="property-tag"]:visible').filter({ hasText: "Important" }),
+		).toBeVisible();
 	});
 
 	catalogTest("remove flag property from article", async ({ catalogPage, sharedPage }) => {
@@ -135,7 +139,9 @@ catalogTest.describe("Managing catalog properties", () => {
 		const importantItemAdd = await articleProperties.findItemByTitle("Important");
 		await importantItemAdd.click();
 
-		await expect(sharedPage.getByTestId("property-tag").filter({ hasText: "Important" })).toBeVisible();
+		await expect(
+			sharedPage.locator('[data-testid="property-tag"]:visible').filter({ hasText: "Important" }),
+		).toBeVisible();
 		await sharedPage.keyboard.press("Escape");
 
 		const articleProperties2 = await catalogPage.getCatalogProperties();
@@ -144,7 +150,9 @@ catalogTest.describe("Managing catalog properties", () => {
 		await importantItem.click();
 		await sharedPage.keyboard.press("Escape");
 
-		await expect(sharedPage.getByTestId("property-tag").filter({ hasText: "Important" })).toBeHidden();
+		await expect(
+			sharedPage.locator('[data-testid="property-tag"]:visible').filter({ hasText: "Important" }),
+		).toHaveCount(0);
 	});
 
 	catalogTest("delete property from catalog", async ({ catalogPage, sharedPage }) => {

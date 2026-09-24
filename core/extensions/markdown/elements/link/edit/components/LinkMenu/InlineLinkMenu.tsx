@@ -1,17 +1,20 @@
 import { useEscapeKeydown } from "@core-ui/hooks/useEscapeKeyDown";
 import useMediaQuery from "@core-ui/hooks/useMediaQuery";
 import { cssMedia } from "@core-ui/utils/cssUtils";
+import {
+	ARTICLE_POPOVER_PADDING,
+	getArticlePopoverBoundary,
+	getArticlePopoverContainer,
+} from "@ext/markdown/core/edit/logic/articlePopover";
+import { CustomBubbleMenu } from "@ext/markdown/elements/customBubbleMenu/edit/components/CustomBubbleMenu";
 import { LinkMenu, type LinkMenuMode } from "@ext/markdown/elements/link/edit/components/LinkMenu/LinkMenu";
 import { useLinkMenuState } from "@ext/markdown/elements/link/edit/hooks/useLinkMenuState";
 import { getMarkEndPos } from "@ext/markdown/elementsUtils/getMarkEndPos";
 import { getMarkStartPos } from "@ext/markdown/elementsUtils/getMarkStartPos";
 import { type Editor, posToDOMRect } from "@tiptap/react";
-import { ComponentVariantProvider } from "@ui-kit/Providers";
 import type { RefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import "tippy.js/animations/shift-toward.css";
-import ArticleRefService from "@core-ui/ContextServices/ArticleRef";
-import { CustomBubbleMenu } from "@ext/markdown/elements/customBubbleMenu/edit/components/CustomBubbleMenu";
+import { flushSync } from "react-dom";
 import type { Instance, Placement, Props } from "tippy.js";
 
 interface InlineLinkMenuProps {
@@ -42,11 +45,15 @@ export const InlineLinkMenu = (props: InlineLinkMenuProps) => {
 	const isMobile = useMediaQuery(cssMedia.JSnarrow);
 	const [mode, setMode] = useState<LinkMenuMode>(mark?.attrs?.href ? "view" : "edit");
 	const instanceRef = useRef<Instance<Props>>(null);
-	const articleRef = ArticleRefService.value;
 
 	const shouldShow = useCallback(() => {
 		if (isMobile) return false;
-		return shouldShowLinkMenu();
+
+		let show = false;
+		flushSync(() => {
+			show = shouldShowLinkMenu();
+		});
+		return show;
 	}, [shouldShowLinkMenu, isMobile]);
 
 	const getReferenceClientRect = useCallback(() => {
@@ -71,36 +78,6 @@ export const InlineLinkMenu = (props: InlineLinkMenuProps) => {
 	}, [editor, getMark]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
-	const onShow = useCallback(
-		(instance: Instance<Props>) => {
-			const commentBoundary = articleRef.current;
-			if (commentBoundary) {
-				instance.setProps({
-					popperOptions: {
-						modifiers: [
-							{
-								name: "flip",
-								options: { fallbackPlacements, boundary: commentBoundary },
-							},
-							{
-								name: "preventOverflow",
-								options: { boundary: commentBoundary, padding: 8 },
-							},
-						],
-					},
-				});
-			}
-
-			requestAnimationFrame(() => {
-				if (instance?.popperInstance) {
-					instance.popperInstance.update();
-				}
-			});
-		},
-		[boundaryRef, fallbackPlacements],
-	);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	useEffect(() => {
 		if (!instanceRef.current) return;
 		requestAnimationFrame(() => {
@@ -112,13 +89,14 @@ export const InlineLinkMenu = (props: InlineLinkMenuProps) => {
 
 	useEscapeKeydown(reset);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	const appendTo = useCallback(() => {
-		return boundaryRef?.current ?? editor.view.dom.parentElement;
-	}, [editor]);
+		return getArticlePopoverContainer(editor, boundaryRef?.current);
+	}, [boundaryRef, editor]);
+	const popoverBoundary = getArticlePopoverBoundary(editor, boundaryRef?.current, boundary);
 
 	return (
 		<CustomBubbleMenu
+			className="article-popover article-popover-stagger"
 			editor={editor}
 			pluginKey="new-link-menu"
 			shouldShow={shouldShow}
@@ -139,39 +117,28 @@ export const InlineLinkMenu = (props: InlineLinkMenuProps) => {
 							name: "flip",
 							options: {
 								fallbackPlacements,
-								boundary: boundaryRef ? "viewport" : boundary,
+								boundary: popoverBoundary,
 							},
 						},
 						{
 							name: "preventOverflow",
 							options: {
-								boundary: boundaryRef ? "viewport" : boundary,
-								padding: 8,
+								altAxis: true,
+								boundary: popoverBoundary,
+								padding: ARTICLE_POPOVER_PADDING,
 							},
 						},
 					],
 				},
-				duration: [150, 150],
-				moveTransition: "transform 0.150s ease-in-out",
-				animation: "shift-toward",
+				duration: [220, 200],
+				animation: "article-popover",
 				placement,
 				getReferenceClientRect,
-				onShow,
 				onHide: reset,
 			}}
 		>
-			{!isMobile && (
-				<ComponentVariantProvider variant="inverse">
-					{mark && isOpen && (
-						<LinkMenu
-							mark={mark}
-							mode={mode}
-							onDelete={handleDelete}
-							onUpdate={onUpdate}
-							setMode={setMode}
-						/>
-					)}
-				</ComponentVariantProvider>
+			{!isMobile && mark && isOpen && (
+				<LinkMenu mark={mark} mode={mode} onDelete={handleDelete} onUpdate={onUpdate} setMode={setMode} />
 			)}
 		</CustomBubbleMenu>
 	);

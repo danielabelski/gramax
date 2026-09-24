@@ -23,10 +23,7 @@ export const RolePicker = ({ value, rules, onChange, disabled, className }: Role
 	const isDisabled = disabled || rules.locked;
 
 	return (
-		<WithTooltip
-			className={className}
-			tooltip={rules.locked ? t("enterprise.admin.guests.reader-only-hint") : undefined}
-		>
+		<WithTooltip className={className} tooltip={rules.locked ? rules.lockedReason : undefined}>
 			<Select disabled={isDisabled} onValueChange={(v) => onChange(v as RoleId)} value={value ?? ""}>
 				<SelectTrigger className={cn(className, isDisabled && "text-muted")}>
 					<SelectValue placeholder={t("enterprise.admin.roles.select")}>

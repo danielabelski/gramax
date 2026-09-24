@@ -8,9 +8,12 @@ const CheckoutConflictErrorComponent = ({ onCancelClick, error }: GetErrorCompon
 		<>
 			<DialogErrorHeader error={error} title={t("git.checkout.error.conflict")} />
 			<DialogBody>
-				<span>{t("git.checkout.conflict")}</span>
+				<div className="flex flex-col gap-4">
+					<p>{t("git.checkout.error.conflict-diagnosis")}</p>
+					<p>{t("git.checkout.error.conflict-recipe")}</p>
+				</div>
 			</DialogBody>
-			<DialogFooterTemplate primaryButton={t("ok")} primaryButtonProps={{ onClick: onCancelClick }} />
+			<DialogFooterTemplate primaryButton={t("close")} primaryButtonProps={{ onClick: onCancelClick }} />
 		</>
 	);
 };

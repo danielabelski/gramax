@@ -3,7 +3,8 @@ import Url from "@core-ui/ApiServices/Types/Url";
 import { NavigationCollapseChevron } from "@ext/navigation/catalog/SidebarNavigation/components/Helpers/NavigationCollapseChevron";
 import { NavigationItemLink } from "@ext/navigation/catalog/SidebarNavigation/components/Helpers/NavigationItemLink";
 import { NavigationTreeItemActions } from "@ext/navigation/catalog/SidebarNavigation/components/Helpers/NavigationTreeItemActions";
-import { ReadonlyMenuButton } from "@ext/navigation/catalog/SidebarNavigation/components/Helpers/ReadonlyMenuButton";
+import { ReadonlyMenuRow } from "@ext/navigation/catalog/SidebarNavigation/components/Helpers/ReadonlyMenuButton";
+import { NAVIGATION_HOVER_ID_ATTR } from "@ext/navigation/catalog/SidebarNavigation/store/navigationTreeStore";
 import type { ItemLink } from "@ext/navigation/NavigationLinks";
 import { SidebarMenuItem, SidebarMenuSubButton, SidebarMenuSubItem } from "@ui-kit/Sidebar";
 import { TextOverflowTooltip } from "@ui-kit/Tooltip";
@@ -20,7 +21,7 @@ interface ReadonlyFolderItemProps {
 
 export const ReadonlyFolderItem = ({ data, level, open, isNested, isSelected, onClick }: ReadonlyFolderItemProps) => {
 	const ItemWrapper = isNested ? SidebarMenuSubItem : SidebarMenuItem;
-	const ButtonComponent = isNested ? SidebarMenuSubButton : ReadonlyMenuButton;
+	const ButtonComponent = isNested ? SidebarMenuSubButton : ReadonlyMenuRow;
 
 	const body = (
 		<>
@@ -39,11 +40,13 @@ export const ReadonlyFolderItem = ({ data, level, open, isNested, isSelected, on
 				data-qa={`catalog-navigation-category-link-level-${level}`}
 			>
 				<ButtonComponent
-					className="group/nav h-7 min-w-0 py-1.5 pr-1.5 font-light"
+					{...{ [NAVIGATION_HOVER_ID_ATTR]: data.ref.path }}
+					aria-label={data?.title || data?.external}
+					className="group/nav h-7 min-w-0 py-1.5 pr-1.5 font-light text-primary-fg data-[active=true]:font-normal select-none"
 					isActive={isSelected}
 					onClick={onClick}
 					title={data?.title || data?.external}
-					{...(isNested ? { asChild: true } : { type: "button" })}
+					{...(isNested ? { asChild: true } : {})}
 				>
 					{isNested ? <Link href={Url.from(data)}>{body}</Link> : body}
 				</ButtonComponent>

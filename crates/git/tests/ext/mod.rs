@@ -5,6 +5,7 @@ pub mod healthcheck;
 pub mod history;
 pub mod lfs;
 pub mod merge_requests;
+pub mod path_follower;
 pub mod read_tree;
 
 use test_utils::git::*;

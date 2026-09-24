@@ -127,6 +127,12 @@ impl<C: Creds> Status for Repo<'_, C> {
 
 	fn status_file<P: AsRef<Path>>(&self, path: P) -> Result<StatusEntry> {
 		info!(target: TAG, "status file: {}", path.as_ref().display());
-		Ok(self.0.status_file(path.as_ref())?.into())
+		match self.0.status_file(path.as_ref()) {
+			Ok(status) => Ok(status.into()),
+			// git knows nothing about the path — it is neither in the index nor on disk.
+			// A full status reports the same thing by simply omitting the entry.
+			Err(err) if err.code() == git2::ErrorCode::NotFound => Ok(StatusEntry::Current),
+			Err(err) => Err(err.into()),
+		}
 	}
 }

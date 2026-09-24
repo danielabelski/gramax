@@ -4,6 +4,8 @@ import { useChatStreamText } from "../../store/ChatStore";
 import type { AssistantChatMessage } from "../../types/chat";
 import { AssistantMarkdown } from "../AssistantMarkdown";
 import { CopyAnswerButton } from "../CopyAnswerButton";
+import type { MissingSecretWarning as MissingSecretWarningViewModel } from "../getMissingSecretsFromToolResult";
+import { MissingSecretWarning } from "./MissingSecretWarning";
 
 export interface AssistantMessageProps {
 	message: AssistantChatMessage;
@@ -11,6 +13,7 @@ export interface AssistantMessageProps {
 	responseRef?: Ref<HTMLDivElement>;
 	showCopyButton?: boolean;
 	footerAlwaysVisible?: boolean;
+	missingSecretWarning?: MissingSecretWarningViewModel | null;
 }
 
 export const AssistantMessage = ({
@@ -19,6 +22,7 @@ export const AssistantMessage = ({
 	responseRef,
 	showCopyButton = false,
 	footerAlwaysVisible = false,
+	missingSecretWarning,
 }: AssistantMessageProps) => {
 	const streamText = useChatStreamText(streamDescription);
 	const isLoading = message.isLoading ?? false;
@@ -31,6 +35,7 @@ export const AssistantMessage = ({
 	return (
 		<div className="w-full min-w-0" ref={responseRef}>
 			{hasContent && <AssistantMarkdown text={displayDescription} />}
+			{missingSecretWarning && <MissingSecretWarning warning={missingSecretWarning} />}
 			{showFooter && (
 				<div
 					className={cn(

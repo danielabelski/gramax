@@ -3,6 +3,7 @@ import ModalToOpenService from "@core-ui/ContextServices/ModalToOpenService/Moda
 import ModalToOpen from "@core-ui/ContextServices/ModalToOpenService/model/ModalsToOpen";
 import ResourceService from "@core-ui/ContextServices/ResourceService/ResourceService";
 import { ArticleComponentResizer } from "@ext/article/Components/ArticleComponentResizer";
+import t from "@ext/localization/locale/translate";
 import { NodeViewContextableWrapper } from "@ext/markdown/core/element/NodeViewContextableWrapper";
 import DiagramActions from "@ext/markdown/elements/diagrams/edit/components/DiagramActions";
 import getNaturalSize from "@ext/markdown/elements/diagrams/logic/getNaturalSize";
@@ -64,12 +65,14 @@ const DiagramComponent = (props: NodeViewProps): ReactElement => {
 
 	return (
 		<NodeViewContextableWrapper
+			aria-label={t("diagram.name")}
 			data-component="diagram"
 			data-drag-handle
 			data-float={float ? float : undefined}
 			data-resize-container
 			props={props}
 			ref={hoverElement}
+			role="figure"
 		>
 			<ArticleComponentResizer
 				disabled={!isEditable}

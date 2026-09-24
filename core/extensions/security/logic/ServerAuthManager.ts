@@ -1,6 +1,7 @@
 import type Query from "@core/Api/Query";
 import type EnterpriseManager from "@ext/enterprise/EnterpriseManager";
 import EnterpriseUser, { type EnterpriseInfo } from "@ext/enterprise/EnterpriseUser";
+import { GesError } from "@ext/enterprise/errors/GesError";
 import type EnterpriseUserJSONData from "@ext/enterprise/types/EnterpriseUserJSONData";
 import AuthManager from "@ext/security/logic/AuthManager";
 import TicketUser from "@ext/security/logic/TicketManager/TicketUser";
@@ -31,6 +32,7 @@ export default class ServerAuthManager extends AuthManager {
 	}
 
 	async logout(cookie: Cookie, req: ApiRequest, res: ApiResponse) {
+		this._removeCachedEnterpriseInfo(cookie);
 		cookie.remove(this._COOKIE_USER);
 		return await this._ap.logout(req, res);
 	}
@@ -82,7 +84,7 @@ export default class ServerAuthManager extends AuthManager {
 		const json: UserJSONData = JSON.parse(userData);
 		switch (json.type) {
 			case "enterprise": {
-				return await this._getEnterpriseUser(json as EnterpriseUserJSONData);
+				return await this._getEnterpriseUser(cookie, json as EnterpriseUserJSONData);
 			}
 			case "ticket": {
 				return TicketUser.initInJSON(json);
@@ -103,9 +105,20 @@ export default class ServerAuthManager extends AuthManager {
 		return user;
 	}
 
-	protected async _getEnterpriseUser(json: EnterpriseUserJSONData): Promise<EnterpriseUser> {
+	protected async _getEnterpriseUser(cookie: Cookie, json: EnterpriseUserJSONData): Promise<User> {
 		const user = EnterpriseUser.initInJSON(json, this._em.getConfig());
-		await this._updateEnterpriseUser(user);
+		if (this._sessionExpired(user)) return await this._invalidateEnterpriseUser(cookie, user);
+
+		try {
+			await this._updateEnterpriseUser(user);
+		} catch (error) {
+			if (error instanceof GesError && error.code === "unauthorized") {
+				return await this._invalidateEnterpriseUser(cookie, user);
+			}
+			throw error;
+		}
+
+		if (this._sessionExpired(user)) return await this._invalidateEnterpriseUser(cookie, user);
 		return user;
 	}
 
@@ -113,7 +126,7 @@ export default class ServerAuthManager extends AuthManager {
 		const info = this._getUsersEnterpriseInfo(user);
 		if (info) user.setEnterpriseInfo(info);
 
-		const updatedUser = await user.updatePermissions();
+		const updatedUser = await user.updatePermissions(false, { throwOnUnauthorized: true });
 		if (!updatedUser) return;
 
 		this._setUsersEnterpriseInfo(updatedUser);
@@ -125,6 +138,28 @@ export default class ServerAuthManager extends AuthManager {
 
 	protected _getUsersEnterpriseInfo(user: EnterpriseUser): EnterpriseInfo {
 		return this._usersEnterprisePermissionInfo[user?.info?.mail ?? ""];
+	}
+
+	private _sessionExpired(user: EnterpriseUser): boolean {
+		return user.expiresAt !== undefined && user.expiresAt <= Date.now();
+	}
+
+	private async _invalidateEnterpriseUser(cookie: Cookie, user: EnterpriseUser): Promise<User> {
+		delete this._usersEnterprisePermissionInfo[user.info?.mail ?? ""];
+		cookie.remove(this._COOKIE_USER);
+		const anonymousUser = await this._getAnonymousUser();
+		if (anonymousUser instanceof EnterpriseUser) anonymousUser.markSessionExpired();
+		return anonymousUser;
+	}
+
+	private _removeCachedEnterpriseInfo(cookie: Cookie): void {
+		const userData = cookie.get(this._COOKIE_USER);
+		if (!userData) return;
+
+		try {
+			const user = JSON.parse(userData) as UserJSONData;
+			if (user.type === "enterprise") delete this._usersEnterprisePermissionInfo[user.info?.mail ?? ""];
+		} catch {}
 	}
 
 	private _extractAuthorizationToken(headers: ApiRequest["headers"]): string {

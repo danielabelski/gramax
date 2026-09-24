@@ -142,6 +142,18 @@ export default withBundleAnalyzer({
 	rewrites: () => {
 		return [
 			{
+				source: "/health",
+				destination: "/api/health",
+			},
+			{
+				source: "/health/liveness",
+				destination: "/api/health/liveness",
+			},
+			{
+				source: "/health/readiness",
+				destination: "/api/health/readiness",
+			},
+			{
 				source: "/robots.txt",
 				destination: "/api/robots.txt",
 			},

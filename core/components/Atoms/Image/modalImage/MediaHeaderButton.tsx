@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noRestrictedImports: pre-existing @emotion/styled import; the Tailwind migration is not this change's scope
 import styled from "@emotion/styled";
 import { IconButton } from "@ui-kit/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
@@ -12,7 +13,7 @@ interface MediaHeaderButtonProps {
 
 const TooltipElement = ({ content, children }: { content: ReactElement; children: ReactElement }) => {
 	return (
-		<Tooltip delayDuration={500}>
+		<Tooltip>
 			<TooltipTrigger asChild>{children}</TooltipTrigger>
 			<TooltipContent>{content}</TooltipContent>
 		</Tooltip>

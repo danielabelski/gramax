@@ -45,11 +45,23 @@ const makeCatalog = () =>
 		getRelativeRootCategoryPath: () => new Path(""),
 	}) as any;
 
-const makeWorkspace = (patterns?: string[]) =>
+const makeWorkspace = (patterns?: string[], policy?: { auto?: boolean; exclude?: string[] }) =>
 	({
-		config: () => Promise.resolve({ git: patterns ? { lfs: { patterns } } : undefined }),
+		config: () =>
+			Promise.resolve({
+				git: patterns || policy ? { lfs: { ...(patterns ? { patterns } : {}), ...policy } } : undefined,
+				// The policy only counts under an administered workspace, so the stub is one whenever a
+				// test states a policy at all.
+				...(policy ? { enterprise: { gesUrl: "https://ges.example" } } : {}),
+			}),
 		getFileProvider: () => dfp,
 	}) as any;
+
+/** A committed `.gitattributes` carrying a mask the workspace list does not contain. */
+const seedForeignMask = async () => {
+	await dfp.write(repPath(".gitattributes"), "*.md diff=markdown\n*.png filter=lfs");
+	await repo.publish({ commitMessage: "attrs", data: mockUserData, filesToPublish: [path(".gitattributes")] });
+};
 
 describe("workspaceLfsMigration", () => {
 	beforeEach(async () => {
@@ -132,6 +144,48 @@ describe("workspaceLfsMigration", () => {
 		expect(d.fileDiff.after).toContain("*.md diff=markdown");
 		expect(d.fileDiff.after).toContain("*.psd filter=lfs");
 		expect(d.fileDiff.after).not.toContain("*.png");
+	});
+
+	describe("under a workspace that asked for the per-catalog auto-add", () => {
+		test("the masks it did not put there stop counting as removed", async () => {
+			await seedForeignMask();
+
+			const d = await getWorkspaceLfsDivergence(makeWorkspace(["*.psd"], { auto: true }), makeCatalog());
+
+			expect(d.added).toEqual(["*.psd"]);
+			// Whatever the auto-add mints looks exactly like this, and stripping it would undo the
+			// very setting the same workspace turned on.
+			expect(d.removed).toEqual([]);
+			expect(d.fileDiff.after).toContain("*.png filter=lfs");
+			expect(d.fileDiff.after).toContain("*.psd filter=lfs");
+		});
+
+		test("and the migration leaves them on disk", async () => {
+			await seedForeignMask();
+
+			await applyWorkspaceLfsMigration(makeWorkspace(["*.psd"], { auto: true }), makeCatalog(), mockUserData);
+
+			const raw = await dfp.read(repPath(".gitattributes"));
+			expect(raw).toContain("*.png filter=lfs");
+			expect(raw).toContain("*.psd filter=lfs");
+			expect(raw).toContain("*.md diff=markdown");
+		});
+
+		test("a policy stating only exclusions leaves the sync owning the masks as before", async () => {
+			await seedForeignMask();
+
+			const d = await getWorkspaceLfsDivergence(makeWorkspace(["*.psd"], { exclude: ["*.gif"] }), makeCatalog());
+
+			expect(d.removed).toEqual(["*.png"]);
+		});
+
+		test("a policy in a workspace that owns no masks still syncs nothing", async () => {
+			await seedForeignMask();
+
+			const d = await getWorkspaceLfsDivergence(makeWorkspace(undefined, { auto: true }), makeCatalog());
+
+			expect(d).toEqual({ added: [], removed: [], legacyStaged: false });
+		});
 	});
 
 	test("apply writes isolated commit and pushes, workdir stays clean", async () => {

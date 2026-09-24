@@ -18,13 +18,14 @@ import { Button, IconButton } from "@ui-kit/Button";
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@ui-kit/Dialog";
 import { Form, FormField, FormFooter, FormStack } from "@ui-kit/Form";
 import { Icon } from "@ui-kit/Icon";
-import { Input, InputGroup, InputGroupInput, InputGroupText } from "@ui-kit/Input";
+import { Input } from "@ui-kit/Input";
 import { TagInput } from "@ui-kit/TagInput";
 import { Textarea } from "@ui-kit/Textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 import { type FC, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { z } from "zod";
+import UrlInputControl from "./UrlInputControl";
 
 interface PropsEditorProps extends Omit<UsePropsEditorActionsParams, "onExternalClose"> {
 	submit: SubmitHandler<{ title: string; fileName: string }>;
@@ -32,7 +33,22 @@ interface PropsEditorProps extends Omit<UsePropsEditorActionsParams, "onExternal
 	isCurrentItem: boolean;
 }
 
-const getSchema = (brotherFileNames: RefObject<string[]>, takenAliases: RefObject<string[]>) => {
+// the message must land on the `aliases` field itself: an error on an array element (aliases.0)
+// has no FormMessage to render it, and the invisible error would block the save silently
+const aliasError = (alias: string, takenAliases: RefObject<string[]>, ownAliases: RefObject<Set<string>>) => {
+	if (!alias) return t("must-be-not-empty");
+	if (!alias.split("/").every((segment) => /^[\w\d\-_]+$/m.test(segment)))
+		return t("no-encoding-symbols-in-url-no-dot");
+	// the paths the article already carries are its own, not somebody else's claim
+	if (!ownAliases.current?.has(alias) && takenAliases.current?.includes(alias)) return t("alias-taken");
+	return null;
+};
+
+const getSchema = (
+	brotherFileNames: RefObject<string[]>,
+	takenAliases: RefObject<string[]>,
+	ownAliases: RefObject<Set<string>>,
+) => {
 	return z.object({
 		title: z.string().min(1, { message: t("must-be-not-empty") }),
 		description: z.string().optional().default(""),
@@ -70,18 +86,18 @@ const getSchema = (brotherFileNames: RefObject<string[]>, takenAliases: RefObjec
 			}),
 		searchPhrases: z.array(z.string().min(1, { message: t("must-be-not-empty") })).nullish(),
 		aliases: z
-			.array(
-				z
-					.string()
-					.min(1, { message: t("must-be-not-empty") })
-					.refine((val) => val.split("/").every((segment) => /^[\w\d\-_]+$/m.test(segment)), {
-						message: t("no-encoding-symbols-in-url-no-dot"),
-					})
-					.refine((val) => !takenAliases.current?.includes(val), {
-						message: t("alias-taken"),
-					}),
-			)
-			.nullish(),
+			.array(z.string())
+			.nullish()
+			.superRefine((aliases, ctx) => {
+				for (const alias of aliases ?? []) {
+					const message = aliasError(alias, takenAliases, ownAliases);
+					if (message)
+						ctx.addIssue({
+							code: z.ZodIssueCode.custom,
+							message: `${alias} — ${message}`,
+						});
+				}
+			}),
 	});
 };
 
@@ -96,8 +112,11 @@ const PropsEditor: FC<PropsEditorProps> = (props) => {
 	const formRef = useRef<HTMLFormElement>(null);
 	const brotherFileNames = useRef<string[]>([]);
 	const takenAliases = useRef<string[]>([]);
+	const ownAliases = useRef<Set<string>>(
+		new Set((item?.aliases ?? []).map((a) => (typeof a === "string" ? a : a.path))),
+	);
 
-	const formSchema = useMemo(() => getSchema(brotherFileNames, takenAliases), []);
+	const formSchema = useMemo(() => getSchema(brotherFileNames, takenAliases, ownAliases), []);
 
 	const form = useForm<PropsEditorFormValues>({
 		resolver: zodResolver(formSchema),
@@ -146,7 +165,10 @@ const PropsEditor: FC<PropsEditorProps> = (props) => {
 			transliterate(watchTitle, { kebab: true, maxLength: 50 }),
 			brotherFileNames.current,
 		);
-		setValue("fileName", newFileName, { shouldValidate: true, shouldDirty: true });
+		setValue("fileName", newFileName, {
+			shouldValidate: true,
+			shouldDirty: true,
+		});
 	}, [watchTitle]);
 
 	const formSubmitHandler = useCallback(
@@ -232,18 +254,13 @@ const PropsEditor: FC<PropsEditorProps> = (props) => {
 
 								<FormField
 									control={({ field, fieldState }) => (
-										<InputGroup>
-											<InputGroupText className="max-w-[65%] overflow-x-auto whitespace-nowrap [mask-image:linear-gradient(to_left,rgba(255,255,255,0),#fff_15%)]">
-												{url}
-											</InputGroupText>
-											<InputGroupInput
-												className="border-l rounded-l-none border-l-secondary-border"
-												data-qa="URL"
-												error={fieldState?.error?.message}
-												placeholder={t("enter-value")}
-												{...field}
-											/>
-										</InputGroup>
+										<UrlInputControl
+											data-qa="URL"
+											error={fieldState?.error?.message}
+											placeholder={t("enter-value")}
+											prefix={url}
+											{...field}
+										/>
 									)}
 									description={t("forms.article-edit-props.props.url.description")}
 									labelClassName={"w-44"}

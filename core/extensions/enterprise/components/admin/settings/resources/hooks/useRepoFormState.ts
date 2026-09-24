@@ -14,10 +14,12 @@ import {
 	type RepoUserAccess,
 } from "@ext/enterprise/components/admin/settings/members/model/Member";
 import {
+	getGroupRules,
 	useGroupRoleRules,
 	useGuestRoleRules,
 	useUserRoleRules,
 } from "@ext/enterprise/components/admin/settings/members/model/roleRules";
+import { resolveSsoGroupRole } from "@ext/enterprise/components/admin/settings/members/model/ssoGroupRoleRestrictions";
 import type { LoadOptionsParams, LoadOptionsResult } from "@ui-kit/AsyncSearchSelect";
 import type { ColumnDef } from "@ui-kit/DataTable";
 import type { SearchSelectOption } from "@ui-kit/SearchSelect";
@@ -52,15 +54,17 @@ export const useRepoFormState = (args: UseRepoFormStateArgs) => {
 	const [groupRowsMap, setGroupRowsMap] = useState(() => {
 		const res = new Map<string, RepoGroupAccess>();
 		repoAccesses.groups.forEach((x) => {
-			res.set(x.group.id, x);
+			res.set(x.group.id, { ...x, role: resolveSsoGroupRole(x.group.source, x.role) });
 		});
 		return res;
 	});
+	const getGroupRoleRules = useCallback((row: RepoGroupAccess) => getGroupRules(row.group.source), []);
 
 	const groupAccess = useAccessDraft({
 		rowsMap: groupRowsMap,
 		setRowsMap: setGroupRowsMap,
 		roleRules: groupRoleRules,
+		getRoleRules: getGroupRoleRules,
 		getId: getGroupAccessRowId,
 	});
 

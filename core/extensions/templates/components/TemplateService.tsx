@@ -5,10 +5,11 @@ import ArticleViewService from "@core-ui/ContextServices/views/articleView/Artic
 import { usePlatform } from "@core-ui/hooks/usePlatform";
 import type { ProviderContextService, ProviderItemProps } from "@ext/articleProvider/models/types";
 import ArticleTemplate from "@ext/templates/components/ArticleTemplate";
+import type { TemplateItemProps } from "@ext/templates/components/TemplatesPanel/types/constants";
 import { createContext, useContext, useState } from "react";
 
 export type TemplateContextType = {
-	templates: Map<string, ProviderItemProps>;
+	templates: Map<string, TemplateItemProps>;
 	selectedID: string;
 };
 
@@ -18,16 +19,18 @@ export const TemplateContext = createContext<TemplateContextType>({
 });
 
 class TemplateService implements ProviderContextService {
-	private _setTemplates: (templates: Map<string, ProviderItemProps>) => void = () => {};
+	private _setTemplates: (templates: Map<string, TemplateItemProps>) => void = () => {};
 	private _setSelectedID: (selectedID: string) => void = () => {};
+	private _templates = new Map<string, TemplateItemProps>();
 	private _isNext: boolean;
 
 	Init = ({ children }: { children: JSX.Element }): JSX.Element => {
-		const [templates, setTemplates] = useState<Map<string, ProviderItemProps>>(new Map());
+		const [templates, setTemplates] = useState<Map<string, TemplateItemProps>>(new Map());
 		const [selectedID, setSelectedID] = useState<string>(null);
 		const { isNext } = usePlatform();
 
 		this._isNext = isNext;
+		this._templates = templates;
 		this._setTemplates = setTemplates;
 		this._setSelectedID = setSelectedID;
 		return <TemplateContext.Provider value={{ templates, selectedID }}>{children}</TemplateContext.Provider>;
@@ -47,8 +50,9 @@ class TemplateService implements ProviderContextService {
 		this.setItems(templates);
 	}
 
-	setItems(templates: ProviderItemProps[]) {
-		this._setTemplates(new Map(templates.map((template) => [template.id, template])));
+	setItems(templates: TemplateItemProps[]) {
+		this._templates = new Map(templates.map((template) => [template.id, template]));
+		this._setTemplates(this._templates);
 	}
 
 	closeItem() {
@@ -57,23 +61,28 @@ class TemplateService implements ProviderContextService {
 		this._setSelectedID(null);
 	}
 
-	openItem(template: ProviderItemProps) {
+	openItem(template: TemplateItemProps) {
 		ArticleViewService.setView(() => <ArticleTemplate item={template} />);
 		this._setSelectedID(template.id);
 	}
 
 	async addNewTemplate(apiUrlCreator: ApiUrlCreator) {
 		const uniqueID = generateUniqueID();
-		await FetchService.fetch(apiUrlCreator.createFileInGramaxDir(uniqueID, "template"));
+		const createResponse = await FetchService.fetch(apiUrlCreator.createFileInGramaxDir(uniqueID, "template"));
+		if (!createResponse.ok) return;
+
+		const createdTemplate: TemplateItemProps = { id: uniqueID, title: "" };
 
 		const res = await FetchService.fetch<ProviderItemProps[]>(apiUrlCreator.getArticleListInGramaxDir("template"));
-		if (!res.ok) return;
+		if (!res.ok) {
+			this.setItems([...this._templates.values(), createdTemplate]);
+			return createdTemplate;
+		}
 
 		const newTemplates = await res.json();
-		this.setItems(newTemplates);
-
 		const addedTemplate = newTemplates.find((template) => template.id === uniqueID);
-		return addedTemplate;
+		this.setItems(addedTemplate ? newTemplates : [...newTemplates, createdTemplate]);
+		return addedTemplate ?? createdTemplate;
 	}
 }
 

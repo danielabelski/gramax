@@ -162,6 +162,44 @@ describe("Path правильно", () => {
 			});
 		});
 
+		describe("расширение особых имен", () => {
+			const cases: [string, string][] = [
+				[".gitignore", null],
+				[".env", null],
+				["folder/.gitignore", null],
+				["./.env", null],
+				[".env.local", "local"],
+				[".doc-root.yaml", "yaml"],
+				["a/b/.hidden.txt", "txt"],
+				["archive.tar.gz", "gz"],
+				["img.PNG", "PNG"],
+				["image.svg+xml", "svg+xml"],
+				["readme", null],
+				["readme.", null],
+				[".", null],
+				["..", null],
+				["", null],
+				["3.Subsystems Architecture/eCompass_Export", null],
+			];
+
+			cases.forEach(([value, extension]) => {
+				test(`для '${value}' => ${extension}`, () => {
+					expect(new Path(value).extension).toEqual(extension);
+				});
+			});
+		});
+
+		describe("путь без расширения у dotfile", () => {
+			test("оставляет имя целиком", () => {
+				expect(new Path(".gitignore").stripExtension).toBe(".gitignore");
+				expect(new Path("folder/.env").stripExtension).toBe("folder/.env");
+			});
+
+			test("все еще срезает расширение после первой точки", () => {
+				expect(new Path(".env.local").stripExtension).toBe(".env");
+			});
+		});
+
 		describe("все расширения", () => {
 			const path = [
 				new Path("rootFolder/folder/file.comment.yaml"),

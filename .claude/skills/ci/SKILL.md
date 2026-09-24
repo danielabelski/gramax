@@ -57,7 +57,6 @@ Part of helping the dev: find **which jobs failed and why**, so you can propose 
 - **Prefer inline comments** on exact lines (`merge-request` → REFERENCE.md → *Inline comments*), one thread = one finding, no status emoji. Summary MR note only for cross-file points not mapping to a line. Don't dump whole review in one note.
 - Output GitLab-flavored markdown. Reference files by path. Terse.
 - **Review**: focus correctness bugs, security, clear simplifications. Skip style nits (Biome handles). Nothing material wrong → say so in one line.
-- **Attribution**: commit or open MR → append the `Assisted-By: <model display name>` footer (e.g. `Assisted-By: Claude Opus 4.8`).
 - **Comment replies = bot.** Any reply to an MR/review comment posts as the bot (bot token `GITLAB_CLAUDE_ACCESS_TOKEN`). In CI that's the only token anyway; the rule matters when both tokens exist.
 - Conventions in `gramax/CLAUDE.md` + workspace `CLAUDE.md` (cwd). Follow.
 

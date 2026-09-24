@@ -82,21 +82,40 @@ bun run --cwd e2e-pw next:ci
 that, run them as-is. `next:start`/`docportal:start` wipe+recreate their
 test-data dir on each start.
 
+## GitLab fixtures — `GX_E2E_GIT_*`
+
+All e2e jobs talk to `gitlab.ics-it.ru`. Values live in `.ci/tests.yml`
+(`.e2e-gitlab-env`); only `GX_E2E_GIT_TOKEN` is a CI variable.
+
+| Var | Role |
+| --- | --- |
+| `GX_E2E_GIT_HOST` | server host, no scheme |
+| `GX_E2E_GIT_GROUP` | group holding the read-only fixture catalogs |
+| `GX_E2E_GIT_TEMP_GROUP` | group receiving the throwaway repos of a run |
+| `GX_E2E_GIT_TEST_REPO` / `..._NO_INDEX` | the two fixture catalogs |
+| `GX_E2E_RUN_ID` | pipeline id — temp repos are named `e2e-$GX_E2E_RUN_ID-*` |
+| `GX_E2E_GIT_TOKEN` | Dedicated PAT (project- or group-level CI variable; independent from `AI_GITLAB_TOKEN`) |
+
+The PAT needs `api` and `write_repository` scopes. Its owner must be able to read the fixture
+projects in `gx/test`, create projects in `gx/test/temp`, and delete the projects it creates. Keep
+the CI variable masked; mark it protected only if E2E runs exclusively on protected refs.
+
+Temp repos are deleted by the Playwright `globalTeardown`. Leftovers are swept by
+the scheduled `e2e-temp-cleanup` job (`$E2E_CLEANUP == "true"`), which runs
+`./.ci/e2e/delete-repos.ts` — run it locally with `--dry-run` first.
+
 ## static (cli) — CI job `static-e2e-pw`
 
 Exercises the **CLI build path** (the `playwright --project static` run is
-commented out in the job). Needs the `GX_E2E_GITLAB_*` creds — the same ones the
-`tests`/e2e jobs use — to clone the external test repo:
+commented out in the job). Needs the `GX_E2E_GIT_*` creds — the same ones the
+e2e jobs use — to clone the fixture catalog:
 
 ```sh
 cd apps/cli
-git clone "https://git:$GX_E2E_GITLAB_TOKEN@$GX_E2E_GITLAB_URL/$GX_E2E_GITLAB_GROUP/$GX_E2E_GITLAB_TEST_REPO.git"
+git clone "https://git:$GX_E2E_GIT_TOKEN@$GX_E2E_GIT_HOST/$GX_E2E_GIT_GROUP/$GX_E2E_GIT_TEST_REPO.git"
 bun run build
-bun run dist/index.js build -s "$GX_E2E_GITLAB_TEST_REPO" --skip-check
+bun run dist/index.js build -s "$GX_E2E_GIT_TEST_REPO" --skip-check
 ```
-
-Vars: `GX_E2E_GITLAB_TOKEN`, `GX_E2E_GITLAB_URL`, `GX_E2E_GITLAB_GROUP`,
-`GX_E2E_GITLAB_TEST_REPO`.
 
 ## Common failure signatures
 

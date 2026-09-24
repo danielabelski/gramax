@@ -1,14 +1,28 @@
 import type { IconCode } from "@components/Atoms/Icon/LucideIcon";
-import { cn } from "@core-ui/utils/cn";
 import type {
 	IconPickerColor,
 	OnChangeCallback,
 } from "@ext/markdown/elements/icon/edit/components/IconPicker/IconPicker";
 import IconComponent from "@ext/markdown/elements/icon/render/components/Icon";
-import { useComponentVariant } from "@ui-kit/hooks/useComponentVariant";
+import { narrowVariant, useComponentVariant } from "@ui-kit/hooks/useComponentVariant";
 import { Icon } from "@ui-kit/Icon";
 import { MenuItem } from "@ui-kit/MenuItem";
 import { forwardRef, type HTMLAttributes, useCallback } from "react";
+import { tv } from "tailwind-variants";
+
+const iconPickerItemStyles = tv({
+	base: "p-1 h-7 w-7 justify-center",
+});
+
+const iconPickerHeaderItemStyles = tv({
+	base: "p-1 inline-flex h-7 w-7 justify-center data-[selected=true]:bg-secondary-bg-hover",
+	variants: {
+		variant: {
+			inverse: "data-[selected=true]:bg-inverse-hover",
+			glass: "data-[selected=true]:bg-secondary-border",
+		},
+	},
+});
 
 interface IconPickerItemProps extends Omit<HTMLAttributes<HTMLDivElement>, "onClick"> {
 	code: IconCode;
@@ -31,12 +45,7 @@ export const IconPickerItem = forwardRef<HTMLDivElement, IconPickerItemProps>(
 		}, [code, color, onClick, svg]);
 
 		return (
-			<MenuItem
-				{...props}
-				className={cn("p-1 h-7 w-7 justify-center", className)}
-				onClick={handleClick}
-				ref={ref}
-			>
+			<MenuItem {...props} className={iconPickerItemStyles({ className })} onClick={handleClick} ref={ref}>
 				{svg ? (
 					<IconComponent
 						className="shrink-0"
@@ -59,19 +68,16 @@ export const IconPickerItem = forwardRef<HTMLDivElement, IconPickerItemProps>(
 
 export const IconPickerHeaderItem = forwardRef<HTMLDivElement, IconPickerHeaderItemProps>(
 	({ code, svg, category, active, className, ...props }, ref) => {
-		const { variant: theme } = useComponentVariant();
+		const { variant } = useComponentVariant();
 		return (
 			<MenuItem
 				data-category={category}
 				data-selected={active}
 				{...props}
-				className={cn(
-					"p-1 inline-flex h-7 w-7 justify-center",
-					theme === "inverse"
-						? "data-[selected=true]:bg-inverse-hover"
-						: "data-[selected=true]:bg-secondary-bg-hover",
+				className={iconPickerHeaderItemStyles({
 					className,
-				)}
+					variant: narrowVariant(variant, ["inverse", "glass"]),
+				})}
 				ref={ref}
 			>
 				{svg ? (

@@ -3,6 +3,7 @@ import SemiBlocks from "@ext/markdown/core/edit/components/Menu/Groups/SemiBlock
 import CodeMenuButton from "@ext/markdown/elements/code/edit/components/CodeMenuButton";
 import TableMenuButton from "@ext/markdown/elements/table/edit/components/TableMenuButton";
 import type { Editor } from "@tiptap/core";
+import { GlassToolbarGroup } from "@ui-kit/GlassToolbar";
 
 interface AnyMenuGroupProps {
 	editor?: Editor;
@@ -13,7 +14,7 @@ interface AnyMenuGroupProps {
 
 const AnyMenuGroup = ({ editor, includeResources, fileName, isSmallEditor }: AnyMenuGroupProps) => {
 	return (
-		<>
+		<GlassToolbarGroup>
 			<CodeMenuButton editor={editor} />
 			<TableMenuButton editor={editor} />
 			<NotesMenuGroup editor={editor} />
@@ -23,7 +24,7 @@ const AnyMenuGroup = ({ editor, includeResources, fileName, isSmallEditor }: Any
 				includeResources={includeResources}
 				isSmallEditor={isSmallEditor}
 			/>
-		</>
+		</GlassToolbarGroup>
 	);
 };
 

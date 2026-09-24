@@ -17,6 +17,7 @@ import type { Crop, ImageObject } from "@ext/markdown/elements/image/edit/model/
 import ImageError from "@ext/markdown/elements/image/render/components/ImageError";
 import { ImageSkeleton } from "@ext/markdown/elements/image/render/components/ImageSkeleton";
 import ObjectRenderer from "@ext/markdown/elements/image/render/components/ObjectRenderer";
+import useImageDecoded from "@ext/markdown/elements/image/render/hooks/useImageDecoded";
 import { cropImage } from "@ext/markdown/elements/image/render/logic/cropImage";
 import type { Attrs } from "@tiptap/pm/model";
 import {
@@ -53,7 +54,6 @@ export const ImageContext = createContext<ImageContextType>({
 
 interface ImageRProps {
 	src: string;
-	onLoad: ReactEventHandler<HTMLImageElement>;
 	onError: ReactEventHandler<HTMLImageElement>;
 	openEditor?: () => void;
 }
@@ -64,7 +64,7 @@ const IMAGE_ACTIONS_OPTIONS = {
 };
 
 const ImageR = forwardRef<HTMLImageElement, ImageRProps>((props, ref) => {
-	const { src, onError, openEditor, onLoad } = props;
+	const { src, onError, openEditor } = props;
 	const {
 		attrs: { id, title, alt, objects, width, src: realSrc },
 		isLoaded,
@@ -80,7 +80,6 @@ const ImageR = forwardRef<HTMLImageElement, ImageRProps>((props, ref) => {
 				modalTitle={title}
 				objects={objects}
 				onError={onError}
-				onLoad={onLoad}
 				realSrc={realSrc}
 				ref={ref}
 				src={src}
@@ -166,17 +165,22 @@ const ImageRenderer = memo((props: ImageProps): ReactElement => {
 	const articleRef = ArticleRefService.value;
 
 	const [imageSrc, setImageSrc] = useState<string>(isNonCroppedValue ? renderSrc || null : null);
-	const [isLoaded, setIsLoaded] = useState<boolean>(false);
+
+	const intrinsicSize = useMemo(() => {
+		if (!width?.endsWith("px") || !height) return null;
+		const croppedW = parseFloat(width) * ((crop?.w ?? 100) / 100);
+		const croppedH = parseFloat(height) * ((crop?.h ?? 100) / 100);
+		if (!croppedW || !croppedH) return null;
+		return { width: croppedW, height: croppedH };
+	}, [width, height, crop]);
 
 	const size = useMemo(() => {
 		const parentWidth = articleRef?.current?.firstElementChild?.firstElementChild?.clientWidth ?? 0;
-		if (!width?.endsWith("px") || !height || !parentWidth) return null;
-		const croppedW = parseFloat(width) * ((crop?.w ?? 100) / 100);
-		const croppedH = parseFloat(height) * ((crop?.h ?? 100) / 100);
+		if (!intrinsicSize || !parentWidth) return null;
 
-		const adjusted = getAdjustedSize(croppedW, croppedH, parentWidth, scale);
+		const adjusted = getAdjustedSize(intrinsicSize.width, intrinsicSize.height, parentWidth, scale);
 		return { width: `${adjusted.width}px`, height: `${adjusted.height}px` };
-	}, [width, height, crop, scale]);
+	}, [intrinsicSize, scale]);
 
 	const isGif = new Path(realSrc).extension === "gif";
 	const { getBuffer } = ResourceService.value;
@@ -184,24 +188,21 @@ const ImageRenderer = memo((props: ImageProps): ReactElement => {
 	const mainContainerRef = useRef<HTMLDivElement>(null);
 	const imageContainerRef = useRef<HTMLDivElement>(null);
 	const imgRef = useRef<HTMLImageElement>(null);
-	const initialLoadDoneRef = useRef<boolean>(false);
+	const isLoaded = useImageDecoded(imgRef, imageSrc);
+	const reservesLayout = !isLoaded && !!intrinsicSize;
+	const usesFallbackLayout = !intrinsicSize && !isLoaded && !error;
 
 	// Fetch the image resource only once it scrolls near the viewport, so an article with many
 	// images no longer loads every resource up front. Print/export and GIFs load eagerly: print
 	// needs all resources ready for pagination, and the GIF branch renders without mainContainerRef.
 	const isInViewport = useElementInViewport(mainContainerRef, {
-		rootMargin: "600px 0px",
+		rootMargin: "1500px 0px",
 		enabled: !isPrint && !isGif,
 	});
 
 	const onError: ReactEventHandler<HTMLImageElement> = useCallback(() => {
 		setError(new ResourceError("Image error", realSrc));
 	}, [realSrc]);
-
-	const onLoad = useCallback(() => {
-		if (!imageSrc) return;
-		setIsLoaded(true);
-	}, [imageSrc]);
 
 	const setSrc = useCallback((newSrc: Blob) => {
 		setImageSrc((prev) => {
@@ -214,9 +215,10 @@ const ImageRenderer = memo((props: ImageProps): ReactElement => {
 	}, []);
 
 	const cropImg = useCallback(
-		async (buffer: Buffer, crop: Crop) => {
+		async (buffer: Buffer, crop: Crop, signal?: AbortSignal) => {
 			const container = mainContainerRef.current;
 			const croppedBlob = await cropImage(container, crop, realSrc, buffer);
+			if (signal?.aborted) return;
 			setSrc(croppedBlob);
 		},
 		[realSrc, setSrc],
@@ -235,19 +237,8 @@ const ImageRenderer = memo((props: ImageProps): ReactElement => {
 		const buffer = getBuffer(realSrc);
 
 		if (!buffer) return;
-		setIsLoaded(false);
 		void cropImg(buffer, crop);
 	}, [crop]);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
-	useEffect(() => {
-		if (renderSrc) return;
-		const buffer = getBuffer(realSrc);
-		if (!buffer?.byteLength) return;
-		if (isLoaded) setIsLoaded(false);
-		initialLoadDoneRef.current = true;
-		void cropImg(buffer, crop);
-	}, []);
 
 	const externalLink = useMemo(() => {
 		if (!shouldSkipLoadResource) return;
@@ -256,15 +247,12 @@ const ImageRenderer = memo((props: ImageProps): ReactElement => {
 	}, [renderSrc, shouldSkipLoadResource]);
 
 	useGetResource(
-		async (buffer, resourceError) => {
+		async (buffer, resourceError, signal) => {
 			if (resourceError || !buffer || !buffer.byteLength) {
 				setError(resourceError ?? new ResourceError("Image error", realSrc));
 				return;
 			}
-			if (initialLoadDoneRef.current) return;
-			if (isLoaded) setIsLoaded(false);
-
-			await cropImg(buffer, crop);
+			await cropImg(buffer, crop, signal);
 		},
 		externalLink || realSrc,
 		undefined,
@@ -342,13 +330,24 @@ const ImageRenderer = memo((props: ImageProps): ReactElement => {
 							rightActions={error ? undefined : rightActions}
 							setIsHovered={setIsHovered}
 						>
-							<div className="w-full [&_img]:select-none [&_img]:w-full" ref={imageContainerRef}>
+							<div className="relative w-full [&_img]:select-none [&_img]:w-full" ref={imageContainerRef}>
 								<BlockCommentView className="rounded-sm" commentId={commentId}>
+									{reservesLayout && (
+										<svg
+											aria-hidden
+											className="block h-auto w-full"
+											data-image-placeholder
+											height={intrinsicSize.height}
+											width={intrinsicSize.width}
+										/>
+									)}
 									<ImageSkeleton
-										className="rounded-sm"
-										height={size?.height}
+										className={cn("rounded-sm", reservesLayout && "absolute inset-0")}
+										height={reservesLayout ? undefined : size?.height}
 										isLoaded={!!error || isLoaded}
-										width={size?.width}
+										layoutReserved={reservesLayout}
+										style={usesFallbackLayout ? { minHeight: "12em" } : undefined}
+										width={reservesLayout ? undefined : size?.width}
 									>
 										{error ? (
 											<ImageError
@@ -359,7 +358,6 @@ const ImageRenderer = memo((props: ImageProps): ReactElement => {
 										) : (
 											<ImageR
 												onError={onError}
-												onLoad={onLoad}
 												openEditor={openEditor}
 												ref={imgRef}
 												src={imageSrc}

@@ -2,7 +2,7 @@ review-ai:
   stage: ai
   interruptible: false
   tags:
-    - kubernetes01-gramax
+    - kubernetes01-gramax-5ghz
   image: $CI_REGISTRY_IMAGE/ai:$USE_IMAGE_TAG
   variables:
     GIT_STRATEGY: none
@@ -18,6 +18,7 @@ review-ai:
   # and don't survive the next commit's pipeline; cache keyed by MR IID does, so it
   # is the primitive that gives the AI job cross-run context.
   rules:
+    - !reference [.rules, default-pipeline-guards]
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: manual
       allow_failure: true
@@ -84,26 +85,29 @@ review-ai:
       echo "$AI_HEAD_SHA" > "$AI_CONTEXT_DIR/last-reviewed-sha"
 
   after_script:
-    - gramax/.ci/metrics/push-ci-job-duration-metrics.sh || true
+    - ./gramax/.ci/metrics/push-ci-job-duration-metrics.sh || true
 
 # --- fix-pipelines: manual, diagnose + repair red CI jobs on a branch --------
 # Unlike review-ai (read-only, lean `ai` image), this job must REPRODUCE the
 # harnesses locally — build gramax-core.node, run cargo/jest/Playwright. So it
-# runs on the ouroboros image (claude + rust + bun + Playwright browsers + glab
+# runs on the agent image (claude + rust + bun + Playwright browsers + glab
 # all baked), pulled from the team-workspace registry.
 #
-# Cross-project image pull: the ouroboros image lives in `gx/team-workspace`, a
+# Cross-project image pull: the agent image lives in `gx/team-workspace`, a
 # different project. The k8s executor needs registry creds to pull it — set the
 # `DOCKER_AUTH_CONFIG` CI/CD variable (project/group, masked) with a token that
-# can pull `gx/team-workspace/ouroboros`. `AI_GITLAB_TOKEN` must additionally
+# can pull `gx/team-workspace/agent`. `AI_GITLAB_TOKEN` must additionally
 # have WRITE scope: the skill pushes CI/test fixes straight to the branch (and
 # opens an MR for app-code fixes on release/develop).
 fix-pipelines-ai:
   stage: ai
   interruptible: false
   tags:
-    - kubernetes01-gramax
-  image: $CI_SERVER_HOST:4567/gx/team-workspace/ouroboros:latest
+    - kubernetes01-gramax-5ghz
+  image: $CI_SERVER_HOST:4567/gx/team-workspace/agent:latest
+  # Sweeps the branch's pipeline history and fixes every distinct broken job in
+  # one run — reproducing several harnesses (cargo/jest/Playwright) is slow.
+  timeout: 180m
   variables:
     GIT_STRATEGY: none
     HTTPS_PROXY: $RUNNER_HTTPS_PROXY
@@ -112,7 +116,10 @@ fix-pipelines-ai:
     GITLAB_TOKEN: $AI_GITLAB_TOKEN
     CLAUDE_CODE_OAUTH_TOKEN: $CLAUDE_CODE_OAUTH_TOKEN
     AI_MODEL: opus
+    # How many recent pipelines on the branch the history sweep looks at.
+    SWEEP_DEPTH: '20'
   rules:
+    - !reference [.rules, default-pipeline-guards]
     # On an MR pipeline: target the MR source branch.
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: manual
@@ -137,7 +144,7 @@ fix-pipelines-ai:
       git -C gramax fetch origin "$BRANCH"
       git -C gramax checkout -B "$BRANCH" FETCH_HEAD
 
-      AI_PROMPT="You're running inside CI in headless mode. Use your fix-pipelines skill to diagnose and repair the red CI jobs on branch '${BRANCH}' of the Gramax repo. Triage the failed jobs, reproduce the failing harness locally, verify the fix by re-running it green, then land it per the skill's branch policy."
+      AI_PROMPT="You're running inside CI in headless mode. Use your fix-pipelines skill on branch '${BRANCH}' of the Gramax repo. Sweep the last ${SWEEP_DEPTH} pipelines on that branch, build the worklist of every distinct broken job, and work the whole list — not just the newest pipeline's failures. Land all verified fixes per the skill's policy and report the outcome of every worklist item."
 
       echo "Running Claude with following prompt:\n${AI_PROMPT}"
 
@@ -145,4 +152,4 @@ fix-pipelines-ai:
         -p "$AI_PROMPT" ${AI_MODEL:+--model "$AI_MODEL"}
 
   after_script:
-    - gramax/.ci/metrics/push-ci-job-duration-metrics.sh || true
+    - ./gramax/.ci/metrics/push-ci-job-duration-metrics.sh || true

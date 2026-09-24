@@ -14,10 +14,15 @@ import { SignInEnterpriseTauriForm } from "@ext/enterprise/components/SingInOut/
 import SignOutEnterprise from "@ext/enterprise/components/SingInOut/SignOutEnterprise";
 import { GesCloudInitCatalog } from "@ext/enterprise-cloud/components/Catalog/GesCloudInitCatalog";
 import { GesCloudSignInFormModal } from "@ext/enterprise-cloud/components/GesCloudSignInFormModal";
-import { GesCloudUrlFormModal } from "@ext/enterprise-cloud/components/GesCloudUrlFormModal";
 import { InviteMismatchModal } from "@ext/enterprise-cloud/components/InviteMismatchModal";
 import { GesCloudOrganizationSettingsModal } from "@ext/enterprise-cloud/components/organizationSettings/OrganizationSettings";
-import { GesCloudInviteUserModal } from "@ext/enterprise-cloud/components/organizationSettings/settings/components/UserToolbarInviteBtn";
+import { LegalEntitySwitchModal } from "@ext/enterprise-cloud/components/organizationSettings/settings/billing/LegalEntitySwitchModal";
+import { InviteMemberModal } from "@ext/enterprise-cloud/components/organizationSettings/settings/components/InviteMemberModal";
+import { PayerTypeChooseModal } from "@ext/enterprise-cloud/components/organizationSettings/settings/components/PayerTypeChooseModal";
+import { TariffChooseModal } from "@ext/enterprise-cloud/components/organizationSettings/settings/components/TariffChooseModal";
+import { ChangePeriodPayModal } from "@ext/enterprise-cloud/components/payModals/ChangePeriodPayModal";
+import { PurchaseSeatPayModal } from "@ext/enterprise-cloud/components/payModals/PurchaseSeatPayModal";
+import { RecoverPayModal } from "@ext/enterprise-cloud/components/payModals/RecoverPayModal";
 import GesCloudSignOutModal from "@ext/enterprise-cloud/components/SignInOut/GesCloudSignOutModal";
 import { CreateAccessTokenModal } from "@ext/enterpriseCommon/components/accessTokens/CreateAccessTokenModal";
 import { ShowAccessTokenModal } from "@ext/enterpriseCommon/components/accessTokens/ShowAccessTokenModal";
@@ -26,6 +31,7 @@ import CreateMergeRequestModal from "@ext/git/actions/Branch/components/MergeReq
 import CloneModal from "@ext/git/actions/Clone/components/CloneModal";
 import MergeConflictConfirm from "@ext/git/actions/MergeConflictHandler/components/MergeConflictConfirm";
 import MergeResolver from "@ext/git/actions/MergeConflictHandler/components/MergeResolver";
+import LfsAutoAttachmentsDialog from "@ext/git/actions/Sync/components/LfsAutoAttachmentsDialog";
 import LfsMigrationDialog from "@ext/git/actions/Sync/components/LfsMigrationDialog";
 import MergeRequestConfirm from "@ext/git/core/GitMergeRequest/components/MergeRequestConfirm";
 import CheckoutHandler from "@ext/git/core/GitPathnameHandler/checkout/components/CheckoutHandler";
@@ -48,6 +54,8 @@ import TemplateContentWarning from "@ext/templates/components/TemplateContentWar
 import CreateWorkspaceForm from "@ext/workspace/components/CreateWorkspaceForm";
 import { AlertConfirm } from "@ui-kit/AlertDialog";
 import { lazy, type ReactNode } from "react";
+import GesCloudAppSettingsEditor from "../../../../extensions/enterprise-cloud/components/GesCloudAppSettingsEditor";
+import { CancelSubscriptionModal } from "../../../../extensions/enterprise-cloud/components/organizationSettings/settings/components/CancelSubscriptionModal";
 import DefaultModal from "../components/DefaultModal";
 import ModalToOpen from "../model/ModalsToOpen";
 
@@ -124,15 +132,23 @@ const getModalComponentToRender: {
 	[ModalToOpen.ShowAccessToken]: ShowAccessTokenModal,
 
 	[ModalToOpen.GesCloudInitCatalog]: GesCloudInitCatalog,
-	[ModalToOpen.GesCloudUrl]: GesCloudUrlFormModal,
 	[ModalToOpen.GesCloudSignIn]: GesCloudSignInFormModal,
-	[ModalToOpen.GesCloudInviteUser]: GesCloudInviteUserModal,
+	[ModalToOpen.GesCloudInviteMember]: InviteMemberModal,
+	[ModalToOpen.TariffChoose]: TariffChooseModal,
+	[ModalToOpen.GesCloudPurchaseSeatPayModal]: PurchaseSeatPayModal,
+	[ModalToOpen.GesCloudPayerTypeChoose]: PayerTypeChooseModal,
+	[ModalToOpen.GesCloudChangePeriod]: ChangePeriodPayModal,
+	[ModalToOpen.GesCloudLegalEntitySwitch]: LegalEntitySwitchModal,
 	[ModalToOpen.GesCloudInviteMismatch]: InviteMismatchModal,
 	[ModalToOpen.GesCloudOrganizationSettings]: GesCloudOrganizationSettingsModal,
 	[ModalToOpen.GesCloudSignOut]: GesCloudSignOutModal,
+	[ModalToOpen.GesAppSettings]: GesCloudAppSettingsEditor,
+	[ModalToOpen.GesCloudRecoverPaymentInfo]: RecoverPayModal,
+	[ModalToOpen.CancelSubscription]: CancelSubscriptionModal,
 
 	[ModalToOpen.AlertConfirm]: AlertConfirm,
 	[ModalToOpen.LfsMigration]: LfsMigrationDialog,
+	[ModalToOpen.LfsAutoAttachments]: LfsAutoAttachmentsDialog,
 
 	[ModalToOpen.AppSettings]: AppSettingsEditor,
 	[ModalToOpen.AgentContextUsageModal]: AgentContextUsageModal,

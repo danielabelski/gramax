@@ -403,7 +403,6 @@ describe("applyAccessChanges", () => {
 				groups: {},
 				workspace: {
 					name: "ws",
-					sections: {},
 					git: { source: { url: "", type: "GitLab", repos: [] } },
 					wordTemplates: [],
 					pdfTemplates: [],
@@ -430,7 +429,6 @@ describe("applyAccessChanges", () => {
 				groups: {},
 				workspace: {
 					name: "ws",
-					sections: {},
 					git: { source: { url: "", type: "GitLab", repos: [] } },
 					wordTemplates: [],
 					pdfTemplates: [],

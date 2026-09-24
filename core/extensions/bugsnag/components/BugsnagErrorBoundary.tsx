@@ -20,7 +20,9 @@ class BugsnagErrorBoundary extends React.Component<BugsnagErrorBoundaryProps> {
 				if (!e.errorMessage.includes(target)) e.errorMessage = `[${target}:ui] ${e.errorMessage}`;
 				normalizeStack(e.stacktrace);
 			});
-			e.addMetadata("ui_props", { context: { ...props.context, sourceDatas: [], userInfo: null } });
+			e.addMetadata("ui_props", {
+				context: { ...props.context, sourceDatas: [], user: { ...props.context.user, info: null } },
+			});
 		};
 		void bugsnag().then(({ default: Bugsnag }) => {
 			if (Bugsnag.isStarted()) Bugsnag.addOnError(onError);
@@ -40,7 +42,7 @@ class BugsnagErrorBoundary extends React.Component<BugsnagErrorBoundaryProps> {
 	}
 
 	override componentDidCatch(error) {
-		sendBug(error);
+		void sendBug(error);
 	}
 
 	override render() {

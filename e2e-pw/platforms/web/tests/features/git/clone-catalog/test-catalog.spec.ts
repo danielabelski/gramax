@@ -1,46 +1,29 @@
 import { expect } from "@playwright/test";
 import { getSourceDataFromEnv, getTestRepoInfoFromEnv } from "@utils/source";
 import { homeTest as test } from "@web/fixtures/home.fixture";
+import { ClonePom } from "@web/pom/clone.pom";
 
 test.use({});
 
 const source = getSourceDataFromEnv();
 const repo = getTestRepoInfoFromEnv();
 
+const catalogTitle = "Автотест";
+
 test.describe
 	.serial("test-catalog", () => {
 		test("clone", async ({ homePage, sharedPage }) => {
-			await sharedPage.getByTestId("add-catalog").click();
+			test.slow();
 
-			await sharedPage.getByRole("menuitem", { name: "Load existing" }).click();
+			const clone = new ClonePom(homePage);
+			await clone.cloneWithNewStorage(source, {
+				group: repo.group,
+				repo: repo.testRepo,
+			});
+			await clone.openCatalog(catalogTitle);
 
-			await sharedPage.getByRole("combobox").click();
-			await sharedPage.getByRole("option", { name: "GitLab" }).click({ force: true });
-
-			await sharedPage.getByRole("textbox", { name: "GitLab Server URL" }).fill(source.domain);
-
-			await sharedPage.getByRole("textbox", { name: "GitLab Token" }).click();
-			await sharedPage.getByRole("textbox", { name: "GitLab Token" }).fill(source.token);
-
-			await expect(sharedPage.getByRole("textbox", { name: "Email" })).toHaveValue(source.userEmail);
-
-			await sharedPage.getByRole("button", { name: "Add" }).click();
-			await sharedPage.getByRole("combobox", { name: "Repository" }).click();
-
-			await sharedPage.getByPlaceholder("Find").fill("test-catalog");
+			await sharedPage.getByRole("link", { name: catalogTitle }).click();
 			await homePage.waitForLoad();
-
-			await sharedPage.getByRole("option", { name: `${repo.group}/${repo.testRepo}` }).click({ timeout: 15_000 });
-
-			await sharedPage.getByRole("button", { name: "Load" }).click();
-
-			await homePage.waitForLoad(1000);
-
-			await sharedPage.getByRole("button", { name: "Автотест" }).click();
-
-			await homePage.waitForLoad(1000);
-
-			await sharedPage.getByRole("link", { name: "Автотест" }).click();
 		});
 
 		test("switch versions", async ({ basePage }) => {
@@ -49,37 +32,29 @@ test.describe
 			await page.getByRole("button", { name: "Автотест" }).click();
 			await basePage.waitForLoad();
 
-			// master -> Z
-			await page.getByRole("complementary").getByText("master").click();
+			// master -> Z. Only refs the clone holds locally count as versions, and a fresh clone holds
+			// `master` plus the tags — `x` and `test/g` stay remote-tracking here, so the branch legs of
+			// this scenario belong to the bare clone the docportal serves
+			// (platforms/docportal/tests/catalog/switch-versions.spec.ts).
+			await page.locator('[data-testid="switch-version-trigger"]:visible').click();
 			await page.getByRole("menuitemradio", { name: "Z" }).click();
 			await basePage.waitForLoad();
 			await basePage.assertNoModal();
-			expect(basePage.url).toContain("/test-catalog:Z");
+			expect(basePage.url).toContain(`/${repo.testRepo}:Z`);
 
-			// Navigate to "Тег" article
-			await page.getByRole("link", { name: "Тег" }).click();
+			// Navigation rows are buttons; only a row that is neither selected nor top-level wraps its
+			// button in a link.
+			await page.getByRole("button", { name: "Тег", exact: true }).click();
 			await basePage.waitForLoad();
 			await basePage.assertNoModal();
-			expect(basePage.url).toContain("/test-catalog:Z/teg");
+			expect(basePage.url).toContain(`/${repo.testRepo}:Z/teg`);
 
-			// Z -> x (branch without this article - expect error)
-			await page.getByRole("complementary").getByText("Z").click();
-			await page.getByRole("menuitemradio", { name: "x" }).click();
-			await basePage.waitForLoad();
-			await expect(page.getByText("Check that the path is correct")).toBeVisible();
-			expect(basePage.url).toContain("/test-catalog:x/teg");
-
-			// x -> test/g
-			await page.getByRole("complementary").getByText("x", { exact: true }).click();
-			await page.getByRole("menuitemradio", { name: "test/g" }).click();
-			await basePage.waitForLoad();
-			await basePage.assertNoModal();
-
-			// test/g -> master (back to current branch)
-			await page.getByRole("complementary").getByText("test/g").click();
+			// Z -> master: the version drops out of the address, the article stays open.
+			await page.locator('[data-testid="switch-version-trigger"]:visible').click();
 			await page.getByRole("menuitemradio", { name: "master" }).click();
 			await basePage.waitForLoad();
 			await basePage.assertNoModal();
-			expect(basePage.url).not.toContain(":");
+			expect(basePage.url).toContain("/teg");
+			expect(basePage.url).not.toContain(`${repo.testRepo}:`);
 		});
 	});

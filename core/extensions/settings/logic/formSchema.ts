@@ -112,6 +112,7 @@ const APP_LEVEL_KEYS = {
 	services: SERVICE_SETTING_KEYS.map((key) => `services.${key}.endpoint`),
 	updates: ["updates.check-frequency"],
 	"experimental-features": [],
+	"keys-passwords": [],
 	diagnostics: ["logging.level", "logging.console"],
 	contentCompare: [
 		"contentCompare.sensitivity",

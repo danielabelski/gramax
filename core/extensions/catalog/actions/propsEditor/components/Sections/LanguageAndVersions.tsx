@@ -2,6 +2,7 @@ import { SectionContainer } from "@ext/catalog/actions/propsEditor/components/Se
 import { FORM_DATA_QA, FORM_STYLES } from "@ext/catalog/actions/propsEditor/consts/form";
 import { useFormSelectValues } from "@ext/catalog/actions/propsEditor/hooks/useFormSelectValues";
 import t from "@ext/localization/locale/translate";
+import SectionHeader from "@ext/settings/components/SectionHeader";
 import { useSetting } from "@ext/settings/logic/hooks";
 import { FormDescription, FormField, FormSectionTitle, FormStack } from "@ui-kit/Form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui-kit/Select";
@@ -18,7 +19,10 @@ export const EditLanguageAndVersionsProps = ({ form }: LanguageAndVersionsProps)
 	const [language] = useSetting("general.language");
 
 	return (
-		<SectionContainer stackClassName="space-y-9 lg:space-y-10">
+		<SectionContainer
+			header={<SectionHeader title={t("forms.catalog-edit-props.tabs.language")} />}
+			stackClassName="space-y-9 lg:space-y-10"
+		>
 			<FormStack className="space-y-4">
 				<div className="space-y-0.5">
 					<FormSectionTitle className="flex items-center gap-2">{t("multilang.name")} </FormSectionTitle>

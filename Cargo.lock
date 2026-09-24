@@ -1197,6 +1197,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "data-url"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376"
+
+[[package]]
 name = "dbus"
 version = "0.9.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2170,7 +2176,6 @@ dependencies = [
  "bugsnag",
  "chrono",
  "colored",
- "cookie_store",
  "copy_dir",
  "dotenvy",
  "gramax-opentelemetry",
@@ -2180,6 +2185,7 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
+ "objc2-pdf-kit",
  "objc2-web-kit",
  "open",
  "opentelemetry",
@@ -2187,8 +2193,8 @@ dependencies = [
  "os_info",
  "plugin-browser-session",
  "plugin-gramax-core",
+ "plugin-mail",
  "reqwest 0.12.28",
- "reqwest_cookie_store",
  "rfd 0.14.1",
  "rlimit",
  "rstest 0.22.0",
@@ -2206,9 +2212,11 @@ dependencies = [
  "tauri-otel-context",
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
+ "tauri-plugin-http",
  "tauri-plugin-shell",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
+ "tempfile",
  "thiserror 2.0.18",
  "tiny_http",
  "tokio",
@@ -4278,6 +4286,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-pdf-kit"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c14ed801ae810c6ba487cedd7616bb48f9a8e37940042f57e862538e2c7db117"
+dependencies = [
+ "bitflags 2.13.0",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-foundation",
+]
+
+[[package]]
 name = "objc2-quartz-core"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4763,6 +4785,20 @@ dependencies = [
  "tauri-otel-context",
  "tauri-plugin",
  "urlencoding",
+]
+
+[[package]]
+name = "plugin-mail"
+version = "0.0.0"
+dependencies = [
+ "base64 0.22.1",
+ "native-tls",
+ "percent-encoding",
+ "serde",
+ "tauri",
+ "tauri-otel-context",
+ "tauri-plugin",
+ "url",
 ]
 
 [[package]]
@@ -5354,18 +5390,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "reqwest_cookie_store"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e75bc88d954b228850d19e3685cedb38c030a17da34aa01c307f95d6e33de34"
-dependencies = [
- "bytes",
- "cookie_store",
- "reqwest 0.12.28",
- "url",
-]
-
-[[package]]
 name = "rfd"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5854,6 +5878,7 @@ version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
 dependencies = [
+ "indexmap 2.14.0",
  "itoa",
  "memchr",
  "serde",
@@ -6670,6 +6695,30 @@ dependencies = [
  "thiserror 2.0.18",
  "toml 1.1.2+spec-1.1.0",
  "url",
+]
+
+[[package]]
+name = "tauri-plugin-http"
+version = "2.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5bd512048e1985b7ec78f96d99083e2ddaf7e0d906b2b63c44ce5bb8b894067"
+dependencies = [
+ "bytes",
+ "cookie_store",
+ "data-url",
+ "http",
+ "regex",
+ "reqwest 0.12.28",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-fs",
+ "thiserror 2.0.18",
+ "tokio",
+ "url",
+ "urlpattern",
 ]
 
 [[package]]

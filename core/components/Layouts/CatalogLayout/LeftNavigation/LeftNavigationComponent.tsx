@@ -1,36 +1,38 @@
-import type { ArticlePageData } from "@core/SitePresenter/types/ArticlePage";
-import SidebarsIsOpenService from "@core-ui/ContextServices/Sidebars/SidebarsIsOpenContext";
-import SidebarsIsPinService from "@core-ui/ContextServices/Sidebars/SidebarsIsPin";
+import { TopBarContentMobile } from "@components/ArticlePage/Bars/TopBarContentMobile";
+import { useRouter } from "@core/Api/useRouter";
+import { useSidebarsPinStore } from "@core-ui/ContextServices/Sidebars/SidebarsPinStore";
 import LeftNavViewContentContainer from "@core-ui/ContextServices/views/leftNavView/LeftNavViewContainer";
-import { usePlatform } from "@core-ui/hooks/usePlatform";
+import useSidebarFloating from "@core-ui/hooks/useSidebarFloating";
 import { getEditorStore } from "@core-ui/stores/EditorStore";
 import { useItemLinks } from "@core-ui/stores/ItemLinksStore/ItemLinksStore.provider";
 import stopOpeningPanels from "@core-ui/utils/stopOpeningPanels ";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useSidebar } from "@ui-kit/Sidebar";
+import { useCallback, useEffect, useRef } from "react";
+import MobileNavigationBottom from "../MobileNavigationBottom";
+import { useCanSeeNavigationBottom } from "../useCanSeeNavigationBottom";
+import { CollapsedNavigationToolbar } from "./CollapsedNavigationToolbar";
 import LeftNavigationBottom from "./LeftNavigationBottom";
 import LeftNavigationLayout from "./LeftNavigationLayout";
 import LeftNavigationTop from "./LeftNavigationTop";
+import { MobileNavigationHeader } from "./MobileNavigationHeader";
+import { useCollapsedNavigationPresentation } from "./useCollapsedNavigationPresentation";
 
 const navsSymbol = Symbol();
 
-const LeftNavigationComponent = ({
-	data,
-	mediumMedia,
-	delay,
-}: {
-	data: ArticlePageData;
-	mediumMedia: boolean;
-	delay?: number;
-}) => {
-	const isPin = SidebarsIsPinService.value.left;
-	const [prevIsPin, setPrevIsPin] = useState<boolean>(undefined);
-	const { isStaticCli } = usePlatform();
+const LeftNavigationComponent = () => {
+	const { isMobile, openMobile, setOpenMobile, toggleSidebar } = useSidebar();
+	const isPinned = useSidebarsPinStore((state) => state.isLeftPinned);
 	const itemLinks = useItemLinks();
-
-	const isOpen = SidebarsIsOpenService.value.left;
-
-	const transitionEndIsOpen = SidebarsIsOpenService.transitionEndIsLeftOpen;
 	const editor = getEditorStore().editor;
+	const canSeeNavigationBottom = useCanSeeNavigationBottom();
+
+	const sidebarRef = useRef<HTMLDivElement>(null);
+
+	const isCollapsed = !isMobile && !isPinned;
+	const { handleTransitionEnd, isCollapsedPresentation } = useCollapsedNavigationPresentation(!isPinned, isMobile);
+	const { isHoverActive } = useSidebarFloating(sidebarRef, isCollapsed && isCollapsedPresentation);
+
+	const isVisible = isMobile ? openMobile : isPinned || (isCollapsedPresentation && isHoverActive);
 
 	useEffect(() => {
 		const onSelectionChange = () => stopOpeningPanels(navsSymbol, editor.view);
@@ -41,53 +43,59 @@ const LeftNavigationComponent = ({
 		};
 	}, [editor]);
 
-	const isLeftNavHover = useRef(false);
-	const unpinAnimation = useRef(false);
+	const closeNavigation = useCallback(() => setOpenMobile(false), [setOpenMobile]);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
-	useLayoutEffect(() => {
-		if (prevIsPin && !isPin) {
-			SidebarsIsOpenService.value = { left: false };
-			unpinAnimation.current = true;
-		}
-		setPrevIsPin(isPin);
-	}, [isPin]);
+	// The overlay's job ends where the user lands: any route change closes it, on mobile only.
+	const { path } = useRouter();
+	const landedPath = useRef(path);
+	useEffect(() => {
+		if (landedPath.current === path) return;
+		landedPath.current = path;
+		if (isMobile) setOpenMobile(false);
+	}, [path, isMobile, setOpenMobile]);
 
-	const onMouseEnter = useCallback(() => {
-		isLeftNavHover.current = true;
-	}, []);
+	const leftNavigationTop = isCollapsedPresentation ? undefined : <LeftNavigationTop />;
+	const leftNavigationContent = (
+		<LeftNavViewContentContainer closeNavigation={isMobile ? closeNavigation : undefined} itemLinks={itemLinks} />
+	);
 
-	const onMouseLeave = useCallback(() => {
-		isLeftNavHover.current = false;
-	}, []);
+	if (isMobile) {
+		return (
+			<>
+				{!openMobile && (
+					<MobileNavigationHeader>
+						<TopBarContentMobile toggleSidebar={toggleSidebar} />
+					</MobileNavigationHeader>
+				)}
+				<LeftNavigationLayout
+					isCollapsed={false}
+					isMobile
+					isVisible={false}
+					leftNavigationBottom={
+						canSeeNavigationBottom ? (
+							<MobileNavigationBottom closeNavigation={closeNavigation} />
+						) : undefined
+					}
+					leftNavigationContent={leftNavigationContent}
+					leftNavigationTop={<LeftNavigationTop forceDesktop onClose={closeNavigation} />}
+				/>
+			</>
+		);
+	}
 
 	return (
-		<div
-			onMouseEnter={onMouseEnter}
-			onMouseLeave={onMouseLeave}
-			style={{ width: isPin ? "var(--left-nav-width)" : "fit-content" }}
-		>
+		<>
+			{isCollapsed && <CollapsedNavigationToolbar />}
 			<LeftNavigationLayout
-				isOpen={isOpen}
-				isPin={isPin}
-				isStaticBuilding={isStaticCli}
-				leftNavigationBottom={<LeftNavigationBottom data={data} />}
-				leftNavigationContent={<LeftNavViewContentContainer itemLinks={itemLinks} />}
-				leftNavigationTop={<LeftNavigationTop />}
-				mediumMedia={mediumMedia}
-				onMouseEnter={() =>
-					setTimeout(() => {
-						if (!isLeftNavHover.current || unpinAnimation.current) return;
-						SidebarsIsOpenService.value = { left: true };
-					}, delay)
-				}
-				onTransitionEnd={() => {
-					SidebarsIsOpenService.transitionEndIsLeftOpen = isOpen;
-					unpinAnimation.current = false;
-				}}
-				transitionEndIsOpen={transitionEndIsOpen}
+				isCollapsed={isCollapsedPresentation}
+				isVisible={isVisible}
+				leftNavigationBottom={canSeeNavigationBottom ? <LeftNavigationBottom /> : undefined}
+				leftNavigationContent={leftNavigationContent}
+				leftNavigationTop={leftNavigationTop}
+				onTransitionEnd={handleTransitionEnd}
+				sidebarRef={sidebarRef}
 			/>
-		</div>
+		</>
 	);
 };
 

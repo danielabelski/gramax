@@ -1,6 +1,9 @@
+import { getExecutingEnvironment } from "@app/resolveModule/env";
+import applyWorkspaceServices from "@app/utils/applyWorkspaceServices";
 import type PageDataContext from "@core/Context/PageDataContext";
 import type { HomePageData } from "@core/SitePresenter/SitePresenter";
 import type { HomePageDataParams } from "@core/SitePresenter/types/PageDataParams";
+import { getGesWebWorkspacePath } from "@ext/enterprise/utils/getGesWebWorkspacePath";
 import { Command } from "../../types/Command";
 import getPageDataContext from "./getPageDataContext";
 
@@ -11,13 +14,24 @@ const getHomePageData: Command<HomePageDataParams, { data: HomePageData; context
 
 	async do({ ctx, path }) {
 		const { wm, sitePresenterFactory } = this._app;
+		const gesWorkspacePath = getGesWebWorkspacePath(
+			getExecutingEnvironment(),
+			this._app.em.getConfig().gesUrl,
+			wm.workspaces(),
+		);
+		if (gesWorkspacePath && wm.maybeCurrent()?.path() !== gesWorkspacePath) {
+			await wm.setWorkspace(gesWorkspacePath);
+			applyWorkspaceServices(this._app.settings, wm.current());
+		}
 
 		if (!wm.hasWorkspace()) {
+			const section = { title: "", href: "", catalogLinks: [] };
+			const view = { section, breadcrumb: [], group: null };
 			return {
 				data: {
-					section: { title: "", href: "", catalogLinks: [] },
-					breadcrumb: [],
 					catalogsLinks: [],
+					hasPersonalOverride: false,
+					views: { global: view, personal: view },
 				},
 				context: await getPageDataContext({ ctx, app: this._app, isArticle: false }),
 			};

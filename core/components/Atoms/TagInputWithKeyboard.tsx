@@ -2,27 +2,56 @@ import { useItemsKeyboardNavigation } from "@ui-kit/hooks/useItemsKeyboardNaviga
 import { Input } from "@ui-kit/Input";
 import { SearchSelectTag } from "@ui-kit/SearchSelect";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 interface TagInputWithKeyboardProps {
 	value: string[];
 	onChange: (tags: string[]) => void;
+	/**
+	 * Entries the list always carries and nobody can take out — shown first, with no remove button and
+	 * deaf to the delete keys. Typing one of them adds nothing, since it is already there.
+	 */
+	lockedValues?: string[];
 	placeholder?: string;
 	readonly?: boolean;
 	description?: string;
+	/**
+	 * Handed down by `FormField`'s `FormControl` slot; they have to reach the real `<input>`, or the
+	 * field's `<label htmlFor>` names nothing and the tag list has no accessible name.
+	 */
+	id?: string;
+	"aria-describedby"?: string;
 }
 
-const TagInputWithKeyboard = ({ value, onChange, placeholder, readonly, description }: TagInputWithKeyboardProps) => {
+const NO_LOCKED_VALUES: string[] = [];
+
+const TagInputWithKeyboard = ({
+	value,
+	onChange,
+	lockedValues = NO_LOCKED_VALUES,
+	placeholder,
+	readonly,
+	description,
+	id,
+	"aria-describedby": ariaDescribedBy,
+}: TagInputWithKeyboardProps) => {
 	const [inputValue, setInputValue] = useState("");
 	const inputRef = useRef<HTMLInputElement>(null);
 
+	// One list for the eye and the keyboard alike; the locked entries lead, so an index below their
+	// count names one of them and everything past it maps straight onto `value`.
+	const tags = useMemo(
+		() => [...lockedValues, ...value.filter((tag) => !lockedValues.includes(tag))],
+		[lockedValues, value],
+	);
+
 	const removeTag = useCallback(
-		(_: string, index: number) => {
-			if (readonly) return;
-			onChange(value.filter((_, i) => i !== index));
+		(tag: string, index: number) => {
+			if (readonly || index < lockedValues.length) return;
+			onChange(value.filter((current) => current !== tag));
 			inputRef.current?.focus();
 		},
-		[readonly, value, onChange],
+		[readonly, value, lockedValues, onChange],
 	);
 
 	const {
@@ -30,7 +59,7 @@ const TagInputWithKeyboard = ({ value, onChange, placeholder, readonly, descript
 		isFocused,
 		focusItemAtIndex,
 	} = useItemsKeyboardNavigation({
-		items: value,
+		items: tags,
 		onDelete: removeTag,
 		cycleNavigation: true,
 	});
@@ -39,7 +68,7 @@ const TagInputWithKeyboard = ({ value, onChange, placeholder, readonly, descript
 		if (e.key === "Enter" && inputValue.trim()) {
 			e.preventDefault();
 			const trimmed = inputValue.trim();
-			if (!value.includes(trimmed)) {
+			if (!tags.includes(trimmed)) {
 				onChange([...value, trimmed]);
 				setInputValue("");
 			}
@@ -53,6 +82,8 @@ const TagInputWithKeyboard = ({ value, onChange, placeholder, readonly, descript
 	return (
 		<div className="group/search-select-trigger flex flex-col gap-2 w-full">
 			<Input
+				aria-describedby={ariaDescribedBy}
+				id={id}
 				onChange={(e) => setInputValue(e.target.value)}
 				onKeyDown={handleInputKeyDown}
 				placeholder={placeholder}
@@ -60,15 +91,15 @@ const TagInputWithKeyboard = ({ value, onChange, placeholder, readonly, descript
 				ref={inputRef}
 				value={inputValue}
 			/>
-			{value.length > 0 && (
+			{tags.length > 0 && (
 				<div className="flex flex-wrap gap-1">
-					{value.map((tag, index) => (
+					{tags.map((tag, index) => (
 						<SearchSelectTag
 							isFocused={isFocused(index)}
 							key={tag}
 							onClose={() => removeTag(tag, index)}
 							onLabelClick={() => focusItemAtIndex(index)}
-							readonly={readonly}
+							readonly={readonly || index < lockedValues.length}
 						>
 							{tag}
 						</SearchSelectTag>

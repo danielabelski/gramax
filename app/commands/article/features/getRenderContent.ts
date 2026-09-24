@@ -67,7 +67,7 @@ const getRenderContent: Command<
 			path: path.value,
 			title: error ? errorArticleData.title : article.getTitle(),
 			content: error ? errorArticleData.content : await article.parsedContent.read((p) => p.renderTree),
-			articleProps: await sp.serializeArticleProps(article, await catalog?.getPathname(article)),
+			articleProps: await sp.serializeArticleProps(article, await catalog?.getPathname(article), catalog),
 			error,
 		};
 	},

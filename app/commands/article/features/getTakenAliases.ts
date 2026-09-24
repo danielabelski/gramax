@@ -19,13 +19,15 @@ const getTakenAliases: Command<{ ctx: Context; path: Path; catalogName: string }
 		const fp = workspace.getFileProvider();
 		const itemRef = fp.getItemRef(path);
 		const currentItem = catalog.findItemByItemRef(itemRef);
+		// a translation shows the aliases of its main-language twin, so they are not taken for it either
+		const aliasOwner = currentItem ? catalog.deref.aliases.ownerOf(currentItem) : null;
 
 		const taken = new Set<string>();
 		if (currentItem) taken.add(catalog.deref.relativeLogicPath(currentItem.logicPath));
 		for (const item of catalog.getItems()) {
 			if (item === currentItem) continue;
 			taken.add(catalog.deref.relativeLogicPath(item.logicPath));
-			if (!Array.isArray(item.props.aliases)) continue;
+			if (item === aliasOwner || !Array.isArray(item.props.aliases)) continue;
 			for (const entry of item.props.aliases) {
 				const aliasPath = aliasPathOf(entry);
 				if (aliasPath) taken.add(aliasPath);

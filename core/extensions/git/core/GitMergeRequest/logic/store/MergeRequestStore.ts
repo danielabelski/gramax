@@ -6,14 +6,14 @@ import { useStoreWithEqualityFn } from "zustand/traditional";
 interface MergeRequestStore {
 	isDraft: boolean;
 	mergeRequest: MergeRequest | null;
-	setMergeRequest: (mergeRequest: MergeRequest) => void;
+	setMergeRequest: (mergeRequest: MergeRequest | null) => void;
 	setIsDraft: (isDraft: boolean) => void;
 }
 
 const mergeRequestStore = createStore<MergeRequestStore>((set) => ({
 	isDraft: false,
 	mergeRequest: null,
-	setMergeRequest: (mergeRequest: MergeRequest) => {
+	setMergeRequest: (mergeRequest: MergeRequest | null) => {
 		set({ mergeRequest });
 	},
 	setIsDraft: (isDraft: boolean) => {

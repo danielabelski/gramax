@@ -146,14 +146,14 @@ export const GesCloudInitCatalog = ({
 								isLoading ? (
 									<LoadingButtonTemplate
 										text={t("enterprise-cloud.buttons.publish")}
-										variant="outline"
+										variant="primary"
 									/>
 								) : (
 									<Button
 										disabled={!repositoryNameFieldValue?.trim()}
 										startIcon="cloud-upload"
 										type="submit"
-										variant="outline"
+										variant="primary"
 									>
 										{t("enterprise-cloud.buttons.publish")}
 									</Button>

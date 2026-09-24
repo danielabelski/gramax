@@ -109,20 +109,6 @@ interface SwitchWorkspaceTriggerProps {
 const SwitchWorkspaceTrigger = ({ currentOrganization, isLoading }: SwitchWorkspaceTriggerProps) => {
 	const isMobile = isMobileService.value;
 
-	if (isLoading || !currentOrganization) {
-		return (
-			<DropdownMenuTriggerButton
-				className={classNames("relative aspect-square p-2", {}, [topMenuItemClassName])}
-				data-qa="qa-clickable"
-				data-testid="switch-workspace"
-				size="lg"
-				variant="ghost"
-			>
-				<Icon icon="loader" />
-			</DropdownMenuTriggerButton>
-		);
-	}
-
 	return isMobile ? (
 		<DropdownMenuTriggerButton
 			className={classNames("relative aspect-square p-2", {}, [topMenuItemClassName])}
@@ -141,7 +127,7 @@ const SwitchWorkspaceTrigger = ({ currentOrganization, isLoading }: SwitchWorksp
 			variant="ghost"
 		>
 			<Icon icon="building" />
-			{currentOrganization.name}
+			{isLoading || !currentOrganization ? <Icon icon="loader" /> : currentOrganization.name}
 			<Icon icon="chevrons-up-down" />
 		</DropdownMenuTriggerButton>
 	);
@@ -173,7 +159,7 @@ export const GesCloudSwitchOrganization = () => {
 					);
 			});
 		},
-		[apiUrlCreator, environment, router],
+		[environment, router],
 	);
 
 	return (

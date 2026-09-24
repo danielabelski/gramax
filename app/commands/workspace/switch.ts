@@ -13,7 +13,7 @@ const switchWorkspace: Command<{ id: WorkspacePath }, void> = Command.create({
 
 	async do({ id }) {
 		await this._app.wm.setWorkspace(id);
-		applyWorkspaceServices(await this._app.wm.current().config());
+		applyWorkspaceServices(this._app.settings, this._app.wm.current());
 	},
 
 	params(_ctx, q) {

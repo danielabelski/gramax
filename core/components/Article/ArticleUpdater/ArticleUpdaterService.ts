@@ -1,10 +1,6 @@
-import type { ArticlePageData, EditArticlePageData } from "@core/SitePresenter/types/ArticlePage";
+import type { EditArticlePageData } from "@core/SitePresenter/types/ArticlePage";
 import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import FetchService from "@core-ui/ApiServices/FetchService";
-
-type ArticlePageDataResponse = {
-	data?: ArticlePageData | null;
-};
 
 class ArticleUpdater {
 	private _onUpdate: (data: EditArticlePageData) => void;
@@ -21,6 +17,9 @@ class ArticleUpdater {
 
 	async update(apiUrlCreator: ApiUrlCreator) {
 		if (!this._onUpdate) return;
+		// No article is open (workspace home page, catalog home) — there is nothing to refresh.
+		// Asking `page/getArticlePageData` without a path crashed the app instead (#910).
+		if (!apiUrlCreator?.articlePath) return;
 		const data = await this._getUpdateDate(apiUrlCreator);
 		if (!data) return;
 

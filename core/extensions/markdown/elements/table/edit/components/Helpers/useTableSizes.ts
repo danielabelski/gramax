@@ -7,10 +7,12 @@ const useTableSizes = (tableRef: MutableRefObject<HTMLTableElement>, onChangeChi
 	const [tableSizes, setTableSizes] = useState<TableDataString>(null);
 
 	useEffect(() => {
-		const tableObserver = new ResizeObserver(() => {
-			const tableSizes = getTableSizes(tableRef.current);
-			setTableSizes(tableSizes);
-		});
+		const table = tableRef.current;
+		if (!table) return;
+
+		const updateSizes = () => setTableSizes(getTableSizes(table));
+
+		const tableObserver = new ResizeObserver(updateSizes);
 
 		const observer = new MutationObserver((mutationsList) => {
 			const filterNodes = (nodes: NodeList) => {
@@ -36,17 +38,39 @@ const useTableSizes = (tableRef: MutableRefObject<HTMLTableElement>, onChangeChi
 					isChildListType &&
 					((isAddNodesNonZero && isAddNodes) || (isRemovedNodesNonZero && isRemovedNodes))
 				) {
-					const tableSizes = getTableSizes(tableRef.current);
-					setTableSizes(tableSizes);
+					updateSizes();
 					return onChangeChildCount?.();
 				}
 			}
 		});
 
-		tableObserver.observe(tableRef.current.lastElementChild);
-		observer.observe(tableRef.current.lastElementChild, { childList: true, subtree: true });
+		// The rows live in the tbody, and ProseMirror can put that tbody in place after this effect
+		// has already run — nested in another node view it usually does. Watching whichever child
+		// happens to be last then leaves the controls measured against a table with no rows: their
+		// grid stays 0px wide and every button becomes unclickable.
+		let body: HTMLElement = null;
+		const observeBody = () => {
+			const currentBody = table.tBodies[0];
+			if (!currentBody || currentBody === body) return false;
+
+			body = currentBody;
+			tableObserver.disconnect();
+			observer.disconnect();
+			tableObserver.observe(body);
+			observer.observe(body, { childList: true, subtree: true });
+			return true;
+		};
+
+		const bodyObserver = new MutationObserver(() => {
+			if (observeBody()) updateSizes();
+		});
+		bodyObserver.observe(table, { childList: true });
+
+		observeBody();
+		updateSizes();
 
 		return () => {
+			bodyObserver.disconnect();
 			tableObserver.disconnect();
 			observer.disconnect();
 		};

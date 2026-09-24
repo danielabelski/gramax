@@ -84,3 +84,48 @@ d"#;
 
 	Ok(())
 }
+
+/// A pointwise question must answer the same thing the full workdir status answers by
+/// including — or omitting — the entry, in every state the path can be in.
+#[rstest]
+fn status_file_matches_full_status(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+	let root = sandbox.path();
+	let target = Path::new("target");
+
+	let deleted_by_full_status = |repo: &Repo<TestCreds>| -> Result<bool> {
+		let status = repo.status(false)?.short_info()?;
+		Ok(status.entries().iter().any(|e| e.path == target && e.status == StatusEntry::Delete))
+	};
+	let deleted_by_status_file = |repo: &Repo<TestCreds>| -> Result<bool> { Ok(repo.status_file(target)? == StatusEntry::Delete) };
+
+	// no such path at all
+	fs::write(root.join("other"), "content")?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+	assert!(!deleted_by_full_status(&repo)?);
+	assert!(!deleted_by_status_file(&repo)?);
+
+	// path is there
+	fs::write(root.join(target), "content")?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+	assert!(!deleted_by_full_status(&repo)?);
+	assert!(!deleted_by_status_file(&repo)?);
+
+	// deleted in the index, still on disk
+	repo.repo().index()?.remove_path(target)?;
+	repo.repo().index()?.write()?;
+	assert_eq!(deleted_by_full_status(&repo)?, deleted_by_status_file(&repo)?);
+
+	// deleted in the working copy
+	repo.add_all()?;
+	repo.commit_debug()?;
+	fs::write(root.join(target), "content")?;
+	repo.add_all()?;
+	repo.commit_debug()?;
+	fs::remove_file(root.join(target))?;
+	assert!(deleted_by_full_status(&repo)?);
+	assert!(deleted_by_status_file(&repo)?);
+
+	Ok(())
+}

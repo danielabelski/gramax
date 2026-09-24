@@ -3,8 +3,10 @@ import Path from "@core/FileProvider/Path/Path";
 import type FileStructure from "@core/FileStructue/FileStructure";
 import type GitMergeResult from "@ext/git/actions/MergeConflictHandler/model/GitMergeResult";
 import type { GitMergeResultContent } from "@ext/git/actions/MergeConflictHandler/model/GitMergeResultContent";
+import type MergeConflictCaller from "@ext/git/actions/MergeConflictHandler/model/MergeConflictCaller";
 import GitMergeConflictResolver from "@ext/git/core/GitMergeConflictResolver/Merge/GitMergeConflictResolver";
 import GitStashConflictResolver from "@ext/git/core/GitMergeConflictResolver/Stash/GitStashConflictResolver";
+import GitStash from "@ext/git/core/model/GitStash";
 import type Repository from "@ext/git/core/Repository/Repository";
 import type SourceData from "@ext/storage/logic/SourceDataProvider/model/SourceData";
 
@@ -25,6 +27,8 @@ export type RepositoryMergeConflictState = State<
 		reverseMerge: boolean;
 		branchNameBefore?: string;
 		isMergeRequest?: boolean;
+		caller?: MergeConflictCaller;
+		stashHash?: string;
 	}
 >;
 
@@ -35,6 +39,14 @@ export type RepositoryStashConflictState = State<
 		reverseMerge: true;
 		conflictFiles: GitMergeResult[];
 		commitHeadBefore: string;
+		/**
+		 * The branch `commitHeadBefore` belongs to, set only when a checkout raised the conflict.
+		 *
+		 * Aborting resets the branch the repository stands on. A sync raises the conflict on the branch
+		 * it started from, so there is nothing to remember; a checkout leaves the repository on another
+		 * branch entirely, and the abort has to come back before it resets anything.
+		 */
+		branchNameBefore?: string;
 	}
 >;
 
@@ -105,7 +117,7 @@ export default class RepositoryStateProvider {
 			if (state.data.deleteAfterMerge) await this._repo.deleteBranch(state.data.theirs, data);
 		} else if (state.value === "stashConflict")
 			await this._stashConflictResolver.resolveConflictedFiles(files, state, data);
-		await this.resetState();
+		await this._finishMergeState(state);
 	}
 
 	async abortMerge(data: SourceData) {
@@ -115,14 +127,47 @@ export default class RepositoryStateProvider {
 		if (state.value === "mergeConflict") await this._mergeConflictResolver.abortMerge(state, data);
 		else if (state.value === "stashConflict") await this._stashConflictResolver.abortMerge(state, data);
 
-		await this.resetState();
+		await this._finishMergeState(state);
+	}
+
+	private async _finishMergeState(state: RepositoryMergeConflictState | RepositoryStashConflictState) {
+		if (state.value !== "mergeConflict" || !state.data.stashHash) {
+			await this.resetState();
+			return;
+		}
+
+		const stash = new GitStash(state.data.stashHash);
+		const commitHeadBefore = await this._repo.gvc.getCurrentVersion();
+		let conflicts: GitMergeResult[];
+		try {
+			conflicts = await this._repo.gvc.applyStash(stash, { deleteAfterApply: false });
+		} catch {
+			await this.resetState();
+			return;
+		}
+
+		if (!conflicts.length) {
+			await this._repo.gvc.deleteStash(stash);
+			await this.resetState();
+			return;
+		}
+
+		await this.saveState({
+			value: "stashConflict",
+			data: {
+				stashHash: stash.toString(),
+				commitHeadBefore: commitHeadBefore.toString(),
+				conflictFiles: conflicts,
+				reverseMerge: true,
+			},
+		});
 	}
 
 	async isMergeStateValid(): Promise<boolean> {
 		const state = await this.getState();
 		if (state.value === "mergeConflict" || state.value === "stashConflict") {
 			const isValid = await this._mergeConflictResolver.isMergeStateValidate(state.data.conflictFiles);
-			if (!isValid) await this.resetState();
+			if (!isValid) await this._finishMergeState(state);
 			return isValid;
 		}
 	}

@@ -67,7 +67,7 @@ const ShareAction = ({ path, isArticle, children, variant = "MenuItem" }: ShareA
 
 	if (variant === "Button") {
 		return (
-			<Button className="p-0 h-full" onClick={onClickButton} size="xs" variant="text">
+			<Button className="p-0 h-full text-sm" onClick={onClickButton} size="xs" variant="text">
 				<Icon code="link" />
 				{isArticle ? t("share.name.article") : t("share.name.catalog")}
 			</Button>

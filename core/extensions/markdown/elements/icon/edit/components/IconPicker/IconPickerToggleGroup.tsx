@@ -1,6 +1,6 @@
 import t from "@ext/localization/locale/translate";
 import type { IconPickerDisableOption } from "@ext/markdown/elements/icon/edit/components/IconPicker/IconPicker";
-import { useComponentVariant } from "@ui-kit/hooks/useComponentVariant";
+import { narrowVariant, useComponentVariant } from "@ui-kit/hooks/useComponentVariant";
 import { ToggleGroup, ToggleGroupItem } from "@ui-kit/ToggleGroup";
 import { useMemo } from "react";
 import { tv } from "tailwind-variants";
@@ -36,7 +36,8 @@ const toggleGroupItemStyles = tv({
 
 export const IconPickerToggleGroup = (props: IconPickerToggleGroupProps) => {
 	const { tab, onTabChange, disable = ["file-input"] } = props;
-	const { variant: theme } = useComponentVariant();
+	const { variant } = useComponentVariant();
+	const theme = narrowVariant(variant, ["inverse"]);
 	const iconsAllowed = !disable.includes("icons");
 	const emojiAllowed = !disable.includes("emoji");
 	const fileInputAllowed = !disable.includes("file-input");

@@ -8,7 +8,7 @@ import TableNodeSheet from "@ext/markdown/elements/table/edit/logic/TableNodeShe
 import tablePropsStore from "@ext/markdown/elements/table/edit/logic/tablePropsStore";
 import TableWrapper from "@ext/markdown/elements/table/render/components/TableWrapper";
 import { type NodeViewProps, useReactNodeView } from "@tiptap/react";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 const TableComponent = (props: NodeViewProps) => {
 	const { node, getPos, editor } = props;
@@ -20,9 +20,18 @@ const TableComponent = (props: NodeViewProps) => {
 	const [parentElement, setParentElement] = useState<HTMLElement>(null);
 	const isDisabledWrapper = Boolean(parentElement);
 
-	useLayoutEffect(() => {
-		tableRef.current = hoverElementRef.current?.querySelector(".tableComponent");
+	// The element itself, never a lookup done once: the table is rendered by this component, and
+	// holding it through a query that runs a single time leaves the ref on a detached table as
+	// soon as React rebuilds the subtree.
+	const setTableRef = useCallback(
+		(element: HTMLTableElement | null) => {
+			nodeViewContentRef(element);
+			tableRef.current = element;
+		},
+		[nodeViewContentRef],
+	);
 
+	useLayoutEffect(() => {
 		const pos = getPos();
 		if (typeof pos !== "number") {
 			setParentElement(null);
@@ -60,7 +69,7 @@ const TableComponent = (props: NodeViewProps) => {
 					data-node-view-content=""
 					data-qa={"table"}
 					data-testid={"table"}
-					ref={nodeViewContentRef}
+					ref={setTableRef}
 					{...(filterAndSortProps.sorted ? { "data-sorted": "" } : {})}
 				>
 					<ColGroup content={node.firstChild} parentElement={parentElement} />
@@ -71,7 +80,7 @@ const TableComponent = (props: NodeViewProps) => {
 		[
 			node.attrs.header,
 			node.firstChild,
-			nodeViewContentRef,
+			setTableRef,
 			parentElement,
 			active,
 			aggregation,
@@ -80,20 +89,12 @@ const TableComponent = (props: NodeViewProps) => {
 		],
 	);
 
-	const StickyTableWrapperComponent = useMemo(
-		() =>
-			({ children }: { children: JSX.Element }) => (
-				<StickyTableWrapper disableWrapper={isDisabledWrapper} tableRef={tableRef}>
-					{children}
-				</StickyTableWrapper>
-			),
-		[isDisabledWrapper],
-	);
-
 	if (!editor.isEditable) {
 		return (
 			<NodeViewContextableWrapper props={props} ref={hoverElementRef}>
-				<StickyTableWrapperComponent>{table}</StickyTableWrapperComponent>
+				<StickyTableWrapper disableWrapper={isDisabledWrapper} tableRef={tableRef}>
+					{table}
+				</StickyTableWrapper>
 			</NodeViewContextableWrapper>
 		);
 	}
@@ -101,11 +102,11 @@ const TableComponent = (props: NodeViewProps) => {
 	return (
 		<NodeViewContextableWrapper props={props} ref={hoverElementRef}>
 			<TableHelper
+				disableWrapper={isDisabledWrapper}
 				editor={editor}
 				hoverElementRef={hoverElementRef}
 				node={node}
 				pos={pos}
-				StickyTableWrapperComponent={StickyTableWrapperComponent}
 				sorted={sorted}
 				tableRef={tableRef}
 				tableSheet={tableSheet}

@@ -4,7 +4,7 @@ import { FileStatus } from "@ext/Watchers/model/FileStatus";
 import { tv } from "tailwind-variants";
 
 const styles = tv({
-	base: "pointer-events-none absolute top-0 my-1.5 h-4 w-0.5 rounded-xs bg-primary-accent",
+	base: "pointer-events-none absolute top-1/2 h-[18px] w-0.5 -translate-y-1/2 rounded-xs bg-primary-accent",
 	variants: {
 		status: {
 			[FileStatus.new]: "bg-[var(--color-status-new)]",

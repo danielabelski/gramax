@@ -1,6 +1,6 @@
 import type Application from "@app/types/Application";
 import type Context from "@core/Context/Context";
-import Path from "@core/FileProvider/Path/Path";
+import { CatalogItemLookup } from "./utils/catalogPaths";
 
 export type ToolPreview = { itemTitle?: string };
 
@@ -9,19 +9,19 @@ export async function buildToolPreview(
 	app: Application,
 	ctx: Context,
 ): Promise<ToolPreview | undefined> {
-	const { catalogName, itemPath, fromItemPath } = (args ?? {}) as {
+	const { catalogName, itemPath, fromItemPath, targetItemPath } = (args ?? {}) as {
 		catalogName?: string;
 		itemPath?: string;
 		fromItemPath?: string;
+		targetItemPath?: string;
 	};
-	const path = itemPath ?? fromItemPath;
+	const path = itemPath ?? fromItemPath ?? targetItemPath;
 	if (!catalogName || !path) return undefined;
 
 	try {
-		const item = (await app.wm.current().getCatalog(catalogName, ctx)).findItemByItemPath(
-			new Path(Path.join(catalogName, path)),
-		);
-		const itemTitle = item?.getTitle();
+		const catalog = await app.wm.current().getCatalog(catalogName, ctx);
+		const resolved = await CatalogItemLookup.resolve(catalog, catalogName, path);
+		const itemTitle = resolved?.item.getTitle();
 		return itemTitle ? { itemTitle } : undefined;
 	} catch {
 		return undefined;

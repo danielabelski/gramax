@@ -1,4 +1,4 @@
-import type { LeftNavigationTab } from "@components/Layouts/StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
+import type { LeftNavigationTab } from "@components/Layouts/LeftNavigationTabs/LeftNavigationTab";
 import React, { type ReactElement, type SetStateAction, useContext, useState } from "react";
 
 type NavigationTabs = {

@@ -96,7 +96,7 @@ export default Placeholder.configure({
 		if (editor.state.doc.firstChild.type.name === "paragraph" && editor.state.doc.firstChild === node)
 			return t("article.title");
 
-		if (isParagraph && editor.state.doc.content.child(1) === node && editor.state.doc.content.childCount === 2)
+		if (isParagraph && editor.state.doc.content.childCount === 2 && editor.state.doc.content.child(1) === node)
 			return t("article.placeholder");
 
 		const parent = getParentNode(editor, pos);

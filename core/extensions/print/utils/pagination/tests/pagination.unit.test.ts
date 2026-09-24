@@ -105,6 +105,9 @@ describe("Paginator System", () => {
 			expect(repeatableThead).not.toBeNull();
 			expect(repeatableThead?.tagName).toBe("THEAD");
 			expect(repeatableThead?.querySelector("th")?.textContent).toBe("Header");
+			// Every page the header repeats on has to budget for it, and the budget reads this. Without it a
+			// real <thead> was reserved as zero and the last row of each page printed past the bottom.
+			expect(repeatableThead?.dataset._height).toBe("20");
 		});
 
 		it("should create synthetic header from first row when data-header='row'", () => {

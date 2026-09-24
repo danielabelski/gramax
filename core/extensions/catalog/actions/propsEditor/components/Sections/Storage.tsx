@@ -2,6 +2,7 @@ import { useCatalogPropsStore } from "@core-ui/stores/CatalogPropsStore/CatalogP
 import { SectionContainer } from "@ext/catalog/actions/propsEditor/components/Sections/SectionContainer";
 import { FORM_DATA_QA, FORM_STYLES } from "@ext/catalog/actions/propsEditor/consts/form";
 import t from "@ext/localization/locale/translate";
+import SectionHeader from "@ext/settings/components/SectionHeader";
 import getPartGitSourceDataByStorageName from "@ext/storage/logic/utils/getPartSourceDataByStorageName";
 import { FormField } from "@ui-kit/Form";
 import { Input } from "@ui-kit/Input";
@@ -11,7 +12,7 @@ export const EditStorageProps = () => {
 	const { sourceType } = getPartGitSourceDataByStorageName(sourceName);
 
 	return (
-		<SectionContainer>
+		<SectionContainer header={<SectionHeader title={t("forms.catalog-edit-props.tabs.storage")} />}>
 			<FormField
 				control={({ field }) => (
 					<Input

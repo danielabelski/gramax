@@ -1,5 +1,6 @@
 import { useSettings } from "@ext/enterprise/components/admin/contexts/SettingsContext";
 import { useOpenState } from "@ext/enterprise/components/admin/hooks/useOpenState";
+import type { RoleId } from "@ext/enterprise/components/admin/settings/components/roles/Access";
 import { buildBulkGroupChanges } from "@ext/enterprise/components/admin/settings/groups/model/buildBulkGroupChanges";
 import { nameColumn } from "@ext/enterprise/components/admin/settings/members/config/nameColumn";
 import { userColumn, userColumnId } from "@ext/enterprise/components/admin/settings/members/config/userColumn";
@@ -12,7 +13,6 @@ import {
 	type BulkLinkedRow,
 	useBulkLinkedDraft,
 } from "@ext/enterprise/components/admin/settings/members/hooks/useBulkLinkedDraft";
-import { useEditorSheet } from "@ext/enterprise/components/admin/settings/members/hooks/useEditorSheet";
 import type { AccessChange } from "@ext/enterprise/components/admin/settings/members/model/AccessChange";
 import {
 	emailKey,
@@ -29,12 +29,19 @@ import {
 	type UserMember,
 } from "@ext/enterprise/components/admin/settings/members/model/Member";
 import {
+	getGroupRules,
 	isMixedRole,
 	MIXED_ROLE,
+	type RoleValue,
 	useGroupRoleRules,
 } from "@ext/enterprise/components/admin/settings/members/model/roleRules";
+import {
+	isSsoGroupRoleRestricted,
+	resolveSsoGroupRole,
+} from "@ext/enterprise/components/admin/settings/members/model/ssoGroupRoleRestrictions";
 import { repoColumn, repoColumnId } from "@ext/enterprise/components/admin/settings/resources/model/repoColumn";
 import { useRowSelectionWithData } from "@ext/enterprise/components/admin/ui-kit/table/useRowSelection";
+import { useEditorSheet } from "@ext/enterpriseCommon/hooks/useEditorSheet";
 import type { ColumnDef } from "@ui-kit/DataTable";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -44,6 +51,26 @@ interface UseBulkGroupsCardArgs {
 	onApply: (changes: AccessChange[]) => Promise<void>;
 	onClose: () => void;
 }
+
+const resolveContainerGroupRole = (group: GroupMember, role: RoleId): RoleId => {
+	return resolveSsoGroupRole(group.source, role);
+};
+
+const resolveBulkGroupRole = (containers: Map<string, AccessRow<GroupMember>>): RoleValue => {
+	const editableRoles = [...containers.values()]
+		.filter((entry) => !isSsoGroupRoleRestricted(entry.cont.source))
+		.map((entry) => entry.role);
+	if (!editableRoles.length) return "reader";
+	return editableRoles.every((role) => role === editableRoles[0]) ? editableRoles[0] : MIXED_ROLE;
+};
+
+const getBulkGroupRules = (row: BulkAccessRow<GesRepo, GroupMember>) => {
+	const containers = [...row.containers.values()];
+	const source =
+		containers.find((entry) => !isSsoGroupRoleRestricted(entry.cont.source))?.cont.source ??
+		containers[0]?.cont.source;
+	return getGroupRules(source);
+};
 
 export const useBulkGroupsCard = (args: UseBulkGroupsCardArgs) => {
 	const { groups, aggregate, onApply, onClose } = args;
@@ -55,7 +82,9 @@ export const useBulkGroupsCard = (args: UseBulkGroupsCardArgs) => {
 
 	const hasSystemOrSso = useMemo(() => groups.some(isSystemGroup), [groups]);
 
-	const { roleRules } = useGroupRoleRules();
+	const roleRulesSource =
+		groups.find((group) => !isSsoGroupRoleRestricted(group.source))?.source ?? groups[0]?.source;
+	const { roleRules } = useGroupRoleRules(roleRulesSource);
 
 	const accessInitial = useMemo(() => {
 		const res = new Map<string, BulkAccessRow<GesRepo, GroupMember>>();
@@ -65,26 +94,24 @@ export const useBulkGroupsCard = (args: UseBulkGroupsCardArgs) => {
 			for (const a of accesses) {
 				const repo = aggregate.repoById.get(a.resourceId);
 				if (!repo) continue;
+				const role = resolveContainerGroupRole(g, a.role);
 				let ex = res.get(a.resourceId);
 				if (!ex) {
 					ex = {
 						ent: repo,
-						role: a.role,
+						role,
 						containers: new Map(),
 					};
 					res.set(a.resourceId, ex);
 				}
 
-				if (ex.role !== a.role) {
-					ex.role = MIXED_ROLE;
-				}
-
 				ex.containers.set(g.id, {
 					cont: g,
-					role: a.role,
+					role,
 				});
 			}
 		}
+		for (const row of res.values()) row.role = resolveBulkGroupRole(row.containers);
 		return res;
 	}, [aggregate.groupAccesses, aggregate.repoById, groups]);
 
@@ -104,9 +131,12 @@ export const useBulkGroupsCard = (args: UseBulkGroupsCardArgs) => {
 		initial: accessInitial,
 		allContainers: groups,
 		roleRules,
+		getRoleRules: getBulkGroupRules,
 		getEntId: getRepoRowId,
 		getContId: getGroupRowId,
 		getNames: getGroupNames,
+		resolveContainerRole: resolveContainerGroupRole,
+		resolveRowRole: resolveBulkGroupRole,
 	});
 
 	const accessColumns = useMemo(

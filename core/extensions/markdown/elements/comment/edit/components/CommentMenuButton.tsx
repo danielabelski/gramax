@@ -5,11 +5,11 @@ import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
 import t from "@ext/localization/locale/translate";
 import { useIsStorageConnected } from "@ext/storage/logic/utils/useStorage";
 import type { Editor } from "@tiptap/core";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 import { memo, useCallback, useEffect, useState } from "react";
 
 const CommentMenuButton = memo(({ editor }: { editor: Editor }) => {
-	const [isSelected, setIsSelected] = useState(false);
+	const [isSelected, setIsSelected] = useState(() => !editor.state.selection.empty);
 	const { isActive, disabled } = ButtonStateService.useCurrentAction({ mark: "comment" });
 	const pageDataContext = PageDataContextService.value;
 	const isStorageConnected = useIsStorageConnected();
@@ -26,10 +26,11 @@ const CommentMenuButton = memo(({ editor }: { editor: Editor }) => {
 		};
 	}, [editor]);
 
-	const isButtonDisabled = !isSelected || !pageDataContext.userInfo || disabled || !isStorageConnected;
+	const isButtonDisabled = !isSelected || !pageDataContext.user.info || disabled || !isStorageConnected;
 	const tooltipText =
-		pageDataContext.userInfo && isStorageConnected ? "leave-comment" : "connect-storage-to-leave-comment";
+		pageDataContext.user.info && isStorageConnected ? "leave-comment" : "connect-storage-to-leave-comment";
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: pre-existing dependency list; changing it here would alter behaviour unrelated to this change
 	const onClickHandler = useCallback(async () => {
 		const res = await FetchService.fetch(apiUrlCreator.getNewCommentId());
 		if (!res.ok) return;
@@ -41,14 +42,16 @@ const CommentMenuButton = memo(({ editor }: { editor: Editor }) => {
 	}, [editor, apiUrlCreator]);
 
 	return (
-		<ToolbarToggleButton
+		<GlassToolbarToggleButton
 			active={isActive}
+			aria-label={t("leave-comment")}
+			data-testid="tb-comment"
 			disabled={isButtonDisabled}
 			onClick={onClickHandler}
-			tooltipText={(!pageDataContext.userInfo || !isStorageConnected || !isButtonDisabled) && t(tooltipText)}
+			tooltipText={(!pageDataContext.user.info || !isStorageConnected || !isButtonDisabled) && t(tooltipText)}
 		>
-			<ToolbarIcon icon={"message-circle-2"} />
-		</ToolbarToggleButton>
+			<GlassToolbarIcon icon={"comment"} />
+		</GlassToolbarToggleButton>
 	);
 });
 

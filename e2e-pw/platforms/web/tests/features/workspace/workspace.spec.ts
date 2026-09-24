@@ -1,3 +1,4 @@
+import { evaluateOnApp } from "@utils/app";
 import { homeTest } from "@web/fixtures/home.fixture";
 
 homeTest.use({});
@@ -6,6 +7,40 @@ homeTest.describe("Workspace", () => {
 	homeTest.describe.configure({ mode: "serial" });
 
 	let workspaceName: string;
+	let defaultWorkspace: { path: string; name: string; icon?: string } | undefined;
+
+	// This suite deletes the default workspace on purpose, and the browser context is worker-scoped:
+	// whatever it leaves behind is what the next spec file on this worker starts from. Put it back.
+	homeTest.beforeAll(async ({ sharedPage }) => {
+		defaultWorkspace = await evaluateOnApp(
+			sharedPage,
+			async () => {
+				const { wm } = await window.app!;
+				const workspace = wm.workspaces().find((w) => w.name === "Default Space");
+				return workspace && { path: workspace.path, name: workspace.name, icon: workspace.icon };
+			},
+			undefined,
+		);
+	});
+
+	homeTest.afterAll(async ({ sharedPage }) => {
+		if (!defaultWorkspace) return;
+
+		await evaluateOnApp(
+			sharedPage,
+			async (workspace) => {
+				const { wm } = await window.app!;
+				for (const other of wm.workspaces()) {
+					if (other.path !== workspace.path) await wm.removeWorkspace(other.path);
+				}
+				await wm.addWorkspace(workspace.path, { name: workspace.name, icon: workspace.icon }, true);
+				await wm.setWorkspace(workspace.path);
+			},
+			defaultWorkspace,
+		);
+
+		await sharedPage.reload({ waitUntil: "domcontentloaded" });
+	});
 
 	homeTest("Creates workspace and makes it active", async ({ homePage }) => {
 		const [workspace, dropdown] = await homePage.topBar.getSwitchWorkspace();

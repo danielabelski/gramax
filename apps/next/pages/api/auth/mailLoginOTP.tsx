@@ -5,7 +5,7 @@ import { ApplyApiMiddleware } from "../../../logic/Api/ApplyMiddleware";
 
 export default ApplyApiMiddleware(
 	async function (req: ApiRequest, res: ApiResponse) {
-		await this.app.am.mailLoginOTP(req, res);
+		await this.app.amp.current().mailLoginOTP(req, res);
 	},
 	[new MainMiddleware()],
 );

@@ -1,8 +1,20 @@
 import type Application from "@app/types/Application";
+import { HealthcheckStatus, ModuleState } from "@ext/healthcheck/HealthChecker";
 import type Logger from "@ext/loggers/Logger";
 import SourceType from "@ext/storage/logic/SourceDataProvider/model/SourceType";
 import type WorkspaceManager from "@ext/workspace/WorkspaceManager";
-import { AutoPull, getAutoPullSourceData, getWebhookSourceData, resolveAutoPullIntervalMs } from "./AutoPull";
+import {
+	AutoPull,
+	type AutoPullState,
+	getAutoPullSourceData,
+	getWebhookSourceData,
+	resolveAutoPullIntervalMs,
+} from "./AutoPull";
+import { AutoPullHealthchecker } from "./AutoPullHealthchecker";
+
+const checkHealth = async (autoPull: AutoPull) => await new AutoPullHealthchecker(autoPull).check();
+const setState = (autoPull: AutoPull, state: Partial<AutoPullState>) =>
+	Reflect.set(autoPull, "_state", { ...autoPull.getState(), ...state });
 
 describe("resolveAutoPullIntervalMs", () => {
 	it("disables the timer for a negative interval", () => {
@@ -65,15 +77,131 @@ describe("AutoPull cycle scheduling", () => {
 			.mockImplementation(() => ({ getAllCatalogs: () => new Map() }));
 		const app = Promise.resolve({ logger, wm: { current } as unknown as WorkspaceManager } as Application);
 
-		await new AutoPull().start(app);
+		const autoPull = new AutoPull();
+		await autoPull.start(app);
 		await jest.advanceTimersByTimeAsync(0);
 		expect(current).toHaveBeenCalledTimes(1);
+		expect(await checkHealth(autoPull)).toMatchObject({
+			status: HealthcheckStatus.UNHEALTHY,
+			code: "AUTO_PULL_FAILED",
+		});
 
 		await jest.advanceTimersByTimeAsync(60_000);
 		expect(current).toHaveBeenCalledTimes(2);
 
 		await jest.advanceTimersByTimeAsync(60_000);
 		expect(current).toHaveBeenCalledTimes(3);
+	});
+});
+
+describe("AutoPull health", () => {
+	const originalToken = process.env.AUTO_PULL_TOKEN;
+	const originalInterval = process.env.AUTO_PULL_INTERVAL;
+	const logger = { logInfo: jest.fn(), logWarning: jest.fn() } as unknown as Logger;
+	const app = () =>
+		Promise.resolve({
+			logger,
+			wm: { current: () => ({ getAllCatalogs: () => new Map() }) } as unknown as WorkspaceManager,
+		} as Application);
+
+	beforeEach(() => jest.useFakeTimers());
+
+	afterEach(() => {
+		jest.useRealTimers();
+		process.env.AUTO_PULL_TOKEN = originalToken;
+		process.env.AUTO_PULL_INTERVAL = originalInterval;
+	});
+
+	it("reports disabled when AUTO_PULL_TOKEN is absent", async () => {
+		delete process.env.AUTO_PULL_TOKEN;
+		const autoPull = new AutoPull();
+
+		await autoPull.start(app());
+
+		expect(await checkHealth(autoPull)).toMatchObject({ state: ModuleState.DISABLED, critical: false });
+		expect((await checkHealth(autoPull)).status).toBeUndefined();
+	});
+
+	it("reports webhook-only for a negative interval", async () => {
+		process.env.AUTO_PULL_TOKEN = "token";
+		process.env.AUTO_PULL_INTERVAL = "-1";
+		const autoPull = new AutoPull();
+
+		await autoPull.start(app());
+
+		expect(await checkHealth(autoPull)).toMatchObject({
+			state: ModuleState.ENABLED,
+			status: HealthcheckStatus.HEALTHY,
+			data: { mode: "webhook-only" },
+		});
+	});
+
+	it("reports stale when the scheduled cycle has not run for two intervals", async () => {
+		process.env.AUTO_PULL_TOKEN = "token";
+		process.env.AUTO_PULL_INTERVAL = "60";
+		const autoPull = new AutoPull();
+		await autoPull.start(app());
+		await jest.advanceTimersByTimeAsync(0);
+
+		jest.setSystemTime(Date.now() + 120_001);
+
+		expect(await checkHealth(autoPull)).toMatchObject({
+			status: HealthcheckStatus.UNHEALTHY,
+			code: "AUTO_PULL_STALE",
+		});
+	});
+
+	it("reports safe names of failed catalogs", async () => {
+		const autoPull = new AutoPull();
+		setState(autoPull, {
+			mode: "interval",
+			lastSummary: {
+				total: 2,
+				pulled: 1,
+				upToDate: 0,
+				skipped: 0,
+				failed: 1,
+				failedCatalogs: ["broken"],
+			},
+		});
+
+		expect(await checkHealth(autoPull)).toMatchObject({
+			status: HealthcheckStatus.UNHEALTHY,
+			code: "AUTO_PULL_FAILED",
+			data: { failedCatalogs: ["broken"] },
+		});
+	});
+
+	it("reports waiting before the first cycle completes", async () => {
+		const autoPull = new AutoPull();
+		setState(autoPull, { mode: "interval" });
+
+		expect(await checkHealth(autoPull)).toMatchObject({
+			status: HealthcheckStatus.HEALTHY,
+			data: { mode: "interval", phase: "waiting" },
+		});
+	});
+
+	it("does not report waiting after a failed attempt", async () => {
+		const autoPull = new AutoPull();
+		setState(autoPull, { mode: "interval", lastAttemptAt: Date.now(), lastCycleFailed: true });
+
+		const result = await checkHealth(autoPull);
+		expect(result.code).toBe("AUTO_PULL_FAILED");
+		expect(result.data?.phase).toBeUndefined();
+	});
+
+	it("reports an initialization failure", async () => {
+		const autoPull = new AutoPull();
+
+		autoPull.markStartFailed();
+
+		expect(await checkHealth(autoPull)).toMatchObject({
+			state: ModuleState.ENABLED,
+			status: HealthcheckStatus.UNHEALTHY,
+			critical: false,
+			code: "AUTO_PULL_INIT_FAILED",
+		});
 	});
 });
 

@@ -6,13 +6,16 @@ use std::time::Duration;
 
 use gramaxfs::commands::FsScope;
 
-use notify_debouncer_full::new_debouncer;
+use notify_debouncer_full::new_debouncer_opt;
+use notify_debouncer_full::notify;
 use notify_debouncer_full::notify::event::ModifyKind;
 use notify_debouncer_full::notify::event::RenameMode;
 use notify_debouncer_full::notify::EventKind;
+use notify_debouncer_full::notify::RecommendedWatcher;
 use notify_debouncer_full::notify::RecursiveMode;
 use notify_debouncer_full::DebounceEventResult;
 use notify_debouncer_full::DebouncedEvent;
+use notify_debouncer_full::NoCache;
 
 use super::dto::FsEvent;
 use super::dto::FsEventKind;
@@ -45,23 +48,34 @@ where
 	let root_for_closure = root_owned.clone();
 	let excludes = opts.excludes.clone();
 
-	let mut debouncer = new_debouncer(Duration::from_millis(opts.debounce_ms), None, move |res: DebounceEventResult| match res {
-		Ok(events) => {
-			let mapped = events
-				.into_iter()
-				.flat_map(|e| map_event(&root_for_closure, &excludes, e))
-				.collect::<Vec<_>>();
-			let coalesced = dedupe(coalesce_renames(mapped));
-			if !coalesced.is_empty() {
-				on_batch(coalesced);
+	// `NoCache`, not the default `RecommendedCache`: that cache walks and stats every path under the
+	// root — on `watch()` and again on every rescan — while holding the lock the ingest thread needs.
+	// On a real workspace (~700k paths) one walk is ~80s, so a single dropped batch triggers a rescan
+	// that guarantees the next drop, and the watcher never catches up. The cache only exists to pair
+	// renames by file id, which `coalesce_renames` already does from the batch itself.
+	let mut debouncer = new_debouncer_opt::<_, RecommendedWatcher, NoCache>(
+		Duration::from_millis(opts.debounce_ms),
+		None,
+		move |res: DebounceEventResult| match res {
+			Ok(events) => {
+				let mapped = events
+					.into_iter()
+					.flat_map(|e| map_event(&root_for_closure, &excludes, e))
+					.collect::<Vec<_>>();
+				let coalesced = dedupe(coalesce_renames(mapped));
+				if !coalesced.is_empty() {
+					on_batch(coalesced);
+				}
 			}
-		}
-		Err(errs) => {
-			for err in errs {
-				tracing::warn!(error = ?err, "notify error");
+			Err(errs) => {
+				for err in errs {
+					tracing::warn!(error = ?err, "notify error");
+				}
 			}
-		}
-	})
+		},
+		NoCache::new(),
+		notify::Config::default(),
+	)
 	.map_err(|e| crate::Error::Other(format!("notify init: {e}")))?;
 
 	let (stop_tx, stop_rx) = mpsc::channel::<()>();
@@ -107,6 +121,15 @@ fn rel_to_string(rel: &Path) -> String {
 }
 
 fn map_event(root: &Path, excludes: &[String], ev: DebouncedEvent) -> Vec<FsEvent> {
+	// The backend overflowed and threw away events. It names a path, but that path only says where
+	// it gave up — the lost changes can be anywhere under the root, so report the whole root.
+	if ev.event.need_rescan() {
+		return vec![FsEvent {
+			rel_path: String::new(),
+			kind: FsEventKind::Rescan,
+		}];
+	}
+
 	let event = ev.event;
 
 	if let EventKind::Modify(ModifyKind::Name(RenameMode::Both)) = event.kind {
@@ -147,6 +170,19 @@ fn map_event(root: &Path, excludes: &[String], ev: DebouncedEvent) -> Vec<FsEven
 		return vec![];
 	}
 
+	// A rename the backend reports as one undirected half: which half it is shows only on disk —
+	// the source is already gone, the destination is there. `coalesce_renames` joins the two back
+	// into a rename once both are in the batch.
+	if let EventKind::Modify(ModifyKind::Name(RenameMode::Any)) = event.kind {
+		return map_paths(root, excludes, &event.paths, |abs| {
+			if abs.exists() {
+				FsEventKind::Created
+			} else {
+				FsEventKind::Removed
+			}
+		});
+	}
+
 	let kind = match event.kind {
 		EventKind::Create(_) => FsEventKind::Created,
 		EventKind::Modify(ModifyKind::Name(RenameMode::From)) => FsEventKind::Removed,
@@ -156,8 +192,11 @@ fn map_event(root: &Path, excludes: &[String], ev: DebouncedEvent) -> Vec<FsEven
 		_ => return vec![],
 	};
 
-	event
-		.paths
+	map_paths(root, excludes, &event.paths, |_| kind.clone())
+}
+
+fn map_paths(root: &Path, excludes: &[String], paths: &[PathBuf], kind: impl Fn(&Path) -> FsEventKind) -> Vec<FsEvent> {
+	paths
 		.iter()
 		.filter_map(|abs| {
 			let rel = to_rel(root, abs)?;
@@ -166,8 +205,46 @@ fn map_event(root: &Path, excludes: &[String], ev: DebouncedEvent) -> Vec<FsEven
 			}
 			Some(FsEvent {
 				rel_path: rel_to_string(&rel),
-				kind: kind.clone(),
+				kind: kind(abs),
 			})
 		})
 		.collect()
+}
+
+#[cfg(test)]
+mod tests {
+	use notify_debouncer_full::notify::event::Flag;
+	use notify_debouncer_full::notify::Event;
+	use std::time::Instant;
+
+	use super::*;
+
+	fn debounced(event: Event) -> DebouncedEvent {
+		DebouncedEvent::new(event, Instant::now())
+	}
+
+	/// The backend tells us it dropped events (macOS `kFSEventStreamEventFlagUserDropped`, Linux
+	/// `IN_Q_OVERFLOW`). Everything that happened in that window is gone, so the only way the app
+	/// stays correct is to hear about it and re-read the tree.
+	#[test]
+	fn dropped_events_surface_as_rescan() {
+		let root = Path::new("/ws");
+		let event = Event::new(EventKind::Other).add_path(root.to_path_buf()).set_flag(Flag::Rescan);
+
+		let mapped = map_event(root, &[], debounced(event));
+
+		assert_eq!(mapped, vec![FsEvent { rel_path: String::new(), kind: FsEventKind::Rescan }]);
+	}
+
+	/// A rescan is about the whole watch root, not about one path, so the exclude list must not
+	/// swallow it even when the backend names an excluded directory.
+	#[test]
+	fn rescan_is_not_filtered_by_excludes() {
+		let root = Path::new("/ws");
+		let event = Event::new(EventKind::Other).add_path(root.join("node_modules")).set_flag(Flag::Rescan);
+
+		let mapped = map_event(root, &["node_modules".to_string()], debounced(event));
+
+		assert_eq!(mapped, vec![FsEvent { rel_path: String::new(), kind: FsEventKind::Rescan }]);
+	}
 }

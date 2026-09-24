@@ -1,5 +1,6 @@
 import AnimatedExtension from "@components/Atoms/ItemWrapper";
 import { classNames } from "@components/libs/classNames";
+// biome-ignore lint/style/noRestrictedImports: will be removed in the future
 import styled from "@emotion/styled";
 import { isFromModal } from "@ui-kit/Dialog/utils";
 import { forwardRef, type MouseEvent, memo, type RefObject, useCallback, useRef } from "react";
@@ -13,6 +14,7 @@ export interface ItemComponentProps {
 	rightActionsWidth?: string;
 	rightText?: JSX.Element;
 	className?: string;
+	isMenuOpen?: boolean;
 }
 
 const isDropdownElement = (e: MouseEvent<HTMLElement>): boolean => {
@@ -33,6 +35,7 @@ const Item = forwardRef((props: ItemComponentProps, ref: RefObject<HTMLDivElemen
 		rightText,
 		className,
 		rightActionsWidth = "1.5em",
+		isMenuOpen,
 	} = props;
 
 	const Ref = ref || useRef<HTMLDivElement>(null);
@@ -52,6 +55,7 @@ const Item = forwardRef((props: ItemComponentProps, ref: RefObject<HTMLDivElemen
 		// biome-ignore lint/a11y/useSemanticElements: ask @NV
 		<div
 			className={classNames(className, { selected: isSelected })}
+			data-menu-open={isMenuOpen ? "true" : undefined}
 			data-qa="qa-clickable"
 			onClick={handleClick}
 			ref={Ref}
@@ -97,12 +101,12 @@ export default memo(styled(Item)`
 	}
 
 	&:hover,
-	&:has(*[aria-expanded="true"]) {
+	&[data-menu-open="true"] {
 		background-color: var(--color-lev-sidebar-hover);
 	}
 
 	&:hover .right-actions,
-	&:has(*[aria-expanded="true"]) .right-actions {
+	&[data-menu-open="true"] .right-actions {
 		padding-left: unset !important;
 		width: ${({ rightActionsWidth }) => rightActionsWidth};
 		opacity: 1;

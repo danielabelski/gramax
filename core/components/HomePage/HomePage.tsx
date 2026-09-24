@@ -37,7 +37,7 @@ const StaticTopMenu = () => {
 			<TopMenuRightSide>
 				<TopMenuSwitchUiLanguageButton />
 				<TopMenuThemeToggle />
-				<UserMenu />
+				<UserMenu showHomeLayoutControls />
 			</TopMenuRightSide>
 		</TopMenuWrapper>
 	);
@@ -74,7 +74,7 @@ const TauriTopMenu = ({ section }: { section?: Section }) => {
 				{hasWorkspace && <TopMenuSearch section={section} />}
 				<TopMenuSwitchUiLanguageButton />
 				<TopMenuThemeToggle />
-				<UserMenu />
+				<UserMenu showHomeLayoutControls />
 			</TopMenuRightSide>
 		</TopMenuWrapper>
 	);
@@ -107,15 +107,15 @@ const StaticHomePage = ({ data }: { data: HomePageData }) => {
 };
 
 const TauriHomePage = ({ data }: { data: HomePageData }) => {
-	const { url: gesCloudUrl, enabled } = PageDataContextService.value.conf.enterpriseCloud;
-	const isLogged = PageDataContextService.value.isLogged;
+	const { conf, isLogged } = PageDataContextService.value;
+	const { url: gesCloudUrl, enabled } = conf.enterpriseCloud;
 	const gesCloudMode = feature("ges-cloud") && gesCloudUrl && enabled && isLogged;
 
 	if (gesCloudMode) return <GesCloudEditorHomePage data={data} />;
 
 	return (
 		<HomePageWrapper>
-			<TauriTopMenu section={data.section} />
+			<TauriTopMenu section={data.views.global.section} />
 			<HomePageCatalogListContent data={data} />
 			<BottomInfo />
 			<GlobalAudioToolbar />

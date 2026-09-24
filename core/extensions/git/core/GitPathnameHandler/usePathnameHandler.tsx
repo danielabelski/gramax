@@ -1,6 +1,5 @@
 import ArticleUpdaterService from "@components/Article/ArticleUpdater/ArticleUpdaterService";
 import { useRouter } from "@core/Api/useRouter";
-import type { UnsubscribeToken } from "@core/Event/EventEmitter";
 import Path from "@core/FileProvider/Path/Path";
 import RouterPathProvider from "@core/RouterPath/RouterPathProvider";
 import FetchService from "@core-ui/ApiServices/FetchService";
@@ -8,7 +7,6 @@ import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import ModalToOpenService from "@core-ui/ContextServices/ModalToOpenService/ModalToOpenService";
 import ModalToOpen from "@core-ui/ContextServices/ModalToOpenService/model/ModalsToOpen";
 import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
-import PagePropsUpdateService from "@core-ui/ContextServices/PagePropsUpdate";
 import SyncIconService from "@core-ui/ContextServices/SyncIconService";
 import ArticleViewService from "@core-ui/ContextServices/views/articleView/ArticleViewService";
 import useWatch from "@core-ui/hooks/useWatch";
@@ -22,6 +20,7 @@ import useOnPathnameUpdateBranch from "@ext/git/core/GitPathnameHandler/checkout
 import type PullHandler from "@ext/git/core/GitPathnameHandler/pull/components/PullHandler";
 import getPathnamePullData from "@ext/git/core/GitPathnameHandler/pull/logic/getPathnamePullData";
 import t from "@ext/localization/locale/translate";
+import { traced } from "@ext/loggers/opentelemetry";
 import useIsSourceDataValid from "@ext/storage/components/useIsSourceDataValid";
 import { useIsRepoOk } from "@ext/storage/logic/utils/useStorage";
 import { type ComponentProps, useEffect, useRef } from "react";
@@ -54,15 +53,9 @@ const usePathnameHandler = (isFirstLoad: boolean) => {
 		haveBeenFirstLoad.current = false;
 
 		const handler = async () => {
-			ArticleViewService.setLoadingView();
-			const exit = () => {
-				SyncIconService.stop();
-				ArticleViewService.setDefaultView();
-			};
-
-			if (isRevision) return exit();
+			if (isRevision) return;
 			const res = await FetchService.fetch<MergeData>(apiUrlCreator.getMergeData());
-			if (!res.ok) return exit();
+			if (!res.ok) return;
 			const mergeData = await res.json();
 
 			const pathnameData = RouterPathProvider.parsePath(routerPath);
@@ -80,10 +73,10 @@ const usePathnameHandler = (isFirstLoad: boolean) => {
 			if (mergeData?.stashRestored) {
 				await ArticleUpdaterService.update(apiUrlCreator);
 				await refreshPage();
-				return exit();
+				return;
 			}
 
-			if (!mergeData || !mergeData.ok) {
+			if (!mergeData?.ok) {
 				tryOpenMergeConflict({
 					mergeData,
 					errorText: checkoutData.haveToCheckout
@@ -94,39 +87,44 @@ const usePathnameHandler = (isFirstLoad: boolean) => {
 						: t("git.merge.confirm.catalog-conflict-state"),
 					title: t("git.merge.error.catalog-conflict-state"),
 				});
-				return exit();
+				return;
 			}
 
 			if (checkoutData.haveToCheckout) {
-				ArticleViewService.setDefaultView();
 				ModalToOpenService.setValue<ComponentProps<typeof CheckoutHandler>>(ModalToOpen.CheckoutHandler, {
+					catalogName: pathnameData.catalogName,
 					currentBranchName: checkoutData.currentBranch,
 					branchToCheckout: checkoutData.branchToCheckout,
 				});
 
-				return exit();
+				return;
 			}
 
-			if (!isSourceValid) return exit();
+			if (!isSourceValid) return;
 
 			SyncIconService.start();
 			const { haveToPull, canPull } = await getPathnamePullData(apiUrlCreator);
 
-			if (!haveToPull) return exit();
+			if (!haveToPull) return;
 
 			if (canPull) {
-				const unsubcribeToken: { current: UnsubscribeToken } = { current: null };
-				PagePropsUpdateService.events.on("update", () => {
-					exit();
-					PagePropsUpdateService.events.off(unsubcribeToken.current);
-				});
 				await SyncService.sync(apiUrlCreator);
 				return;
 			}
-			exit();
+
 			ModalToOpenService.setValue<ComponentProps<typeof PullHandler>>(ModalToOpen.PullHandler);
 		};
-		void handler();
+
+		// Cleanup belongs in finally: sync, conflict and error paths finish through different returns,
+		// and thrown errors do not emit a page update event.
+		void traced("git-pathname-handler", async () => {
+			try {
+				await handler();
+			} finally {
+				SyncIconService.stop();
+				ArticleViewService.setDefaultView();
+			}
+		});
 	}, [router.path, router.hash, isFirstLoad, isArticle, isRepoOk, isSourceValid, apiUrlCreator, isRevision]);
 };
 

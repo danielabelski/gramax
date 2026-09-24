@@ -14,7 +14,7 @@ interface ChangeRoleButtonProps {
 
 export const ChangeRoleButton = (props: ChangeRoleButtonProps) => {
 	const { count, onChange, rules } = props;
-	if (!count) return null;
+	if (!count || rules.locked) return null;
 	return (
 		<DropdownMenu>
 			<DropdownMenuTriggerButton className="pl-3 pr-2.5">

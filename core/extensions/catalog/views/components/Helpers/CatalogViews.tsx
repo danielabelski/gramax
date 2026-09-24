@@ -14,6 +14,7 @@ import {
 } from "@ui-kit/Dropdown";
 import { Icon } from "@ui-kit/Icon";
 import { MenuItem, MenuItemIconButton } from "@ui-kit/MenuItem";
+import { ComponentVariantProvider } from "@ui-kit/Providers";
 import { TextOverflowTooltip } from "@ui-kit/Tooltip";
 import type { HTMLAttributes } from "react";
 
@@ -31,65 +32,67 @@ const CatalogViewItem = (props: CatalogViewItemProps) => {
 	const { view, editable, onEditClick, onItemClick, onUpdateDocportalVisible, onDeleteClick, ...rest } = props;
 
 	return (
-		<MenuItem
-			className="[&>span:first-child]:shrink-0 py-1 -ml-2 w-[calc(100%+1rem)] pr-1 aria-selected:bg-secondary-bg-hover"
-			data-testid="catalog-view-item"
-			onClick={() => onItemClick(view.id)}
-			{...rest}
-		>
-			<TextOverflowTooltip className="min-w-0 flex-1 truncate">{view.name}</TextOverflowTooltip>
-			{editable && (
-				<>
-					<div className="flex items-center gap-1 ml-auto">
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<div className="shrink-0">
-									<MenuItemIconButton
-										className="ml-auto"
-										data-testid="catalog-view-item-menu-trigger"
-										icon="ellipsis-vertical"
-									/>
-								</div>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent>
-								<DropdownMenuItem
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										onEditClick?.(view);
-									}}
-								>
-									<Icon icon="pencil" />
-									{t("edit2")}
-								</DropdownMenuItem>
-								<DropdownMenuCheckboxItem
-									checked={view.options?.docportalVisible}
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										onUpdateDocportalVisible?.(view, !view.options?.docportalVisible);
-									}}
-								>
-									{t("catalog.views.edit.form.options.docportalVisible.name")}
-								</DropdownMenuCheckboxItem>
-								<DropdownMenuSeparator />
-								<DropdownMenuItem
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										onDeleteClick?.(view);
-									}}
-									type="danger"
-								>
-									<Icon icon="trash" />
-									{t("delete")}
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
-				</>
-			)}
-		</MenuItem>
+		<ComponentVariantProvider variant="glass">
+			<MenuItem
+				className="[&>span:first-child]:shrink-0 py-1 -ml-2 w-[calc(100%+1rem)] pr-1 aria-selected:bg-secondary-border"
+				data-testid="catalog-view-item"
+				onClick={() => onItemClick(view.id)}
+				{...rest}
+			>
+				<TextOverflowTooltip className="min-w-0 flex-1 truncate">{view.name}</TextOverflowTooltip>
+				{editable && (
+					<>
+						<div className="flex items-center gap-1 ml-auto">
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<div className="shrink-0">
+										<MenuItemIconButton
+											className="ml-auto"
+											data-testid="catalog-view-item-menu-trigger"
+											icon="ellipsis-vertical"
+										/>
+									</div>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent>
+									<DropdownMenuItem
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											onEditClick?.(view);
+										}}
+									>
+										<Icon icon="pencil" />
+										{t("edit2")}
+									</DropdownMenuItem>
+									<DropdownMenuCheckboxItem
+										checked={view.options?.docportalVisible}
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											onUpdateDocportalVisible?.(view, !view.options?.docportalVisible);
+										}}
+									>
+										{t("catalog.views.edit.form.options.docportalVisible.name")}
+									</DropdownMenuCheckboxItem>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											onDeleteClick?.(view);
+										}}
+										type="danger"
+									>
+										<Icon icon="trash" />
+										{t("delete")}
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						</div>
+					</>
+				)}
+			</MenuItem>
+		</ComponentVariantProvider>
 	);
 };
 

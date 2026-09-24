@@ -25,7 +25,8 @@ type Result<T> = std::result::Result<T, UpdaterError>;
 
 pub trait UpdaterExt<R: Runtime> {
 	fn updater_init(&self) -> Result<()>;
-	fn updater(&self) -> State<'_, Updater<R>>;
+	/// `Err(Unavailable)` when the updater could not be built at startup — see `UpdaterError::Unavailable`.
+	fn updater(&self) -> Result<State<'_, Updater<R>>>;
 }
 
 #[derive(serde::Serialize, Debug, Clone, Copy)]
@@ -209,32 +210,32 @@ pub fn restart_app<R: Runtime>(window: Window<R>) {
 #[instrument(skip(app))]
 #[command(async)]
 pub async fn update_check<R: Runtime>(app: AppHandle<R>) -> Result<UpdateCheckOutcome> {
-	app.updater().check(false).await.inspect_err(|e| _ = emit_error(app, e))
+	app.updater()?.check(false).await.inspect_err(|e| _ = emit_error(app, e))
 }
 
 #[instrument(skip(app))]
 #[command(async)]
 pub fn update_install<R: Runtime>(app: AppHandle<R>) -> Result<()> {
-	app.updater().install().inspect_err(|e| _ = emit_error(app, e))
+	app.updater()?.install().inspect_err(|e| _ = emit_error(app, e))
 }
 
 #[instrument(skip(app))]
 #[command(async)]
 pub async fn update_reset_bytes<R: Runtime>(app: AppHandle<R>) -> Result<()> {
-	app.updater().ready_update.lock().await.take();
+	app.updater()?.ready_update.lock().await.take();
 	Ok(())
 }
 
 #[instrument(skip(app))]
 #[command]
 pub fn update_cache_clear<R: Runtime>(app: AppHandle<R>) -> Result<()> {
-	app.updater().cache.clear().map_err(Into::into)
+	app.updater()?.cache.clear().map_err(Into::into)
 }
 
 #[instrument(skip(app))]
 #[command(async)]
 pub async fn update_install_by_path<R: Runtime>(app: AppHandle<R>) -> Result<()> {
-	let updates_dir = app.updater().cache.cached_updates_dir()?;
+	let updates_dir = app.updater()?.cache.cached_updates_dir()?;
 	std::fs::create_dir_all(&updates_dir)?;
 
 	let Some(path) = app
@@ -251,7 +252,7 @@ pub async fn update_install_by_path<R: Runtime>(app: AppHandle<R>) -> Result<()>
 
 	info!(target: TAG, "selected file: {}", path.display());
 	let bytes = std::fs::read(path)?;
-	app.updater().install_bytes(bytes).await?;
+	app.updater()?.install_bytes(bytes).await?;
 	Ok(())
 }
 
@@ -262,8 +263,8 @@ impl<R: Runtime> UpdaterExt<R> for AppHandle<R> {
 		Ok(())
 	}
 
-	fn updater(&self) -> State<'_, Updater<R>> {
-		self.state::<Updater<R>>()
+	fn updater(&self) -> Result<State<'_, Updater<R>>> {
+		self.try_state::<Updater<R>>().ok_or(UpdaterError::Unavailable)
 	}
 }
 

@@ -22,7 +22,7 @@ const getCatalogRepositoryName: Command<
 		const catalog = await workspace.getCatalog(oldCatalogName, ctx);
 		assert(catalog, `Catalog not found: ${oldCatalogName}`);
 
-		const gesCloudApi = new GesCloudApi(enterpriseCloudManager.getConfig().url);
+		const gesCloudApi = new GesCloudApi((await enterpriseCloudManager.getConfig()).url);
 		const localCatalogRepositoryNames = Array.from(workspace.getAllCatalogs().values())
 			.filter((catalog) => !catalog.repo.storage?.getSourceName() && catalog.name !== oldCatalogName)
 			.map((catalog) => catalog.name);

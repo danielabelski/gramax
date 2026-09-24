@@ -95,9 +95,15 @@ export const createFormSchema = ({ allCatalogNames, validateEncodingSymbolsUrl }
 		lfs: z
 			.object({
 				patterns: z.optional(z.array(z.string()).nullable()),
+				lazy: z.optional(z.boolean()),
+				auto: z.optional(z.boolean()),
+				exclude: z.optional(z.array(z.string()).nullable()),
 			})
 			.default({
 				patterns: [],
+				lazy: true,
+				auto: false,
+				exclude: [],
 			}),
 	});
 

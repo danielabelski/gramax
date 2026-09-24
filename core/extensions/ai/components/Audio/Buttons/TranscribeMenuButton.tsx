@@ -5,7 +5,7 @@ import { usePlatform } from "@core-ui/hooks/usePlatform";
 import AudioRecorderService from "@ext/ai/components/Audio/AudioRecorderService";
 import t from "@ext/localization/locale/translate";
 import type { Editor } from "@tiptap/core";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 import { useCallback, useMemo } from "react";
 
 const TranscribeButton = ({ editor }: { editor?: Editor }) => {
@@ -66,14 +66,14 @@ const TranscribeButton = ({ editor }: { editor?: Editor }) => {
 	}, [micState, recorderState]);
 
 	return (
-		<ToolbarToggleButton
+		<GlassToolbarToggleButton
 			active={isActive(recorderState)}
 			disabled={isDisabled || isReadOnly}
 			onClick={handleClick}
 			tooltipText={tooltipText}
 		>
-			<ToolbarIcon icon={icon} />
-		</ToolbarToggleButton>
+			<GlassToolbarIcon icon={icon} />
+		</GlassToolbarToggleButton>
 	);
 };
 

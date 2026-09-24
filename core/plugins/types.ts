@@ -47,6 +47,9 @@ export interface PluginMetadata {
 	icon?: string;
 	navigateTo?: string;
 	onSave?: (newSettings: unknown) => Promise<void>;
+	engines?: {
+		gramaxSdk?: string;
+	};
 }
 
 export interface PluginData extends PluginConfig {

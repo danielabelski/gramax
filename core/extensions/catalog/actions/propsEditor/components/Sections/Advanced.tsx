@@ -2,6 +2,7 @@ import { SectionContainer } from "@ext/catalog/actions/propsEditor/components/Se
 import { FORM_DATA_QA, FORM_STYLES } from "@ext/catalog/actions/propsEditor/consts/form";
 import { useFormSelectValues } from "@ext/catalog/actions/propsEditor/hooks/useFormSelectValues";
 import t from "@ext/localization/locale/translate";
+import SectionHeader from "@ext/settings/components/SectionHeader";
 import { FormField } from "@ui-kit/Form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui-kit/Select";
 
@@ -9,7 +10,7 @@ export const EditAdvancedProps = () => {
 	const { syntaxes } = useFormSelectValues();
 
 	return (
-		<SectionContainer>
+		<SectionContainer header={<SectionHeader title={t("forms.catalog-edit-props.tabs.advanced")} />}>
 			<FormField
 				control={({ field }) => (
 					<Select defaultValue={field.value || undefined} onValueChange={field.onChange}>

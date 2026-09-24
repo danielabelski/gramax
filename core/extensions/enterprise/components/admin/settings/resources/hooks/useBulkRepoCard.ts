@@ -7,7 +7,6 @@ import {
 	type BulkAccessRow,
 	useBulkAccessDraft,
 } from "@ext/enterprise/components/admin/settings/members/hooks/useBulkAccessDraft";
-import { useEditorSheet } from "@ext/enterprise/components/admin/settings/members/hooks/useEditorSheet";
 import type { AccessChange } from "@ext/enterprise/components/admin/settings/members/model/AccessChange";
 import {
 	type GesRepo,
@@ -27,15 +26,18 @@ import {
 	type UserMember,
 } from "@ext/enterprise/components/admin/settings/members/model/Member";
 import {
+	getGroupRules,
 	isMixedRole,
 	MIXED_ROLE,
 	useBulkRepoUserRoleRules,
 	useGroupRoleRules,
 	useGuestRoleRules,
 } from "@ext/enterprise/components/admin/settings/members/model/roleRules";
+import { resolveSsoGroupRole } from "@ext/enterprise/components/admin/settings/members/model/ssoGroupRoleRestrictions";
 import { buildBulkRepoChanges } from "@ext/enterprise/components/admin/settings/resources/model/buildBulkRepoChanges";
 import { useRowSelectionWithData } from "@ext/enterprise/components/admin/ui-kit/table/useRowSelection";
 import { deepEqual } from "@ext/enterprise/utils/deepEqual";
+import { useEditorSheet } from "@ext/enterpriseCommon/hooks/useEditorSheet";
 import { useCallback, useMemo } from "react";
 
 interface UseBulkRepoCardArgs {
@@ -44,6 +46,8 @@ interface UseBulkRepoCardArgs {
 	onApply: (changes: AccessChange[]) => Promise<void>;
 	onClose: () => void;
 }
+
+const getBulkRepoGroupRules = (row: BulkAccessRow<GroupMember, GesRepo>) => getGroupRules(row.ent.source);
 
 export const useBulkRepoCard = (args: UseBulkRepoCardArgs) => {
 	const { repos, aggregate, onApply, onClose } = args;
@@ -61,23 +65,24 @@ export const useBulkRepoCard = (args: UseBulkRepoCardArgs) => {
 		for (const repo of repos) {
 			const groupAccess = aggregate.repoAccesses.get(repo.id)?.groups ?? [];
 			for (const ga of groupAccess) {
+				const role = resolveSsoGroupRole(ga.group.source, ga.role);
 				let ex = res.get(ga.group.id);
 				if (!ex) {
 					ex = {
 						ent: ga.group,
-						role: ga.role,
+						role,
 						containers: new Map(),
 					};
 					res.set(ga.group.id, ex);
 				}
 
-				if (ex.role !== ga.role) {
+				if (ex.role !== role) {
 					ex.role = MIXED_ROLE;
 				}
 
 				ex.containers.set(repo.id, {
 					cont: repo,
-					role: ga.role,
+					role,
 				});
 			}
 		}
@@ -99,6 +104,7 @@ export const useBulkRepoCard = (args: UseBulkRepoCardArgs) => {
 		getEntId: getGroupRowId,
 		getContId: getRepoRowId,
 		roleRules: groupRoleRules,
+		getRoleRules: getBulkRepoGroupRules,
 	});
 
 	const groupColumns = useMemo(

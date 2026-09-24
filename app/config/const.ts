@@ -26,13 +26,11 @@ export const DOC_ROOT_FILENAMES = [
 	"doc-root.yml",
 	"docroot.yml",
 ] as const;
-export const DOC_ROOT_REGEXP = /.(doc-)?root.ya?ml/;
 
 export const NEW_CATALOG_NAME = "untitled";
 
 export const CATEGORY_ROOT_FILENAME = "_index.md";
 export const CATEGORY_ROOT_FILENAMES = ["_index.md"] as const;
-export const CATEGORY_ROOT_REGEXP = /(_index_\w\w\.md$|_index\.md$)/;
 
 export const NEW_ARTICLE_FILENAME = "untitled";
 export const NEW_ARTICLE_REGEX = /^(?:untitled|new[-_]article)/;

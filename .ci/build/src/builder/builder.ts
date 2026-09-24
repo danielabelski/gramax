@@ -133,10 +133,12 @@ export abstract class Builder {
 				? "https://gram.ax/apps"
 				: "https://develop.gram.ax/apps";
 
+		// tauri substitutes the file being signed for the "%1" argument; without it the path is never
+		// passed and the installer stays unsigned. see tauri-bundler `sign_command_custom`.
 		const signCommand =
 			this.platform === "windows-x86_64"
-				? `${path.join(project, "gx")} sign-ci-windows --target ${this.target} --profile ${this.profile}`
-				: "";
+				? { cmd: path.join(project, "gx"), args: ["sign-ci-windows", "%1"] }
+				: undefined;
 
 		return JSON.stringify({
 			productName: this.opts.productName,

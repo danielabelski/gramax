@@ -62,12 +62,18 @@ pub trait Fs: Send + Sync {
 	fn delete_empty_dirs(&self, _path: &Path) -> Result<()>;
 }
 
-/// Length of the opening `---` delimiter line (including its trailing LF) if `bytes` starts with one.
-/// Tolerates trailing whitespace before the LF. Doubles as a close-delimiter line test for streaming readers.
+/// UTF-8 byte order mark. Windows editors write it, and a file that starts with one still starts
+/// with frontmatter as far as every author is concerned.
+pub const BOM: &[u8] = b"\xEF\xBB\xBF";
+
+/// Length of the opening `---` delimiter line (including its trailing LF, and a leading BOM if the
+/// file has one) if `bytes` starts with one. Tolerates trailing whitespace before the LF. Doubles as
+/// a close-delimiter line test for streaming readers.
 pub fn open_delimiter_len(bytes: &[u8]) -> Option<usize> {
-	let after = bytes.strip_prefix(b"---")?;
+	let bom = if bytes.starts_with(BOM) { BOM.len() } else { 0 };
+	let after = bytes[bom..].strip_prefix(b"---")?;
 	let lf = after.iter().position(|b| *b == b'\n')?;
-	after[..lf].iter().all(|b| matches!(b, b' ' | b'\t' | b'\r')).then_some(3 + lf + 1)
+	after[..lf].iter().all(|b| matches!(b, b' ' | b'\t' | b'\r')).then_some(bom + 3 + lf + 1)
 }
 
 /// Locates the closing `---` delimiter inside `body` (everything after the opening line).
@@ -146,6 +152,13 @@ mod tests {
 	#[test]
 	fn open_delimiter_rejects_missing_lf() {
 		assert_eq!(open_delimiter_len(b"---   "), None);
+	}
+
+	#[test]
+	fn open_delimiter_tolerates_a_byte_order_mark() {
+		assert_eq!(open_delimiter_len(b"\xEF\xBB\xBF---\nbody"), Some(7));
+		assert_eq!(open_delimiter_len(b"\xEF\xBB\xBF--- \r\nbody"), Some(9));
+		assert_eq!(open_delimiter_len(b"\xEF\xBB\xBFx---\nbody"), None);
 	}
 
 	#[test]

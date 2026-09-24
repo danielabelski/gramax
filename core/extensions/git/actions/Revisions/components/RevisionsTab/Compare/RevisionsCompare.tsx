@@ -1,7 +1,5 @@
 import Date from "@components/Atoms/Date";
 import { TooltipIconButton } from "@components/Atoms/TooltipIconButton";
-import NavigationTabsService from "@components/Layouts/LeftNavigationTabs/NavigationTabsService";
-import { LeftNavigationTab } from "@components/Layouts/StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
 import useSetArticleDiffView from "@core-ui/hooks/diff/useSetArticleDiffView";
 import {
 	type RevisionCommit,
@@ -20,8 +18,8 @@ import ScrollableDiffEntriesLayout from "@ext/git/core/Diff/components/Changes/S
 import { DiffCount } from "@ext/git/core/Diff/components/helpers/DiffCount";
 import type { DiffFlattenTreeItem } from "@ext/git/core/GitDiffItemCreator/RevisionDiffPresenter";
 import t, { pluralize } from "@ext/localization/locale/translate";
-import { TriggerButton } from "@ui-kit/Button";
 import { Divider } from "@ui-kit/Divider";
+import { FloatingTriggerButton } from "@ui-kit/FloatingPanel";
 import { Icon } from "@ui-kit/Icon";
 import { Indicator } from "@ui-kit/Indicator";
 import { Loader } from "@ui-kit/Loader";
@@ -157,9 +155,14 @@ const CompareResults = () => {
 	);
 };
 
-export const RevisionsCompare = ({ tabWrapperRef }: { tabWrapperRef: RefObject<HTMLDivElement> }) => {
+export const RevisionsCompare = ({
+	anchorRef,
+	panelOpen,
+}: {
+	anchorRef: RefObject<HTMLDivElement>;
+	panelOpen: boolean;
+}) => {
 	const [isOpen, setIsOpen] = useState(false);
-	const bottomTab = NavigationTabsService.value.bottomTab;
 
 	const { setStatus, setRevisionsCompare, setCompareDiffTree } = useRevisionCatalogStore((state) => ({
 		setStatus: state.setStatus,
@@ -173,12 +176,9 @@ export const RevisionsCompare = ({ tabWrapperRef }: { tabWrapperRef: RefObject<H
 		revisionsCompare: state.revisionsCompare,
 	}));
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: we need to close the popover when the bottom tab changes
 	useEffect(() => {
-		if ((!bottomTab || bottomTab !== LeftNavigationTab.CatalogRevisions) && isOpen) {
-			setIsOpen(false);
-		}
-	}, [bottomTab]);
+		if (!panelOpen && isOpen) setIsOpen(false);
+	}, [panelOpen, isOpen]);
 
 	const hasAny = hasFrom || hasTo;
 
@@ -216,24 +216,23 @@ export const RevisionsCompare = ({ tabWrapperRef }: { tabWrapperRef: RefObject<H
 		<>
 			<Tooltip>
 				<TooltipTrigger asChild>
-					<TriggerButton
+					<FloatingTriggerButton
 						aria-controls="revisions-compare-popover"
 						className="relative shrink-0 ml-auto"
 						data-state={isOpen ? "open" : "closed"}
 						onClick={() => handleOpenChange(!isOpen)}
 						size="xs"
-						variant="text"
 					>
-						<Icon className="h-4 w-4" icon="git-compare-arrows" />
+						<Icon className="h-3.5 w-3.5" icon="git-compare-arrows" />
 						{hasAny && (
 							<Indicator className="rounded-full absolute right-1.5 top-1 bg-status-info" size="xs" />
 						)}
-					</TriggerButton>
+					</FloatingTriggerButton>
 				</TooltipTrigger>
 				<TooltipContent>{t("git.history.revisions.title")}</TooltipContent>
 			</Tooltip>
 			<Popover onOpenChange={handleOpenChange} open={isOpen}>
-				<PopoverAnchor virtualRef={tabWrapperRef} />
+				<PopoverAnchor virtualRef={anchorRef} />
 				<PopoverContent
 					align="start"
 					className="p-0 w-72 pb-0 overflow-hidden"

@@ -19,7 +19,9 @@ const getProps: Command<{ catalogName: string; articlePath: Path; ctx: Context }
 		const itemRef = fp.getItemRef(articlePath);
 		const article = catalog.findItemByItemRef<Article>(itemRef);
 		if (!article) return;
-		return sitePresenterFactory.fromContext(ctx).serializeArticleProps(article, await catalog.getPathname(article));
+		return sitePresenterFactory
+			.fromContext(ctx)
+			.serializeArticleProps(article, await catalog.getPathname(article), catalog);
 	},
 
 	params(ctx, q) {

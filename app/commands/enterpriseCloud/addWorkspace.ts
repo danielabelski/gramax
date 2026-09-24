@@ -17,8 +17,8 @@ const addWorkspace: Command<{ ctx: Context }, UserSettings> = Command.create({
 	kind: ResponseKind.json,
 
 	async do({ ctx }) {
-		const { wm, am, enterpriseCloudManager } = this._app;
-		const gesCloudUrl = enterpriseCloudManager.getConfig().url;
+		const { wm, amp, enterpriseCloudManager } = this._app;
+		const gesCloudUrl = (await enterpriseCloudManager.getConfig()).url;
 		if (!gesCloudUrl) throw new DefaultError(t("enterprise.config-error"));
 
 		const gesApi = new GesCloudApi(gesCloudUrl);
@@ -46,6 +46,7 @@ const addWorkspace: Command<{ ctx: Context }, UserSettings> = Command.create({
 			id: enterpriseWorkspace.id,
 			name: enterpriseWorkspace.name,
 			icon: enterpriseWorkspace.icon,
+			layout: enterpriseWorkspace.layout,
 			sections: enterpriseWorkspace.sections,
 			services: enterpriseWorkspace.services,
 			enterpriseCloud: {
@@ -67,7 +68,7 @@ const addWorkspace: Command<{ ctx: Context }, UserSettings> = Command.create({
 		const sourceData = userSettings.source;
 		const userInfo: UserInfo = { mail: sourceData.userEmail, name: sourceData.userName, id: sourceData.userEmail };
 		const user = new User(true, userInfo);
-		am.setUser(ctx.cookie, user);
+		amp.current().setUser(ctx.cookie, user);
 
 		return userSettings;
 	},

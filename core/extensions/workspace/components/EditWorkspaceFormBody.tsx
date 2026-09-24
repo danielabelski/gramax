@@ -4,7 +4,8 @@ import type { FormProps } from "@ext/catalog/actions/propsEditor/logic/createFor
 import t from "@ext/localization/locale/translate";
 import { PopoverIconPicker } from "@ext/markdown/elements/icon/edit/components/IconPicker/PopoverIconPicker";
 import type { SidebarItem } from "@ext/settings/components/AppSettingsSidebarTabsRenderer";
-import { useRegisterSettingsSave, useReportSettingsDirty } from "@ext/settings/components/SettingsDirtyContext";
+import SectionHeader from "@ext/settings/components/SectionHeader";
+import { useReportSettingsDirty } from "@ext/settings/components/SettingsDirtyContext";
 import AiSettingsFields from "@ext/settings/components/sections/AiSettingsFields";
 import ServicesSection from "@ext/settings/components/sections/ServicesSection";
 import { createAiSchema, servicesSchema } from "@ext/settings/logic/formSchema";
@@ -77,7 +78,7 @@ const EditWorkspaceFormBody = ({
 			.string()
 			.min(2, { message: t("space-name-min-length") })
 			.refine(isNameUnique, { message: t("cant-be-same-name") }),
-		icon: z.optional(z.string()),
+		icon: z.string().nullish(),
 		logo: z.object({ light: z.null().optional(), dark: z.null().optional() }).optional(),
 		path: z.optional(
 			z
@@ -154,23 +155,19 @@ const EditWorkspaceFormBody = ({
 		})();
 	}, [form, originalProps, updateSettings, saveAiData, onSubmit, onCloseHandler, onSubmitParent]);
 
-	// The unsaved-changes guard's "Save and close" submits this form.
-	useRegisterSettingsSave(submitForm);
-
 	const formSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
 		return submitForm();
 	};
 
-	const formProps: FormProps = useMemo(() => ({ labelClassName: "w-max" }), []);
+	const formProps: FormProps = useMemo(() => ({ layout: "horizontal", labelClassName: "w-[30%] shrink-0" }), []);
 
 	const renderGeneral = () => (
-		<SectionContainer>
+		<SectionContainer header={<SectionHeader title={t("name")} />}>
 			<FormField
 				control={({ field }) => (
 					<Input {...field} autoFocus data-qa={t("name")} placeholder={t("workspace.enter-name")} />
 				)}
-				layout="vertical"
 				name="name"
 				required
 				title={t("name")}
@@ -182,11 +179,10 @@ const EditWorkspaceFormBody = ({
 						disable={["emoji", "file-input", "color"]}
 						label={field.value ? field.value : t("icon")}
 						onChange={(value) => "code" in value && field.onChange(value.code)}
-						onClear={() => field.onChange(undefined)}
+						onClear={() => field.onChange(null)}
 						value={field.value ? { code: field.value } : undefined}
 					/>
 				)}
-				layout="vertical"
 				name="icon"
 				title={t("icon")}
 				{...formProps}
@@ -202,7 +198,6 @@ const EditWorkspaceFormBody = ({
 							title={field.value}
 						/>
 					)}
-					layout="vertical"
 					name="path"
 					required
 					title={t("working-directory")}
@@ -216,10 +211,18 @@ const EditWorkspaceFormBody = ({
 		originalProps.path ? (
 			<EditCustomTheme {...workspaceStyleProps} {...workspaceLogoProps} form={form} formProps={formProps} />
 		) : (
-			<div className="text-sm text-muted">{t("workspace.appearance")}</div>
+			<SectionContainer header={<SectionHeader title={t("workspace.appearance")} />}>
+				<div className="text-sm text-muted">{t("workspace.appearance-unavailable")}</div>
+			</SectionContainer>
 		);
 
-	const renderAi = () => <AiSettingsFields isChecking={isAiChecking} labelClassName="w-44" prefix="ai" />;
+	const renderAi = () => (
+		<AiSettingsFields
+			header={<SectionHeader title={t("workspace.set-ai-server")} />}
+			isChecking={isAiChecking}
+			prefix="ai"
+		/>
+	);
 
 	const renderServices = () => <ServicesSection disabled={isDocportal} prefix="settings.services" />;
 

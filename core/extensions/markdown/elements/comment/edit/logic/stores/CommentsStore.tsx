@@ -1,9 +1,6 @@
-import { RequestStatus, useApi } from "@core-ui/hooks/useApi";
-import { usePlatform } from "@core-ui/hooks/usePlatform";
-import { useIsRevision } from "@ext/git/actions/Revisions/logic/hooks/useIsRevision";
 import type { Signature } from "@ext/git/core/model/Signature";
 import type UserInfo from "@ext/security/logic/User/UserInfo";
-import { type DependencyList, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { create } from "zustand";
 
 export type AuthoredComments = { total: number; pathnames: CommentsByArticle };
@@ -13,11 +10,6 @@ export type CommentsByArticle = { [pathname: string]: string[] };
 export type AuthoredCommentsByAuthor = { [author: string]: AuthoredComments };
 
 export type UseReviewerCommentsProps = { authors: Signature[]; pathnames?: string[] };
-
-interface CommentsProviderProps {
-	children: React.ReactNode;
-	deps?: DependencyList;
-}
 
 interface CommentsState {
 	comments: AuthoredCommentsByAuthor;
@@ -161,26 +153,4 @@ export const useReviewerComments = ({ authors, pathnames }: UseReviewerCommentsP
 			}, {} as AuthoredCommentsByAuthor),
 		[authors, comments, pathnames],
 	);
-};
-
-export const CommentsCounterProvider = ({ children, deps = [] }: CommentsProviderProps) => {
-	const { isNext, isStatic, isStaticCli } = usePlatform();
-	const isRevision = useIsRevision();
-	const skip = isNext || isStatic || isStaticCli || isRevision;
-
-	const { call, status, reset } = useApi<AuthoredCommentsByAuthor>({
-		url: (api) => api.getCommentsByAuthors(),
-		parse: "json",
-		onDone: (data) => setComments(data || {}),
-	});
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: only deps trigger refetch; status/reset/call are read but must not retrigger
-	useEffect(() => {
-		if (skip) return;
-		if (status !== RequestStatus.Init) return;
-		reset();
-		void call();
-	}, [skip, ...deps]);
-
-	return children;
 };

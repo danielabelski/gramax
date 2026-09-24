@@ -37,7 +37,8 @@ describe("GitAutoMerger", () => {
 
 		await expect(merger.merge([conflict])).resolves.toEqual([conflict]);
 		expect(fp.write).not.toHaveBeenCalled();
-		expect(git.add).toHaveBeenCalledWith([], true);
+		// Nothing was auto-merged, so nothing is staged: an empty list would reach git as `.`.
+		expect(git.add).not.toHaveBeenCalled();
 	});
 
 	test("keeps conflict when neither side points to an existing file", async () => {
@@ -55,6 +56,7 @@ describe("GitAutoMerger", () => {
 		await expect(merger.merge([conflict])).resolves.toEqual([conflict]);
 		expect(fp.read).not.toHaveBeenCalled();
 		expect(fp.write).not.toHaveBeenCalled();
-		expect(git.add).toHaveBeenCalledWith([], true);
+		// Nothing was auto-merged, so nothing is staged: an empty list would reach git as `.`.
+		expect(git.add).not.toHaveBeenCalled();
 	});
 });

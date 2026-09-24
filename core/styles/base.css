@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/complexity/noImportantStyles: the global reset must override styles from host pages */
 html,
 body,
 div#__next,
@@ -10,7 +11,6 @@ div#root {
 	font-weight: var(--font-weight-default) !important;
 	letter-spacing: normal !important;
 	scroll-behavior: smooth !important;
-	background-color: var(--color-home-bg);
 	-webkit-font-smoothing: antialiased !important;
 	font-family: var(--app-font-famaly), sans-serif !important;
 }

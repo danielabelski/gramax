@@ -15,7 +15,7 @@ const logout: Command<{ ctx: Context; id: WorkspacePath }, void> = Command.creat
 
 	async do({ ctx, id }) {
 		const { enterpriseCloudManager } = this._app;
-		const cloudConfig = enterpriseCloudManager.getConfig();
+		const cloudConfig = await enterpriseCloudManager.getConfig();
 		const cloudEnabled = cloudConfig.url && cloudConfig.enabled !== false;
 
 		if (!cloudEnabled) return;
@@ -32,7 +32,7 @@ const logout: Command<{ ctx: Context; id: WorkspacePath }, void> = Command.creat
 		});
 		await this._commands.workspace.remove.do({ ctx, id });
 		await this._commands.ai.server.removeAiData.do({ ctx, workspacePath: id });
-		await this._app.am.logout(ctx.cookie);
+		await this._app.amp.current().logout(ctx.cookie);
 	},
 
 	params(ctx, q) {

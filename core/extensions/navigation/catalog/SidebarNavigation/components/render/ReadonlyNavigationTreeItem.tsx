@@ -4,24 +4,18 @@ import { useNavigationItem } from "@ext/navigation/catalog/SidebarNavigation/hoo
 import { useNavigationItemClick } from "@ext/navigation/catalog/SidebarNavigation/hooks/useNavigationItemClick";
 import { Collapsible, CollapsibleContent } from "@ui-kit/Collapsible";
 import { SidebarMenuSub } from "@ui-kit/Sidebar";
-import { memo, useEffect, useRef } from "react";
+import { memo } from "react";
 import { ReadonlyArticleItem } from "./ReadonlyArticleItem";
 import { ReadonlyFolderItem } from "./ReadonlyFolderItem";
 
 interface ReadonlyNavigationTreeItemProps {
 	id: string;
 	level: number;
+	virtualized?: boolean;
 }
 
-const ReadonlyNavigationTreeItemInner = ({ id, level }: ReadonlyNavigationTreeItemProps) => {
+const ReadonlyNavigationTreeItemInner = ({ id, level, virtualized = false }: ReadonlyNavigationTreeItemProps) => {
 	const { data, children: childIds, open, isSelected, toggleExpanded, select } = useNavigationItem(id);
-	const itemRef = useRef<HTMLElement>(null);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll on mount only
-	useEffect(() => {
-		if (!isSelected) return;
-		itemRef.current?.scrollIntoView({ behavior: "instant", inline: "center", block: "center" });
-	}, []);
 
 	const isFolder = childIds.length > 0;
 	const isNested = level > 1;
@@ -44,11 +38,8 @@ const ReadonlyNavigationTreeItemInner = ({ id, level }: ReadonlyNavigationTreeIt
 		return (
 			<Collapsible
 				className="relative flex flex-col gap-0.5"
-				onOpenChange={handleOpenChange}
+				onOpenChange={virtualized ? (next) => toggleExpanded(id, next) : handleOpenChange}
 				open={open}
-				ref={(el) => {
-					itemRef.current = el as HTMLElement;
-				}}
 			>
 				<ReadonlyFolderItem
 					data={data}
@@ -58,18 +49,21 @@ const ReadonlyNavigationTreeItemInner = ({ id, level }: ReadonlyNavigationTreeIt
 					onClick={handleClick}
 					open={open}
 				/>
-				<CollapsibleContent
-					className={cn(!animating && "data-[state=open]:!overflow-visible")}
-					onAnimationEnd={handleAnimationEnd}
-				>
-					<div className="relative ml-4">
-						<SidebarMenuSub className="ml-0 gap-0 border-none p-0 [&>*:not(:first-child)]:pt-0.5">
-							{childIds.map((childId) => (
-								<ReadonlyNavigationTreeItem id={childId} key={childId} level={level + 1} />
-							))}
-						</SidebarMenuSub>
-					</div>
-				</CollapsibleContent>
+				{!virtualized && (
+					<CollapsibleContent
+						className={cn(!animating && "data-[state=open]:!overflow-visible")}
+						data-navigation-children
+						onAnimationEnd={handleAnimationEnd}
+					>
+						<div className="relative ml-4">
+							<SidebarMenuSub className="ml-0 gap-0 border-none p-0 [&>*:not(:first-child)]:pt-0.5">
+								{childIds.map((childId) => (
+									<ReadonlyNavigationTreeItem id={childId} key={childId} level={level + 1} />
+								))}
+							</SidebarMenuSub>
+						</div>
+					</CollapsibleContent>
+				)}
 			</Collapsible>
 		);
 	}
@@ -79,7 +73,6 @@ const ReadonlyNavigationTreeItemInner = ({ id, level }: ReadonlyNavigationTreeIt
 			data={data}
 			isNested={isNested}
 			isSelected={isSelected}
-			itemRef={itemRef}
 			level={level}
 			onClick={handleClick}
 		/>

@@ -13,7 +13,6 @@ import type OtherLanguagesPresentWarning from "@ext/localization/actions/OtherLa
 import { shouldShowActionWarning } from "@ext/localization/actions/OtherLanguagesPresentWarning";
 import DragTreeTransformer from "@ext/navigation/catalog/drag/logic/DragTreeTransformer";
 import { useProvideCreateArticle } from "@ext/navigation/catalog/SidebarNavigation/hooks/useCreateArticle";
-import { useHoverBelowNavigation } from "@ext/navigation/catalog/SidebarNavigation/hooks/useHoverBelowNavigation";
 import { useNavigationDnd } from "@ext/navigation/catalog/SidebarNavigation/hooks/useNavigationDnd";
 import {
 	navigationTreeStore,
@@ -25,10 +24,13 @@ import { navigationCollisionDetection } from "@ext/navigation/catalog/SidebarNav
 import { nodeModelsToItemLinks } from "@ext/navigation/catalog/SidebarNavigation/utils/nodeModelsToItemLinks";
 import type { ItemLink } from "@ext/navigation/NavigationLinks";
 import type { NodeModel } from "@minoru/react-dnd-treeview";
-import { SidebarGroup } from "@ui-kit/Sidebar";
-import { type ComponentProps, useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { type ComponentProps, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { VirtualNavigationTree } from "../Helpers/VirtualNavigationTree";
 import { NavigationDragPreview } from "../SidebarDragnDrop/NavigationDragPreview";
-import { AfterContainerInsertionLine } from "./AfterContainerInsertionLine";
+import { NavigationDropMeasurer } from "../SidebarDragnDrop/NavigationDropMeasurer";
+import { NavigationAncestorLines } from "../SidebarInsertionLine/NavigationAncestorLines";
+import { AddRootArticleRow } from "./AddRootArticleRow";
 import { NavigationGroupFirstSlot } from "./NavigationGroupFirstSlot";
 import { NavigationGroupLastSlot } from "./NavigationGroupLastSlot";
 import { NavigationTreeItem } from "./NavigationTreeItem";
@@ -45,7 +47,7 @@ const collisionDetection: CollisionDetection = (args) => {
 	return beforeItemCollision ? [beforeItemCollision] : collisions;
 };
 
-export const NavigationTree = ({ items }: { items: ItemLink[]; closeNavigation?: () => void }) => {
+export const NavigationTree = ({ items, beforeGroups }: { items: ItemLink[]; beforeGroups?: ReactNode }) => {
 	const isReadOnly = PageDataContextService.value.conf.isReadOnly;
 	const articleProps = ArticlePropsService.value;
 	const supportedLanguages = useCatalogPropsStore((state) => state.data?.supportedLanguages, "shallow");
@@ -61,20 +63,26 @@ export const NavigationTree = ({ items }: { items: ItemLink[]; closeNavigation?:
 
 	const { call: updateCatalogNav } = useDeferApi<NodeModel<ItemLink>[]>({ opts: { mime: MimeTypes.json } });
 
-	const { setNavItems, setOnDrop, setOnToggle, setDragLocked, flatIndex, draggingId, rootIds } =
-		useNavigationTreeStore((s) => ({
+	const { setNavItems, setOnDrop, setOnToggle, setDragLocked, flatIndex, draggingId } = useNavigationTreeStore(
+		(s) => ({
 			setNavItems: s.setNavItems,
 			setOnDrop: s.setOnDrop,
 			setOnToggle: s.setOnToggle,
 			setDragLocked: s.setDragLocked,
 			flatIndex: s.flatIndex,
 			draggingId: s.draggingId,
-			rootIds: s.rootIds,
-		}));
+		}),
+	);
 
 	const containerRef = useRef<HTMLDivElement>(null);
-	const { isHoverBelow } = useHoverBelowNavigation(containerRef);
 	articlePropsRef.current = articleProps;
+
+	// dnd-kit positions the overlay with `position: fixed`. The navigation scroll container sets `contain: layout`
+	// and the navigation layout has a `transform`, and each of those makes an ancestor the containing block for
+	// fixed descendants — an in-place overlay would then be offset by that ancestor's own position. Rendering it
+	// into `<body>` keeps the preview under the cursor. Resolved in an effect so SSR renders no portal.
+	const [overlayHost, setOverlayHost] = useState<HTMLElement | null>(null);
+	useEffect(() => setOverlayHost(document.body), []);
 
 	useProvideCreateArticle();
 
@@ -134,7 +142,7 @@ export const NavigationTree = ({ items }: { items: ItemLink[]; closeNavigation?:
 				if (navigationTreeStore.getState().scope !== treeScope) return;
 
 				const currentItem = newItems.find((i) => i.data.isCurrentLink);
-				if (currentItem) router.pushPath(currentItem.data.pathname);
+				if (currentItem) void router.pushPath(currentItem.data.pathname);
 
 				const preservedItems = reconcileDrop(flatItems, newItems, draggedId);
 				updateDisplayedItems(nodeModelsToItemLinks(preservedItems, DragTreeTransformer.getRootId()));
@@ -190,9 +198,11 @@ export const NavigationTree = ({ items }: { items: ItemLink[]; closeNavigation?:
 			onDragCancel={onDragCancel}
 			onDragEnd={onDragEnd}
 			onDragMove={onDragMove}
+			onDragOver={onDragMove}
 			onDragStart={onDragStart}
 			sensors={sensors}
 		>
+			<NavigationDropMeasurer />
 			<div
 				className={cn(
 					"relative mt-4 flex flex-col gap-3 [transform:translateZ(0)] [&_li]:mb-0 [&_li]:list-none",
@@ -200,23 +210,26 @@ export const NavigationTree = ({ items }: { items: ItemLink[]; closeNavigation?:
 				)}
 				ref={containerRef}
 			>
-				{rootIds.map((groupId) => {
-					const groupData = flatIndex[groupId];
-					if (!groupData) return null;
-
-					return (
-						<SidebarGroup className="relative mt-0.5 py-0 px-2.5" key={groupId}>
-							<NavigationGroupFirstSlot groupId={groupId} />
-							<NavigationTreeItem id={groupId} level={1} />
-							<NavigationGroupLastSlot groupId={groupId} />
-						</SidebarGroup>
-					);
-				})}
+				{beforeGroups}
+				<VirtualNavigationTree
+					afterLastGroup={(groupId) => <NavigationGroupLastSlot groupId={groupId} />}
+					ancestorLines={({ id, level }) => <NavigationAncestorLines id={id} level={level} />}
+					beforeGroup={(groupId) => <NavigationGroupFirstSlot groupId={groupId} />}
+					containerRef={containerRef}
+				>
+					{({ id, level }) => <NavigationTreeItem id={id} level={level} virtualized />}
+				</VirtualNavigationTree>
 			</div>
-			<AfterContainerInsertionLine isVisible={isHoverBelow && !draggingId} />
-			<DragOverlay>
-				{draggingId && flatIndex[draggingId] && <NavigationDragPreview name={flatIndex[draggingId].title} />}
-			</DragOverlay>
+			<AddRootArticleRow />
+			{overlayHost &&
+				createPortal(
+					<DragOverlay>
+						{draggingId && flatIndex[draggingId] && (
+							<NavigationDragPreview name={flatIndex[draggingId].title} />
+						)}
+					</DragOverlay>,
+					overlayHost,
+				)}
 		</DndContext>
 	);
 };

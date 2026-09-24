@@ -13,3 +13,5 @@ export {
 export { AlertDialogContent } from "./AlertDialogContent";
 export { AlertDialogIcon } from "./AlertDialogIcon";
 export { AlertConfirm } from "./templates/AlertConfirm";
+export { AlertProgressConfirm, type AlertProgressConfirmProps } from "./templates/AlertProgressConfirm";
+export { UnsavedChanges } from "./templates/UnsavedChanges";

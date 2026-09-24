@@ -63,11 +63,12 @@ const publish: Command<
 	},
 
 	params(ctx, q, body) {
+		const { message, filePaths } = (body ?? {}) as { message: string; filePaths?: string[] };
 		return {
 			ctx,
-			message: q.commitMessage,
+			message,
 			catalogName: q.catalogName,
-			filePaths: body as string[],
+			filePaths,
 		};
 	},
 });

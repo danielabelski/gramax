@@ -102,18 +102,30 @@ class ViewSorter {
 		return 0;
 	}
 
+	// `new Date()` yields an Invalid Date for anything it cannot read, and every comparison
+	// against NaN is false — so the old comparator answered 0 for such a value against
+	// everything, which is not a consistent ordering and left the whole list arbitrary.
+	private _toTimestamp(prop: Property): number | null {
+		const value = prop.value?.[0];
+		if (value === undefined || value === null || value === "") return null;
+
+		const time = new Date(value).getTime();
+		return Number.isNaN(time) ? null : time;
+	}
+
 	private _sortByDate(aProp: Property, bProp: Property): number {
-		const aValue = new Date(aProp.value?.[0]);
-		const bValue = new Date(bProp.value?.[0]);
+		const aTime = this._toTimestamp(aProp);
+		const bTime = this._toTimestamp(bProp);
 
-		if (!aValue && !bValue) return 0;
-		if (!aValue) return 1;
+		// A value with no place on the timeline goes after every real date, the same way the
+		// rest of this class treats a missing value, and two of them fall back to their raw
+		// text so the comparison stays total and repeatable.
+		if (aTime === null && bTime === null) return this._sortOtherProps(aProp, bProp);
+		if (aTime === null) return 1;
+		if (bTime === null) return -1;
 
-		if (aValue === bValue) return 0;
-		if (aValue < bValue) return -1;
-		if (aValue > bValue) return 1;
-
-		return 0;
+		if (aTime === bTime) return 0;
+		return aTime < bTime ? -1 : 1;
 	}
 }
 

@@ -4,6 +4,8 @@ import type { AgentAttachment } from "./attachmentStore";
 
 export type AgentTurnStatus = "completed" | "failed" | "cancelled";
 
+export type AgentQuote = { catalogName?: string; itemPath?: string; text: string };
+
 export type AgentEvent =
 	| {
 			type: "user_message";
@@ -12,12 +14,27 @@ export type AgentEvent =
 			content: string;
 			browserAllowed?: boolean;
 			attachments?: AgentAttachment[];
+			quote?: AgentQuote;
 			useSkill?: string;
 			openCatalogName?: string;
 			openItemPath?: string;
 	  }
+	| {
+			type: "context_compacted";
+			turnId: string;
+			ts: number;
+			summary: string;
+			tailUserMessages: Extract<AgentEvent, { type: "user_message" }>[];
+	  }
 	| { type: "assistant_delta"; turnId: string; ts: number; content: string }
-	| { type: "assistant_message"; turnId: string; ts: number; content: string; reasoningContent?: string }
+	| {
+			type: "assistant_message";
+			turnId: string;
+			ts: number;
+			content: string;
+			contentPreview: string;
+			reasoningContent?: string;
+	  }
 	| {
 			type: "tool_call_requested";
 			turnId: string;
@@ -38,6 +55,7 @@ export type AgentEvent =
 			fullLength: number;
 			isError: boolean;
 			refreshPage?: boolean;
+			catalogMutated?: boolean;
 	  }
 	| {
 			type: "tool_awaiting_confirmation";

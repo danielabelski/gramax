@@ -1,13 +1,45 @@
 import type { ArticlePageData } from "@core/SitePresenter/types/ArticlePage";
 import ArticleRefService from "@core-ui/ContextServices/ArticleRef";
+import { useArticleViewKey } from "@core-ui/ContextServices/views/articleView/ArticleViewKey";
 import { useScrollPositionStore } from "@core-ui/stores/ScrollPositionStore";
+import NavigationEvents from "@ext/navigation/NavigationEvents";
 import { useEffect, useLayoutEffect, useRef } from "react";
 
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Spacebar"]);
 
 const SETTLE_MS = 250;
 const MAX_RESTORE_MS = 4000;
+const DISPOSE_FALLBACK_MS = 1000;
 const POSITION_TOLERANCE_PX = 1;
+
+let restoreEndPaintFrame: number | undefined;
+let restoreEndFrame: number | undefined;
+
+const cancelRestoreEnd = () => {
+	if (restoreEndPaintFrame !== undefined) cancelAnimationFrame(restoreEndPaintFrame);
+	if (restoreEndFrame !== undefined) cancelAnimationFrame(restoreEndFrame);
+	restoreEndPaintFrame = undefined;
+	restoreEndFrame = undefined;
+};
+
+const setRestoringScrollPosition = (active: boolean) => {
+	if (active) {
+		cancelRestoreEnd();
+		const store = useScrollPositionStore.getState();
+		if (!store.isRestoringScrollPosition) store.setRestoringScrollPosition(true);
+		return;
+	}
+
+	if (restoreEndPaintFrame !== undefined || restoreEndFrame !== undefined) return;
+	restoreEndPaintFrame = requestAnimationFrame(() => {
+		restoreEndPaintFrame = undefined;
+		restoreEndFrame = requestAnimationFrame(() => {
+			restoreEndFrame = undefined;
+			const store = useScrollPositionStore.getState();
+			if (store.isRestoringScrollPosition) store.setRestoringScrollPosition(false);
+		});
+	});
+};
 
 // An `#anchor` or `:~:text=` fragment in the URL — those handlers own the scroll, so we don't restore.
 const urlHasScrollTarget = (): boolean => {
@@ -19,8 +51,9 @@ const urlHasScrollTarget = (): boolean => {
 };
 
 // Images, diagrams, drawio and video all render a `.skeleton` placeholder until they're ready.
-// While any remain the article height isn't final yet — so this gates restoration generically,
-const hasPendingContent = (container: HTMLElement): boolean => container.querySelector(".skeleton") !== null;
+// A skeleton with reserved layout can stay lazy without holding scroll restoration open.
+const hasPendingContent = (container: HTMLElement): boolean =>
+	container.querySelector(".skeleton:not([data-layout-reserved])") !== null;
 
 // Calls `onChange` whenever the article's rendered height may have moved: element resize,
 // DOM mutations, or an image finishing — the last covers images with no reserved space.
@@ -80,29 +113,65 @@ const restoreScrollPosition = (
 	onActiveChange: (active: boolean) => void,
 ): (() => void) => {
 	let active = true;
+	let disposed = false;
+	let applyFrame: number | null = null;
 	let settleTimer: ReturnType<typeof setTimeout> | null = null;
 	let hardTimer: ReturnType<typeof setTimeout> | null = null;
+	let disposePaintFrame: number | null = null;
+	let disposeFrame: number | null = null;
+	let disposeFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 	const cleanups: (() => void)[] = [];
 
 	const apply = () => {
 		if (Math.abs(container.scrollTop - target) > POSITION_TOLERANCE_PX) container.scrollTop = target;
 	};
 
-	const stop = (applyFinal: boolean) => {
-		if (!active) return;
-		active = false;
-		if (applyFinal) apply();
+	const dispose = () => {
+		if (disposed) return;
+		disposed = true;
 		if (settleTimer) clearTimeout(settleTimer);
 		if (hardTimer) clearTimeout(hardTimer);
+		if (applyFrame !== null) cancelAnimationFrame(applyFrame);
+		if (disposePaintFrame !== null) cancelAnimationFrame(disposePaintFrame);
+		if (disposeFrame !== null) cancelAnimationFrame(disposeFrame);
+		if (disposeFallbackTimer) clearTimeout(disposeFallbackTimer);
 		cleanups.forEach((cleanup) => cleanup());
+	};
+
+	const disposeAfterPaint = () => {
+		disposeFallbackTimer = setTimeout(dispose, DISPOSE_FALLBACK_MS);
+		disposePaintFrame = requestAnimationFrame(() => {
+			disposePaintFrame = null;
+			disposeFrame = requestAnimationFrame(() => {
+				disposeFrame = null;
+				dispose();
+			});
+		});
+	};
+
+	const stop = (applyFinal: boolean, deferDisposal = false) => {
+		if (!active) return;
+		active = false;
+		if (applyFrame !== null) {
+			cancelAnimationFrame(applyFrame);
+			applyFrame = null;
+		}
+		if (applyFinal) apply();
 		onActiveChange(false);
+		if (!deferDisposal) {
+			dispose();
+			return;
+		}
+		disposeAfterPaint();
 	};
 
 	// Re-arm a countdown that finishes the restore once the layout has been quiet for SETTLE_MS
 	// with no loading blocks left; otherwise keep waiting for them to render.
 	const waitUntilSettled = () => {
+		if (!active) return;
 		if (settleTimer) clearTimeout(settleTimer);
 		settleTimer = setTimeout(() => {
+			if (!active) return;
 			if (hasPendingContent(container)) waitUntilSettled();
 			else stop(true);
 		}, SETTLE_MS);
@@ -118,17 +187,29 @@ const restoreScrollPosition = (
 	cleanups.push(observeHeightChanges(container, onHeightChange));
 	cleanups.push(observeUserTakeover(container, () => stop(false)));
 
-	apply();
+	applyFrame = requestAnimationFrame(() => {
+		applyFrame = null;
+		if (active) apply();
+	});
 	waitUntilSettled();
 	hardTimer = setTimeout(() => stop(true), MAX_RESTORE_MS);
 
-	return () => stop(false);
+	return () => stop(false, true);
 };
 
 const useArticleScrollPosition = (data: ArticlePageData) => {
 	const articleRef = ArticleRefService.value;
 	const currentArticlePath = data?.articleProps?.ref?.path;
 	const isRestoringRef = useRef(false);
+	const view = useArticleViewKey();
+
+	useEffect(() => {
+		const token = NavigationEvents.on("item-rename", ({ from, patch, view: renamedView }) => {
+			if (view !== null && renamedView !== view) return;
+			useScrollPositionStore.getState().movePosition(from.path, patch.ref.path);
+		});
+		return () => NavigationEvents.off(token);
+	}, [view]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: it's ok
 	useLayoutEffect(() => {
@@ -144,7 +225,7 @@ const useArticleScrollPosition = (data: ArticlePageData) => {
 
 		return restoreScrollPosition(container, savedPosition, (active) => {
 			isRestoringRef.current = active;
-			useScrollPositionStore.getState().setRestoringScrollPosition(active);
+			setRestoringScrollPosition(active);
 		});
 	}, [currentArticlePath, articleRef]);
 

@@ -19,10 +19,15 @@ const StyledPrintBody = styled.div<{ title: string; titlePageExist: boolean; toc
 	--toc-page-title: "${(p) => p.tocPageTitle}";
 
 	counter-reset: page 0;
-	.page {
+	/* Scoped to a direct child, like the geometry rules in PrintView: a page box is always one, and
+	   @gramax/openapi-viewer names its own document container <main class="page">. Written as a bare
+	   .page this counted that container too -- and since it sits inside .page-content, ahead of the
+	   strip that prints the number, every page holding an OpenAPI block printed the next page's number
+	   and every page after it was off by one. */
+	& > .page {
 		counter-increment: page;
 	}
-	.page > .page-bottom > .page-bottom-right::before {
+	& > .page > .page-bottom > .page-bottom-right::before {
 		content: counter(page);
 	}
 `;

@@ -333,14 +333,11 @@ describe("SearchRowsModel", () => {
 							},
 						},
 						breadcrumbs: [
-							{
-								type: "header",
-								title: [
-									{ type: "text", text: "L" },
-									{ type: "highlight", text: "og" },
-									{ type: "text", text: "o" },
-								],
-							},
+							[
+								{ type: "text", text: "L" },
+								{ type: "highlight", text: "og" },
+								{ type: "text", text: "o" },
+							],
 						],
 						children: [
 							{
@@ -725,16 +722,11 @@ describe("SearchRowsModel", () => {
 							pathname: "release-notes",
 							query: { highlightFragment: "Fragment with file", highlightFragmentIndex: "0" },
 						}),
-						breadcrumbs: [
+						title: (searchData.items[0] as SearchResultBlockItem).title,
+						fileName: [
 							{
-								type: "file",
-								title: (searchData.items[0] as SearchResultBlockItem).title,
-								fileName: [
-									{
-										type: "text",
-										text: "Some file",
-									},
-								],
+								type: "text",
+								text: "Some file",
 							},
 						],
 						children: [
@@ -764,15 +756,12 @@ describe("SearchRowsModel", () => {
 								type: "block",
 								id: "3",
 								breadcrumbs: [
-									{
-										type: "header",
-										title: [
-											{
-												type: "text",
-												text: "Block inside file",
-											},
-										],
-									},
+									[
+										{
+											type: "text",
+											text: "Block inside file",
+										},
+									],
 								],
 								children: [
 									{
@@ -927,13 +916,13 @@ describe("SearchRowsModel", () => {
 				url: Url.from({ pathname: "release-notes" }),
 				items: [
 					{
-						type: "file-block",
+						type: "block",
 						id: "1",
 						openSideEffect: {
 							params: {
 								pathname: "release-notes",
 								fragmentInfo: {
-									text: "text attached to the file",
+									text: "Chapter with file",
 									indexInArticle: 0,
 								},
 							},
@@ -941,80 +930,20 @@ describe("SearchRowsModel", () => {
 						url: Url.from({
 							pathname: "release-notes",
 							query: {
-								highlightFragment: "text attached to the file",
+								highlightFragment: "Chapter with file",
 								highlightFragmentIndex: "0",
 							},
 						}),
 						breadcrumbs: [
-							{
-								type: "header",
-								title: [
-									{
-										type: "text",
-										text: "Chapter with ",
-									},
-									{
-										type: "highlight",
-										text: "file",
-									},
-								],
-							},
-							{
-								type: "file",
-								title: [
-									{
-										type: "text",
-										text: "text attached to the ",
-									},
-									{
-										type: "highlight",
-										text: "file",
-									},
-								],
-								fileName: [
-									{
-										type: "text",
-										text: "This is ",
-									},
-									{
-										type: "highlight",
-										text: "name",
-									},
-									{
-										type: "text",
-										text: " of file.pdf",
-									},
-								],
-							},
-							{
-								type: "header",
-								title: [
-									{
-										type: "text",
-										text: "This is chapter ",
-									},
-									{
-										type: "highlight",
-										text: "inside file",
-									},
-								],
-							},
+							[
+								{ type: "text", text: "Chapter with " },
+								{ type: "highlight", text: "file" },
+							],
 						],
 						children: [
 							{
-								type: "link",
+								type: "file-block",
 								id: "2",
-								url: Url.from({
-									pathname: "release-notes",
-									query: {
-										highlightFragment: "text attached to the file",
-										highlightFragmentIndex: "0",
-									},
-								}),
-								marks: [
-									{ type: "highlight", text: "This is" },
-									{ type: "text", text: " paragraph" },
-								],
 								openSideEffect: {
 									params: {
 										pathname: "release-notes",
@@ -1024,6 +953,76 @@ describe("SearchRowsModel", () => {
 										},
 									},
 								},
+								url: Url.from({
+									pathname: "release-notes",
+									query: {
+										highlightFragment: "text attached to the file",
+										highlightFragmentIndex: "0",
+									},
+								}),
+								title: [
+									{ type: "text", text: "text attached to the " },
+									{ type: "highlight", text: "file" },
+								],
+								fileName: [
+									{ type: "text", text: "This is " },
+									{ type: "highlight", text: "name" },
+									{ type: "text", text: " of file.pdf" },
+								],
+								children: [
+									{
+										type: "block",
+										id: "3",
+										openSideEffect: {
+											params: {
+												pathname: "release-notes",
+												fragmentInfo: {
+													text: "text attached to the file",
+													indexInArticle: 0,
+												},
+											},
+										},
+										url: Url.from({
+											pathname: "release-notes",
+											query: {
+												highlightFragment: "text attached to the file",
+												highlightFragmentIndex: "0",
+											},
+										}),
+										breadcrumbs: [
+											[
+												{ type: "text", text: "This is chapter " },
+												{ type: "highlight", text: "inside file" },
+											],
+										],
+										children: [
+											{
+												type: "link",
+												id: "4",
+												url: Url.from({
+													pathname: "release-notes",
+													query: {
+														highlightFragment: "text attached to the file",
+														highlightFragmentIndex: "0",
+													},
+												}),
+												marks: [
+													{ type: "highlight", text: "This is" },
+													{ type: "text", text: " paragraph" },
+												],
+												openSideEffect: {
+													params: {
+														pathname: "release-notes",
+														fragmentInfo: {
+															text: "text attached to the file",
+															indexInArticle: 0,
+														},
+													},
+												},
+											},
+										],
+									},
+								],
 							},
 						],
 					},

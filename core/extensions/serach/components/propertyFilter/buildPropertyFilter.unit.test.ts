@@ -29,8 +29,9 @@ const makeItem = (args: {
 
 	return {
 		property: args.property,
+		shown: true,
 		selection: {
-			options: values.map((value) => ({ value, selected: selected.has(value) })),
+			options: values.map((value) => ({ value, selected: selected.has(value), shown: true })),
 			emptySelected,
 			allSelected: emptySelected && values.every((v) => selected.has(v)),
 		},

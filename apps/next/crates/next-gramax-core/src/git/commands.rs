@@ -62,8 +62,13 @@ pub fn status_file(repo_path: String, path: String) -> Output {
 }
 
 #[napi_async]
-pub fn get_all_commit_authors(repo_path: String) -> Output {
-	git::get_all_commit_authors(Path::new(&repo_path))
+pub fn get_commit_authors(repo_path: String, pathspecs: Option<Vec<String>>) -> Output {
+	git::get_commit_authors(Path::new(&repo_path), pathspecs)
+}
+
+#[napi_async]
+pub fn get_commit_range(repo_path: String, pathspecs: Option<Vec<String>>) -> Output {
+	git::get_commit_range(Path::new(&repo_path), pathspecs)
 }
 
 #[napi_async]
@@ -173,13 +178,23 @@ pub fn reset(repo_path: String, opts: ResetOptions) -> Output {
 }
 
 #[napi_async]
-pub fn stash(repo_path: String, creds: AccessTokenCreds, message: Option<String>) -> Output {
-	git::stash(Path::new(&repo_path), message.as_deref(), creds.into())
+pub fn stash(repo_path: String, message: Option<String>) -> Output {
+	git::stash(Path::new(&repo_path), message.as_deref())
 }
 
 #[napi_async]
 pub fn stash_apply(repo_path: String, oid: String) -> Output {
 	git::stash_apply(Path::new(&repo_path), &oid)
+}
+
+#[napi_async]
+pub fn stash_restore(repo_path: String, oid: String) -> Output {
+	git::stash_restore(Path::new(&repo_path), &oid)
+}
+
+#[napi_async]
+pub fn stash_list(repo_path: String) -> Output {
+	git::stash_list(Path::new(&repo_path))
 }
 
 #[napi_async]

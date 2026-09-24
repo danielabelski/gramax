@@ -2,24 +2,23 @@ import type { AppConfig } from "@app/config/AppConfig";
 import { getExecutingEnvironment } from "@app/resolveModule/env";
 import bugsnag from "@dynamicImports/bugsnag";
 import normalizeStacktrace from "@ext/bugsnag/logic/normalizeStacktrace";
+import { REDACTED } from "@ext/loggers/redactSecrets";
 import sendBug from "../bugsnag/logic/sendBug";
 import BaseLogger from "./BaseLogger";
 import type Logger from "./Logger";
 
 export default class BugsnagLogger extends BaseLogger implements Logger {
-	private static readonly REDACTED = "<redacted>";
-
 	private constructor() {
 		super();
 	}
 
 	static async init(config: AppConfig): Promise<BugsnagLogger> {
-		const bugsnagStarted = await BugsnagLogger.startBugsnag(config);
+		const bugsnagStarted = await BugsnagLogger._startBugsnag(config);
 		if (bugsnagStarted) console.log(`Bugsnag is started! [AppVersion:${config.buildVersion}]`);
 		return new BugsnagLogger();
 	}
 
-	private static async startBugsnag(config: AppConfig) {
+	private static async _startBugsnag(config: AppConfig) {
 		if (!config.bugsnagApiKey) return;
 		const Bugsnag = (await bugsnag()).default;
 		if (Bugsnag.isStarted()) return;
@@ -47,6 +46,7 @@ export default class BugsnagLogger extends BaseLogger implements Logger {
 			tokens: {
 				cookie: this._redactIfPresent(config.tokens.cookie),
 				share: this._redactIfPresent(config.tokens.share),
+				healthcheck: this._redactIfPresent(config.tokens.healthcheck),
 			},
 			admin: {
 				login: this._redactIfPresent(config.admin.login),
@@ -56,6 +56,7 @@ export default class BugsnagLogger extends BaseLogger implements Logger {
 				user: this._redactIfPresent(config.mail.user),
 				password: this._redactIfPresent(config.mail.password),
 			},
+			bugsnagApiKey: this._redactIfPresent(config.bugsnagApiKey),
 			portalAi: {
 				...config.portalAi,
 				token: this._redactIfPresent(config.portalAi.token),
@@ -65,7 +66,7 @@ export default class BugsnagLogger extends BaseLogger implements Logger {
 	}
 
 	private static _redactIfPresent(value: string | null): string | null {
-		return value ? this.REDACTED : value;
+		return value ? REDACTED : value;
 	}
 
 	logError(e: Error, errorDisplayed?: boolean) {

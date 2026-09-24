@@ -4,17 +4,12 @@ import CatalogMoveItem, { CatalogMoveSelectItem } from "@components/Actions/Cata
 import ExportCatalogItem from "@components/Actions/CatalogItems/ExportCatalogItem";
 import ExportMenuItem from "@components/Actions/CatalogItems/ExportMenuItem";
 import FavoriteMenuItem from "@components/Actions/CatalogItems/FavoriteMenuItem";
-import FragmentsItem from "@components/Actions/CatalogItems/FragmentsItem";
 import HealthcheckItem from "@components/Actions/CatalogItems/HealthcheckItem";
-import LfsLazyToggleItem from "@components/Actions/CatalogItems/LfsLazyToggleItem";
 import NotesItem from "@components/Actions/CatalogItems/NotesItem";
 import RepositoryPermissionItem from "@components/Actions/CatalogItems/RepositoryPermissionItem";
 import ShareCatalogItem from "@components/Actions/CatalogItems/ShareCatalogItem";
-import TemplateItem from "@components/Actions/CatalogItems/TemplateItem";
-import ViewFavoritesItem from "@components/Actions/CatalogItems/ViewFavoritesItem";
 import Icon from "@components/Atoms/Icon";
 import { PlatformServiceNew } from "@core-ui/PlatformService";
-import AgentSkillsItem from "@ext/agent/components/skills/AgentSkillsItem";
 import type { CatalogMoveActionRenderProps } from "@ext/catalog/actions/move/components/CatalogMoveAction";
 import CatalogPropsTrigger from "@ext/catalog/actions/propsEditor/components/CatalogPropsTrigger";
 import DeleteCatalog from "@ext/catalog/actions/propsEditor/components/DeleteCatalog";
@@ -25,21 +20,13 @@ import { ExportFormat } from "@ext/wordExport/components/ItemExport";
 import type { CoreMenuItemId } from "@gramax/sdk/ui";
 import { DropdownMenuLabel, DropdownMenuSeparator } from "@ui-kit/Dropdown";
 import type { ReactNode } from "react";
-import IsReadOnlyHOC from "../../../ui-logic/HigherOrderComponent/IsReadOnlyHOC";
 import DownloadZip from "../DownloadZip";
 import ShowInExplorer from "../ShowInExplorer";
 import type { CatalogActionsContextValue } from "./CatalogActionsContext";
 
-type CoreMenuItemIdNew =
-	| "navigation-title"
-	| "separator"
-	| "repository-permission"
-	| "favorite-articles"
-	| "lfs-lazy-toggle"
-	| "fragments"
-	| "agent-skills";
+type CoreMenuItemIdNew = "navigation-title" | "separator" | "repository-permission" | "fragments" | "agent-skills";
 
-export type CoreMenuItemIdApp = CoreMenuItemId | CoreMenuItemIdNew;
+export type CoreMenuItemIdApp = Exclude<CoreMenuItemId, "view-favorites"> | CoreMenuItemIdNew;
 
 export interface MenuItemPropMap {
 	"navigation-title": ReactNode;
@@ -54,9 +41,7 @@ export interface MenuItemPropMap {
 	"export-zip": ReactNode;
 	"publish-to-cloud": ReactNode;
 	"toggle-favorite": ReactNode;
-	"view-favorites": ReactNode;
 	notes: ReactNode;
-	"catalog-tools": ReactNode;
 	snippets: ReactNode;
 	fragments: ReactNode;
 	"agent-skills": ReactNode;
@@ -67,8 +52,6 @@ export interface MenuItemPropMap {
 	"catalog-move": (props: CatalogMoveActionRenderProps) => ReactNode;
 	"catalog-move-select": CatalogMoveActionRenderProps;
 	"repository-permission": ReactNode;
-	"favorite-articles": ReactNode;
-	"lfs-lazy-toggle": ReactNode;
 }
 
 export type MenuItemDescriptorApp = {
@@ -110,11 +93,6 @@ export function buildCatalogMenu(ctx: CatalogActionsContextValue): MenuItemDescr
 			component: (children) => <FavoriteMenuItem>{children}</FavoriteMenuItem>,
 		},
 		{
-			id: "view-favorites",
-			visible: !platform.isStatic && !platform.isStaticCli,
-			component: (children) => <ViewFavoritesItem>{children}</ViewFavoritesItem>,
-		},
-		{
 			id: "catalog-move",
 			component: (children) => <CatalogMoveItem>{children}</CatalogMoveItem>,
 			visible: !platform.isStatic && !platform.isStaticCli && !platform.isDocPortal,
@@ -140,49 +118,9 @@ export function buildCatalogMenu(ctx: CatalogActionsContextValue): MenuItemDescr
 
 	const toolsGroup: MenuItemDescriptorApp[] = [
 		{
-			id: "catalog-tools",
-			visible: !isReadOnly,
-			component: (children) => (
-				<IsReadOnlyHOC>
-					<CatalogItem
-						renderLabel={(Item) => (
-							<Item>
-								<Icon code="tool-case" />
-								{t("tools")}
-							</Item>
-						)}
-					>
-						{children}
-					</CatalogItem>
-				</IsReadOnlyHOC>
-			),
-			children: [
-				{
-					id: "fragments",
-					component: (children) => <FragmentsItem>{children}</FragmentsItem>,
-					visible: true,
-				},
-				{
-					id: "agent-skills",
-					component: (children) => <AgentSkillsItem>{children}</AgentSkillsItem>,
-					visible: feature("agent-chat"),
-				},
-				{
-					id: "template",
-					component: (children) => <TemplateItem>{children}</TemplateItem>,
-					visible: true,
-				},
-				{
-					id: "ai-prompt",
-					component: (children) => <AiPromptItem>{children}</AiPromptItem>,
-					visible: isAiEnabled,
-				},
-				{
-					id: "lfs-lazy-toggle",
-					component: (children) => <LfsLazyToggleItem>{children}</LfsLazyToggleItem>,
-					visible: hasSource,
-				},
-			],
+			id: "ai-prompt",
+			component: (children) => <AiPromptItem>{children}</AiPromptItem>,
+			visible: !isReadOnly && isAiEnabled,
 		},
 		{
 			id: "notes",

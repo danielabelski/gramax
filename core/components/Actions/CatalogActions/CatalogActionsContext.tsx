@@ -1,8 +1,9 @@
-import { LeftNavigationTab } from "@components/Layouts/StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
+import { LeftNavigationTab } from "@components/Layouts/LeftNavigationTabs/LeftNavigationTab";
 import IsMacService from "@core-ui/ContextServices/IsMac";
 import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
 import WorkspaceService from "@core-ui/ContextServices/Workspace";
 import { useCatalogPropsStore } from "@core-ui/stores/CatalogPropsStore/CatalogPropsStore.provider";
+import { useAgentChatVisibility } from "@ext/agent/components/hooks/useAgentChatVisibility";
 import type { ItemLink } from "@ext/navigation/NavigationLinks";
 import PermissionService from "@ext/security/logic/Permission/components/PermissionService";
 import { configureCatalogPermission, editCatalogPermission } from "@ext/security/logic/Permission/Permissions";
@@ -22,6 +23,7 @@ export interface CatalogActionsContextValue {
 	hasWorkspaceGesUrl: boolean;
 	isArticleExist: boolean;
 	isAiEnabled: boolean;
+	isAgentAvailable: boolean;
 	renderDeleteCatalog: boolean;
 	isMac: boolean;
 	isReadOnly: boolean;
@@ -83,6 +85,7 @@ export function CatalogActionsProvider({
 	const hasWorkspaceGesUrl = !!workspaceGesUrl;
 	const isArticleExist = !!itemLinks.length;
 	const isAiEnabled = pageData.conf.ai.enabled;
+	const { showToggle: isAgentAvailable } = useAgentChatVisibility();
 	const isMac = IsMacService.value;
 	const isReadOnly = pageData.conf.isReadOnly;
 	const cloudServiceUrl = pageData.conf.cloudServiceUrl;
@@ -129,6 +132,7 @@ export function CatalogActionsProvider({
 		hasWorkspaceGesUrl,
 		isArticleExist,
 		isAiEnabled,
+		isAgentAvailable,
 		renderDeleteCatalog,
 		isMac,
 		isReadOnly,

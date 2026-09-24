@@ -24,11 +24,9 @@ import { Indicator } from "@ui-kit/Indicator";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/ru";
-
+import { Popover, PopoverContent, PopoverTriggerButton } from "@ui-kit/Popover";
 // biome-ignore lint/style/noRestrictedImports: dont have inport from @ui-kit
 import { Container } from "ics-ui-kit/components/container";
-// biome-ignore lint/style/noRestrictedImports: dont have import from @ui-kit
-import { Popover, PopoverContent, PopoverTriggerButton } from "ics-ui-kit/components/popover";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 dayjs.extend(relativeTime);
@@ -49,7 +47,7 @@ const NewsFeed = () => {
 	const initialLoadDoneRef = useRef(false);
 
 	const context = PageDataContextService.value;
-	const userEmail = context?.userInfo?.mail;
+	const userEmail = context?.user?.info?.mail;
 	const gesUrl = context?.conf?.enterprise?.gesUrl;
 	const sourceDatas = SourceDataService.value;
 	const token = gesUrl ? getEnterpriseSourceData(sourceDatas, gesUrl)?.token : undefined;

@@ -44,12 +44,30 @@ export type Creds = {
 	protocol?: string;
 };
 
+/** One entry of the `refs/stash` reflog — what `git stash list` prints. */
+export type StashInfo = {
+	oid: string;
+	message: string;
+	/** Written by a person at a terminal with `git stash`, and not by Gramax. */
+	isForeign: boolean;
+};
+
 export type RefInfo =
 	| { kind: "tag"; name: string; oid: string; isLightweight: boolean; author?: string | null; date?: number }
 	| { kind: "branch"; name: string; date?: number };
 
 export type CommitAuthorInfo = Signature & {
 	count: number;
+};
+
+export type CommitPointInfo = {
+	date: number;
+	oid: string;
+};
+
+export type CommitRangeInfo = {
+	start: CommitPointInfo;
+	end: CommitPointInfo;
 };
 
 export type RawCommitInfo = {
@@ -228,9 +246,13 @@ export const addRemote = (args: Args & { name: string; url: string }) => rustCal
 
 export const hasRemotes = (args: Args) => rustCall<boolean>("git.has_remotes", args);
 
-export const stash = (args: CredsArgs & { message: string | null }) => rustCall<Oid>("git.stash", args);
+export const stash = (args: Args & { message: string | null }) => rustCall<Oid>("git.stash", args);
 
 export const stashApply = (args: Args & { oid: Oid }) => rustCall<MergeResult>("git.stash_apply", args);
+
+export const stashRestore = (args: Args & { oid: Oid }) => rustCall<MergeResult>("git.stash_restore", args);
+
+export const stashList = (args: Args) => rustCall<StashInfo[]>("git.stash_list", args);
 
 export const stashDelete = (args: Args & { oid: Oid }) => rustCall<void>("git.stash_delete", args);
 
@@ -288,7 +310,11 @@ export const defaultBranch = (args: Args & { creds: Creds }) =>
 		data ? intoGitBranchData(data) : null,
 	);
 
-export const getCommitAuthors = (args: Args) => rustCall<CommitAuthorInfo[]>("git.get_all_commit_authors", args);
+export const getCommitAuthors = (args: Args & { pathspecs?: string[] }) =>
+	rustCall<CommitAuthorInfo[]>("git.get_commit_authors", args);
+
+export const getCommitRange = (args: Args & { pathspecs?: string[] }) =>
+	rustCall<CommitRangeInfo | null>("git.get_commit_range", args);
 
 export const gc = (args: Args & { opts: GcOptions }) => rustCall<void>("git.gc", args);
 

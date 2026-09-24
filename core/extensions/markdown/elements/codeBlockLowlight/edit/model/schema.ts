@@ -6,7 +6,7 @@ const code_block = {
 	code: true,
 	defining: true,
 	content: "text*",
-	attrs: { language: { default: null } },
+	attrs: { language: { default: null }, gitConflict: { default: false } },
 };
 
 export default code_block;

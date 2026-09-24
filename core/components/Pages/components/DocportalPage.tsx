@@ -72,7 +72,7 @@ const DocportalTopMenu = ({ section }: { section?: Section }) => {
 const HomePage = ({ data }: { data: HomePageData }) => {
 	return (
 		<HomePageWrapper>
-			<DocportalTopMenu />
+			<DocportalTopMenu section={data.views.global.section} />
 			<HomePageCatalogListContent data={data} />
 			<BottomInfo />
 		</HomePageWrapper>

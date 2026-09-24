@@ -52,7 +52,7 @@ const GesWebTopMenu = ({ section }: { section?: Section }) => {
 				{hasWorkspace && <TopMenuSearch section={section} />}
 				<TopMenuSwitchUiLanguageButton />
 				<TopMenuThemeToggle />
-				<UserMenu />
+				<UserMenu showHomeLayoutControls />
 			</TopMenuRightSide>
 		</TopMenuWrapper>
 	);

@@ -1,8 +1,10 @@
 import { PlatformServiceNew } from "@core-ui/PlatformService";
-import { addEvent, Level } from "@ext/loggers/opentelemetry";
+import { addEvent, Level, traced } from "@ext/loggers/opentelemetry";
 import type { PluginProps } from "@gramax/sdk";
+import type { PlatformEnvironmentKey } from "@plugins/api/sdk/utilities";
+import { GRAMAX_SDK_VERSION } from "@plugins/constants/sdkVersion";
 import { PluginManager } from "@plugins/core/PluginManager";
-import { pluginValidator } from "@plugins/core/PluginValidator";
+import { pluginValidator, type SdkCompatibilityResult } from "@plugins/core/PluginValidator";
 import {
 	createBlobUrl,
 	createPluginData,
@@ -22,34 +24,75 @@ export interface PluginStoreType {
 	pluginsData: PluginData[];
 	pluginsReady: boolean;
 	isLoading: boolean;
-	init: (pluginText: PluginConfig[], props?: PluginProps, app?: unknown) => Promise<void>;
+	init: (pluginText: PluginConfig[], props?: PluginProps, app?: unknown) => Promise<PluginLoadResult>;
 	clear: () => void;
 	remove: (pluginId: string) => void;
 	add: (pluginRaw: PluginConfig) => Promise<void>;
 	toggle: (pluginId: string, disabled: boolean) => Promise<void>;
 }
 
+export type PluginLoadIssue = {
+	pluginId: string;
+	pluginName: string;
+	type: "sdk-incompatible" | "validation-error";
+	errors?: string[];
+	sdkCompatibility?: SdkCompatibilityResult;
+};
+
+export type PluginLoadResult = { issues: PluginLoadIssue[] };
+
+export const partitionPluginsForLoad = (
+	plugins: PluginConfig[],
+	currentPlatform: PlatformEnvironmentKey,
+	sdkVersion: string = GRAMAX_SDK_VERSION,
+): { plugins: PluginConfig[]; issues: PluginLoadIssue[] } =>
+	traced("plugin-validation", { level: Level.Internal, omitResult: true }, () => {
+		const loadable: PluginConfig[] = [];
+		const issues: PluginLoadIssue[] = [];
+
+		for (const plugin of plugins) {
+			if (plugin.metadata.disabled) continue;
+			if (!isPluginCompatibleWithPlatform(plugin.metadata, currentPlatform)) {
+				addEvent("plugin-skipped-platform", Level.Full, { id: plugin.metadata.id, platform: currentPlatform });
+				continue;
+			}
+
+			const validation = pluginValidator.validateFiles(plugin, sdkVersion);
+			if (validation.valid) {
+				loadable.push(plugin);
+				continue;
+			}
+
+			const type = validation.sdkCompatibility ? "sdk-incompatible" : "validation-error";
+			issues.push({
+				pluginId: plugin.metadata.id,
+				pluginName: plugin.metadata.name,
+				type,
+				errors: type === "validation-error" ? validation.errors : undefined,
+				sdkCompatibility: validation.sdkCompatibility,
+			});
+			addEvent("plugin-validation-failed", Level.Commands, {
+				id: plugin.metadata.id,
+				errors: validation.errors.join(", "),
+				sdkVersion: validation.sdkCompatibility?.sdkVersion,
+				requiredRange: validation.sdkCompatibility?.requiredRange,
+				reason: validation.sdkCompatibility?.reason,
+			});
+		}
+
+		return { plugins: loadable, issues };
+	});
+
 export const initPluginsCore = async (
 	pluginsRaw: PluginConfig[],
 	props?: PluginProps,
 	app?: unknown,
-): Promise<{ pluginsData: PluginData[]; manager: PluginManager | undefined }> => {
-	const enabled = pluginsRaw.filter((p) => !p.metadata.disabled);
+): Promise<{ pluginsData: PluginData[]; manager: PluginManager | undefined; issues: PluginLoadIssue[] }> => {
 	const currentPlatform = PlatformServiceNew.getCurrentPlatform();
-	const compatible = enabled.filter((p) => {
-		const ok = isPluginCompatibleWithPlatform(p.metadata, currentPlatform);
-		if (!ok) addEvent("plugin-skipped-platform", Level.Full, { id: p.metadata.id, platform: currentPlatform });
-		return ok;
-	});
-	const valid = compatible.filter((p) => {
-		const v = pluginValidator.validateFiles(p);
-		if (!v.valid)
-			addEvent("plugin-validation-failed", Level.Commands, { id: p.metadata.id, errors: v.errors.join(", ") });
-		return v.valid;
-	});
-	const pluginsData = valid.map((p) => createPluginData(p, createBlobUrl(p.script)));
+	const { plugins, issues } = partitionPluginsForLoad(pluginsRaw, currentPlatform);
+	const pluginsData = plugins.map((p) => createPluginData(p, createBlobUrl(p.script)));
 	const manager = await PluginManager.init(pluginsData.map(createPluginForManager), props, app);
-	return { pluginsData, manager };
+	return { pluginsData, manager, issues };
 };
 
 export const PluginStore = create<PluginStoreType>((set, get) => ({
@@ -60,15 +103,16 @@ export const PluginStore = create<PluginStoreType>((set, get) => ({
 
 	init: async (pluginsRaw, props, app) => {
 		set({ pluginsReady: false, isLoading: true });
-		const { pluginsData, manager } = await initPluginsCore(pluginsRaw, props, app);
+		const { pluginsData, manager, issues } = await initPluginsCore(pluginsRaw, props, app);
 		set({ pluginsData, pluginsReady: true, manager: manager ?? null, isLoading: false });
+		return { issues };
 	},
 
 	clear: () => {
 		const { manager, pluginsData } = get();
 		manager?.clear();
 		pluginsData.forEach((plugin) => revokeBlobUrl(plugin.blobUrl));
-		set({ pluginsData: [], manager: null });
+		set({ pluginsData: [], manager: null, pluginsReady: false, isLoading: true });
 	},
 
 	remove: (pluginId: string) => {

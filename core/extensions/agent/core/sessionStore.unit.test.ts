@@ -27,6 +27,7 @@ const makeSession = (id: string, ts: number): ReturnType<AgentSession["toSnapsho
 	cancelled: false,
 	processing: false,
 	lastError: null,
+	catalogMutated: false,
 	events: [{ type: "user_message", turnId: `turn-${id}`, ts, content: id }],
 	usage: {
 		totalUsage: 0,

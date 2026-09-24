@@ -4,6 +4,8 @@ import getCommands from "@app/node/commands";
 import DiskFileProvider from "@core/FileProvider/DiskFileProvider/DiskFileProvider";
 import Path from "@core/FileProvider/Path/Path";
 import type { UnsupportedElements } from "@ext/import/model/UnsupportedElements";
+import UiLanguage, { ContentLanguage } from "@ext/localization/core/model/Language";
+import t from "@ext/localization/locale/translate";
 import { ExportFormat } from "@ext/wordExport/components/ItemExport";
 import chalk from "chalk";
 import { exists, mkdir, readFile, writeFileSync } from "fs-extra";
@@ -169,6 +171,10 @@ export const exportCommandFunction = async (options: ExportOptions) => {
 				skipConfirm,
 				params: {
 					tocPage: PdfToc,
+					tocPageTitle:
+						catalog.props.language === ContentLanguage.ru
+							? t("export.pdf.tocPageTitle", UiLanguage.ru)
+							: t("export.pdf.tocPageTitle", UiLanguage.en),
 					titlePage: PdfTitle,
 					titleNumber: PdfNumber,
 					template,

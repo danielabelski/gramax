@@ -1,4 +1,5 @@
 pub mod add;
+pub mod assume_unchanged;
 pub mod branch;
 pub mod checkout;
 pub mod clone;
@@ -14,6 +15,7 @@ pub mod tags;
 
 pub mod prelude {
 	pub use crate::actions::add::*;
+	pub use crate::actions::assume_unchanged::*;
 	pub use crate::actions::branch::*;
 	pub use crate::actions::checkout::*;
 	pub use crate::actions::clone::*;

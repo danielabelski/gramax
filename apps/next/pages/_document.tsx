@@ -1,5 +1,6 @@
 import type { OpenGraphData } from "@core/SitePresenter/SitePresenter";
 import ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
+import { LEFT_SIDEBAR_BOOTSTRAP_SCRIPT } from "@core-ui/ContextServices/Sidebars/leftSidebarBootstrap";
 import { SETTINGS_STORAGE_KEY } from "@ext/settings/logic/cachedSettingsStore";
 import { parseSettingsCookie } from "@ext/settings/logic/cookieStorage";
 import { validateTheme } from "@ext/Theme/utils";
@@ -78,8 +79,10 @@ class MyDocument extends Document<MyDocumentProps> {
 		const customStyleAssetLink = apiUrlCreator.getCustomStyleAsset().toString();
 
 		return (
-			<Html className={this.props.theme}>
+			<Html className={this.props.theme} data-left-sidebar-pinned="true">
 				<Head>
+					{/** biome-ignore lint/style/useNamingConvention: expected */}
+					<script dangerouslySetInnerHTML={{ __html: LEFT_SIDEBAR_BOOTSTRAP_SCRIPT }} />
 					{openGraphData && (
 						<>
 							<meta content={openGraphData.title || ""} property="og:title" />

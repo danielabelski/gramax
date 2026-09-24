@@ -8,6 +8,8 @@ const getSourceData: Command<{ ctx: Context }, SourceData[]> = Command.create({
 
 	kind: ResponseKind.json,
 
+	flags: ["otel-omit-result"],
+
 	do({ ctx }) {
 		const { wm } = this._app;
 		if (!wm) return [];

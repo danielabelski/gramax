@@ -46,7 +46,7 @@ export const ColorTilePicker = ({ value, onChange }: ColorTilePickerProps) => {
 	return (
 		<div className="grid grid-rows-2 grid-cols-4 gap-1.5 p-1.5" data-testid="color-tile-picker">
 			{SPECTRUM.map((style) => (
-				<Tooltip delayDuration={250} key={style}>
+				<Tooltip key={style}>
 					<TooltipTrigger asChild>
 						<div
 							className={colorTileStyles({ selected: value === style })}

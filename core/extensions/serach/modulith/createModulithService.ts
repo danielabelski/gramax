@@ -23,6 +23,7 @@ export interface CreateModulithServiceArgs {
 	diagramRendererServerUrl?: string;
 	tablesManager: TableDB;
 	resourceSearchEnabled: boolean;
+	failOnRemoteError?: boolean;
 }
 
 export async function createModulithService({
@@ -36,6 +37,7 @@ export async function createModulithService({
 	diagramRendererServerUrl,
 	tablesManager,
 	resourceSearchEnabled,
+	failOnRemoteError,
 }: CreateModulithServiceArgs): Promise<ModulithService> {
 	const sap = new SearchArticleParser({
 		parser,
@@ -52,6 +54,7 @@ export async function createModulithService({
 		sap,
 		immediateIndexing,
 		resourceSearchEnabled,
+		failOnRemoteError,
 	});
 
 	return service;

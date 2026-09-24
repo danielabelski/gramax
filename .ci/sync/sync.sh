@@ -18,7 +18,7 @@ rm -rf .git
 mv temp/.git ./
 rm -rf temp
 
-./.ci/sync/delete-secrets.sh
+./.ci/sync/delete-secrets.sh --delete-plugins
 trufflehog filesystem . --fail --filter-entropy=4.5 --print-avg-detector-time --exclude-paths=.git/config
 
 git config --global user.email "$GITHUB_DEPLOY_USER_EMAIL"

@@ -14,7 +14,8 @@ import {
 	type MemberAggregate,
 	type RepoGroupAccess,
 } from "@ext/enterprise/components/admin/settings/members/model/Member";
-import { useGroupRoleRules } from "@ext/enterprise/components/admin/settings/members/model/roleRules";
+import { getGroupRules, useGroupRoleRules } from "@ext/enterprise/components/admin/settings/members/model/roleRules";
+import { isSsoGroupRoleRestricted } from "@ext/enterprise/components/admin/settings/members/model/ssoGroupRoleRestrictions";
 import { TypeFilterDropdown } from "@ext/enterprise/components/admin/settings/users/components/TypeFilterDropdown";
 import { GroupSource } from "@ext/enterprise/components/admin/settings/workspace/components/access/components/group/types/GroupTypes";
 import { Button } from "@ext/enterprise/components/admin/ui-kit/Button";
@@ -89,14 +90,14 @@ export const useGroupAccessPickerDialogContent = (args: UseGroupAccessPickerDial
 				isWorkspaceOwner: (row) => row.group.isWorkspaceOwner,
 			}),
 			roleColumn({
-				getRules: () => roleRules,
+				getRules: (row) => getGroupRules(row.group.source),
 				getValue: (row) => row.role,
 				onChange: (row, role) => access.setRole([row.group.id], role),
 				isDisabled: (row) => !selection[row.group.id],
 			}),
 			branchesColumn({}),
 		],
-		[access.setRole, roleRules, selection],
+		[access.setRole, selection],
 	);
 
 	const createNew = useCallback(
@@ -123,11 +124,16 @@ export const useGroupAccessPickerDialogContent = (args: UseGroupAccessPickerDial
 		[setSelection, access.add, setRowsMap],
 	);
 
+	const selectedEditableGroupIds = useMemo(
+		() => selectedIds.filter((id) => !isSsoGroupRoleRestricted(rowsMap.get(id)?.group.source)),
+		[rowsMap, selectedIds],
+	);
+
 	const bulkRoleChange = useCallback(
 		(role: RoleId) => {
-			access.setRole(selectedIds, role);
+			access.setRole(selectedEditableGroupIds, role);
 		},
-		[access.setRole, selectedIds],
+		[access.setRole, selectedEditableGroupIds],
 	);
 
 	const headerLeftControls = (
@@ -140,7 +146,7 @@ export const useGroupAccessPickerDialogContent = (args: UseGroupAccessPickerDial
 
 	const headerControls = (
 		<>
-			<ChangeRoleButton count={selectedIds.length} onChange={bulkRoleChange} rules={roleRules} />
+			<ChangeRoleButton count={selectedEditableGroupIds.length} onChange={bulkRoleChange} rules={roleRules} />
 			<Button className="pl-2.5 pr-3" onClick={() => setAddNewOpen(true)} startIcon="plus" variant="outline">
 				{t("enterprise.admin.groups.add")}
 			</Button>

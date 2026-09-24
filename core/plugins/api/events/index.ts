@@ -1,5 +1,6 @@
 import type { ArticlePageData } from "@core/SitePresenter/types/ArticlePage";
 import type {
+	BranchBeforeCheckoutPayload,
 	PluginEventMap,
 	PluginEventName,
 	SearchClickPayload,
@@ -18,14 +19,41 @@ type EventPayload<E extends PluginEventName> = Parameters<PluginEventMap[E]>[0];
 type EventInputMap = {
 	"app:open": GramaxData;
 	"app:close": undefined;
-	"article:open": { data: ArticlePageData };
+	"article:open": ArticlePageData;
 	"article:close": undefined;
+	"git:branch:before-checkout": BranchBeforeCheckoutPayload;
 	"search:start": SearchStartPayload;
 	"search:click": SearchClickPayload;
 	"search:results": SearchResultsPayload;
 };
 
 type EventInput<E extends PluginEventName> = EventInputMap[E];
+
+export const PLUGINS_READY_TIMEOUT_MS = 30_000;
+
+export const waitForPluginsReady = async (): Promise<void> => {
+	const state = PluginStore.getState();
+	if (state.pluginsReady) return;
+
+	await new Promise<void>((resolve, reject) => {
+		const finish = (callback: () => void) => {
+			clearTimeout(timeout);
+			unsubscribe();
+			callback();
+		};
+		const unsubscribe = PluginStore.subscribe((nextState) => {
+			if (nextState.pluginsReady) {
+				finish(resolve);
+			} else if (!nextState.isLoading) {
+				finish(() => reject(new Error("Plugins failed to load")));
+			}
+		});
+		const timeout = setTimeout(
+			() => finish(() => reject(new Error("Plugins load timeout"))),
+			PLUGINS_READY_TIMEOUT_MS,
+		);
+	});
+};
 
 export const emitPluginEvent = async <E extends PluginEventName>(
 	event: E,
@@ -91,7 +119,7 @@ const eventHandlers: Partial<EventHandlers> = {
 
 			firedRef.current = false;
 
-			const articleData = rawData.data;
+			const articleData = rawData;
 			const payload = {
 				context: {
 					catalogName: articleData.catalogProps?.title,

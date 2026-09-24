@@ -13,7 +13,8 @@ import reset from "./branch/reset";
 import diff from "./diff";
 import discard from "./discard";
 import fileStatus from "./fileStatus";
-import getAllCommitAuthors from "./getAllCommitAuthors";
+import getCommitAuthors from "./getCommitAuthors";
+import getCommitRange from "./getCommitRange";
 import abort from "./mergeConflict/abort";
 import getMergeData from "./mergeConflict/getMergeData";
 import resolve from "./mergeConflict/resolve";
@@ -25,7 +26,8 @@ const versionControl = {
 	discard,
 	fileStatus,
 	statuses,
-	getAllCommitAuthors,
+	getCommitAuthors,
+	getCommitRange,
 	addAll,
 	revision,
 	lfs,

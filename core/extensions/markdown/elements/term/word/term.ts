@@ -5,11 +5,14 @@ import { escapeLinkForPatcher } from "@ext/wordExport/utils/escapeLinkForPatcher
 import type { WordInlineChild } from "../../../../wordExport/options/WordTypes";
 
 export const termWordLayout: WordInlineChild = async ({ tag, addOptions }) => {
+	const children = [await createContent(tag.attributes.title, { ...addOptions, style: WordFontStyles.term })];
+	if (!tag.attributes.url) return children;
+
 	const { ExternalHyperlink } = await docx();
-	return Promise.resolve([
+	return [
 		new ExternalHyperlink({
-			children: [await createContent(tag.attributes.title, { ...addOptions, style: WordFontStyles.term })],
+			children,
 			link: escapeLinkForPatcher(tag.attributes.url),
 		}),
-	]);
+	];
 };

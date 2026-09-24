@@ -1,3 +1,4 @@
+import { resolveWorkspaceLayout } from "@components/HomePage/utils/workspaceLayout";
 import { XxHash } from "@core/Hash/Hasher";
 import asyncUtils from "@core/utils/asyncUtils";
 import { svgToBase64 } from "@core/utils/CustomLogoDriver";
@@ -8,6 +9,7 @@ import Theme from "@ext/Theme/Theme";
 import type { TemplateAsset } from "@ext/workspace/assets/TemplateAsset";
 import { calcPluginsHash } from "@plugins/core/calcPluginsHash";
 import { Workspace } from "../workspace/Workspace";
+import applyWorkspaceGit from "./utils/applyWorkspaceGit";
 
 export class EnterpriseWorkspace extends Workspace {
 	private _updateInterval: number = 1000 * 60 * 5; // 5 minutes
@@ -72,7 +74,7 @@ export class EnterpriseWorkspace extends Workspace {
 			name: this._config.get("name"),
 			webEditorUrl: this._config.get("webEditorUrl"),
 			services: this._config.get("services"),
-			sections: this._config.get("sections"),
+			layout: resolveWorkspaceLayout(this._config.inner()).items,
 			style: {
 				css: customCss,
 				logo,
@@ -104,13 +106,20 @@ export class EnterpriseWorkspace extends Workspace {
 
 		this._config.set("name", config.name);
 		this._config.set("icon", config.icon);
-		this._config.set("sections", config.sections || config.groups);
+		const localLayout = resolveWorkspaceLayout(this._config.inner());
+		const remoteLayout = resolveWorkspaceLayout(config);
+		this._config.set("layout", {
+			items: remoteLayout.items,
+			...(localLayout.personal ? { personal: localLayout.personal } : {}),
+		});
 		this._config.delete("groups");
+		this._config.delete("sections");
+		this._config.delete("personalSections");
 		this._config.set("enterprise", {
 			...this._config.get("enterprise"),
 			modules: config.modules,
 		});
-		if (config.git) this._config.set("git", config.git);
+		this._config.set("git", applyWorkspaceGit(this._config.get("git"), config));
 		if (config.services) this._config.set("services", config.services);
 		this._config.set("webEditorUrl", config.webEditorUrl);
 

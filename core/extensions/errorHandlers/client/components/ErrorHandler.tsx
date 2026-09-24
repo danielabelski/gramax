@@ -4,6 +4,7 @@ import sendBug from "../../../bugsnag/logic/sendBug";
 
 export interface ErrorHandlerProps {
 	children: ReactNode;
+	resetKey?: string;
 }
 
 interface ErrorHandlerState {
@@ -24,7 +25,11 @@ class ErrorHandler<
 	}
 
 	override componentDidCatch(error: Error): void {
-		sendBug(error);
+		void sendBug(error);
+	}
+
+	override componentDidUpdate(previousProps: P): void {
+		if (this.state.error && previousProps.resetKey !== this.props.resetKey) this.setState({ error: null } as S);
 	}
 
 	renderError() {

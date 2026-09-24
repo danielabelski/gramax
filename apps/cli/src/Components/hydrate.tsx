@@ -141,7 +141,7 @@ const Component = () => {
 
 	return (
 		<Router base={(global.config as AppConfig).paths.base.value} hook={() => [data.path, setLocation]}>
-			<Gramax data={data} platform="static" refresh={refresh} setData={() => {}} />
+			<Gramax data={data} platform="static" refresh={refresh} setData={() => {}} viewKey={data.path} />
 		</Router>
 	);
 };

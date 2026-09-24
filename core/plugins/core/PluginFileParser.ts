@@ -2,7 +2,8 @@ import type { PluginAssetFile, PluginConfig, PluginMetadata } from "@plugins/typ
 import assert from "assert";
 
 export const PLUGIN_FILE_NAMES = {
-	metadata: "_metadata.json",
+	metadata: "manifest.json",
+	legacyMetadata: "_metadata.json",
 	script: (pluginId: string) => `${pluginId}.js`,
 	locale: "locale.json",
 	assets: "assets",
@@ -75,6 +76,12 @@ export class PluginFileParser {
 			locale: PLUGIN_FILE_NAMES.locale,
 			assets: PLUGIN_FILE_NAMES.assets,
 		};
+	}
+
+	static getMetadataFileName(fileNames: Iterable<string>): string | undefined {
+		const names = new Set(fileNames);
+		if (names.has(PLUGIN_FILE_NAMES.metadata)) return PLUGIN_FILE_NAMES.metadata;
+		if (names.has(PLUGIN_FILE_NAMES.legacyMetadata)) return PLUGIN_FILE_NAMES.legacyMetadata;
 	}
 
 	static getStylePaths(metadata: Pick<PluginMetadata, "styles">): string[] {

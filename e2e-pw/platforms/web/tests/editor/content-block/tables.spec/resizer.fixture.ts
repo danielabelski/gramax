@@ -6,6 +6,8 @@ type TableCellPosition = { rowIndex: number; cellIndex: number };
 export interface ResizerFixture {
 	getCell: (cell: TableCellPosition) => Locator;
 	dragResizer: (deltaX: number, cell: TableCellPosition) => Promise<void>;
+	/** Column widths from the table's `<colgroup>`; `null` for a column that carries none. */
+	colWidths: () => Promise<(number | null)[]>;
 }
 
 export const resizerTest = editorTest.extend<ResizerFixture>({
@@ -14,6 +16,17 @@ export const resizerTest = editorTest.extend<ResizerFixture>({
 			sharedPage.getByTestId("table").locator("tbody tr").nth(rowIndex).locator("td").nth(cellIndex);
 
 		await use(getCell);
+	},
+
+	colWidths: async ({ editor }, use) => {
+		await use(async () => {
+			// The editor keeps the resize in memory until a save; without this the read still sees the
+			// document as it was before the drag.
+			await editor.forceSave();
+			const markdown = await editor.markdown();
+			const colgroup = markdown.match(/<colgroup>(.*?)<\/colgroup>/s)?.[1] ?? "";
+			return [...colgroup.matchAll(/<col(?:\s+width="(\d+)")?\s*\/>/g)].map((m) => (m[1] ? Number(m[1]) : null));
+		});
 	},
 
 	dragResizer: async ({ getCell }, use) => {

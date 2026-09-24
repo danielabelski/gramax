@@ -20,6 +20,14 @@ export class ActionExecutor {
 	clickElement(elementId: string): true {
 		const element = this.requireElement(elementId) as HTMLElement;
 		element.scrollIntoView?.({ block: "center", inline: "center" });
+
+		const anchor = element.closest?.("a[href]") as HTMLAnchorElement | null;
+		const href = anchor?.href;
+		if (anchor?.target === "_blank" && href && !href.startsWith("javascript:")) {
+			this._windowLike.location.href = href;
+			return true;
+		}
+
 		element.focus?.();
 		element.click?.();
 		return true;

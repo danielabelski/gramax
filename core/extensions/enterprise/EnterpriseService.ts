@@ -75,6 +75,14 @@ export interface EtagResult<T> {
 	notModified: boolean;
 }
 
+export interface LicenseInfo {
+	isValid: boolean;
+	editorCount?: number;
+	expirationDate?: string;
+	unlimitedEditors?: boolean;
+	occupiedEditors: number;
+}
+
 type ConfigTabMap = Omit<Settings, "searchMetrics">;
 
 const specialConfigNameMap: Partial<Record<keyof ConfigTabMap, string>> = {
@@ -114,6 +122,10 @@ class EnterpriseService {
 		return res.status !== 401 && res.status !== 403;
 	}
 
+	async getLicenseInfo(token: string): Promise<LicenseInfo> {
+		return this._fetchGet<LicenseInfo>("/enterprise/config/license/get", token);
+	}
+
 	async checkDataProviderHealth(): Promise<boolean> {
 		try {
 			const res = await fetch(`${this._url}/enterprise/data-provider-health`);
@@ -136,7 +148,8 @@ class EnterpriseService {
 		}
 	}
 
-	@trace({ level: Level.Commands })
+	// `token` is a bare parameter — the encoder sees a positional array and has no key name to mask by
+	@trace({ level: Level.Commands, omitArgs: true })
 	async markNotificationsAsRead(userEmail: string, notificationIds: number[], token: string): Promise<boolean> {
 		try {
 			const res = await fetch(`${this._url}/enterprise/notifications/mark-read`, {
@@ -160,7 +173,8 @@ class EnterpriseService {
 		}
 	}
 
-	@trace({ level: Level.Internal })
+	// `token` is a bare parameter — the encoder sees a positional array and has no key name to mask by
+	@trace({ level: Level.Internal, omitArgs: true })
 	async fetchNotificationHistory(
 		userEmail: string,
 		token: string,
@@ -191,7 +205,8 @@ class EnterpriseService {
 		}
 	}
 
-	@trace({ level: Level.Internal })
+	// `token` is a bare parameter — the encoder sees a positional array and has no key name to mask by
+	@trace({ level: Level.Internal, omitArgs: true })
 	async getResourceConfig(token: string, resourceId: string): Promise<ResourcesSettings | null> {
 		if (!this._url || !token) return null;
 		try {

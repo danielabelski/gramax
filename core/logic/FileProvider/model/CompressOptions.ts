@@ -19,18 +19,18 @@ type OptionsFor<T extends CompressTarget> = Omit<ImageOptions & { target: T }, "
 export const COMPRESS_FORMATS: readonly CompressTarget[] = ["png", "jpeg", "webp"];
 
 const PNG_DEFAULTS: OptionsFor<"png"> = { compressionLevel: 6 };
-const LOSSY_DEFAULTS: OptionsFor<"jpeg"> = { quality: 80, effort: 4 };
+const LOSSY_DEFAULTS: OptionsFor<"jpeg"> = { quality: 75, effort: 4 };
 
 export const defaultOptionsForTarget = (target: CompressTarget): OptionsFor<CompressTarget> => {
 	if (target === "png") return { ...PNG_DEFAULTS };
 	return { ...LOSSY_DEFAULTS };
 };
 
-const OPTIMAL_TARGET: CompressTarget = "jpeg";
+const OPTIMAL_TARGET: CompressTarget = "webp";
 
 /**
  * Rules used when the compression toggle is on but the per-format editor is
- * unavailable: every supported source format is re-encoded to JPEG with the
+ * unavailable: every supported source format is re-encoded to WebP with the
  * standard lossy options.
  */
 export const optimalCompressRules = (): CompressRule[] =>

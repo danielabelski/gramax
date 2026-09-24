@@ -1,5 +1,23 @@
 ################ TEMPLATES ################
 
+# Where the e2e suites get their catalogs. Nothing here is secret; `GX_E2E_GIT_TOKEN` is provided
+# separately as a masked project- or group-level CI variable with `api` and `write_repository` scopes.
+# `gx/test` holds the read-only fixture catalogs, `gx/test/temp` receives the throwaway repos a run
+# creates; everything under it named `e2e-$GX_E2E_RUN_ID-*` is deleted by the Playwright teardown.
+#
+# The GX_E2E_GIT_ prefix is deliberately different from the older GX_E2E_GITLAB_ one: project-level
+# CI variables outrank `variables:` declared here, so reusing the old names would silently keep the
+# suites pointed at the external gitlab.com fixtures until someone deletes those settings.
+.e2e-gitlab-env: &e2e-gitlab-env
+  GX_E2E_GIT_HOST: gitlab.ics-it.ru
+  GX_E2E_GIT_GROUP: gx/test
+  GX_E2E_GIT_TEMP_GROUP: gx/test/temp
+  GX_E2E_GIT_TEST_REPO: catalog
+  GX_E2E_GIT_TEST_REPO_NO_INDEX: no-index-catalog
+  # Per job, not per pipeline: the Playwright teardown deletes by this prefix, and the e2e jobs
+  # run in parallel — a shared id lets a job that finishes early delete another one's live repos.
+  GX_E2E_RUN_ID: $CI_PIPELINE_ID-$CI_JOB_ID
+
 .template.e2e-pw:
   stage: test
   interruptible: true
@@ -20,12 +38,30 @@
     - changes:
         - e2e-pw/**/*
   variables:
+    <<: *e2e-gitlab-env
     PRODUCTION: 'false'
-    GX_E2E_GITLAB_PUSH_REPO: test-push-$CI_COMMIT_SHORT_SHA
     KUBERNETES_MEMORY_REQUEST: '2Gi'
-    KUBERNETES_CPU_REQUEST: '1'
-    KUBERNETES_CPU_LIMIT: '5'
+    # Two workers and two cores, requested and capped at the same number, because the request is what
+    # the scheduler believes and the limit is what the suite actually runs at. Asking for one while
+    # running four browsers put two suites on the same node, and each ran about twice as slow as it
+    # does alone — every wall-clock threshold in Playwright then fires on someone else's load.
+    #
+    # Matching the two closes what raising the request alone left open. A ceiling of five let a suite
+    # that started on an empty node run at more than twice the speed of the same suite on a full one:
+    # web-e2e-pw took 16 minutes in pipeline 597120 and 35 in 597201, both green, and the four reds
+    # in between sit inside that spread rather than above it. A threshold cannot be set against a
+    # machine that fast one hour and that slow the next, and the reds it produces name a different
+    # test every time (join-lists, heading, delete column, move-nodes across 597107-597192), which is
+    # what a starved render looks like rather than a broken suite.
+    #
+    # The trade is stated plainly: the fast runs go away with the slow ones. A suite settles near the
+    # long end of what it used to span, and pays that every time, in exchange for a number that means
+    # something — the red runs cost a full rerun anyway.
+    KUBERNETES_CPU_REQUEST: '2'
+    KUBERNETES_CPU_LIMIT: '2'
+    PLAYWRIGHT_WORKERS: '2'
     CARGO_HOME: '$CI_PROJECT_DIR/.cargo'
+  cache: !reference [.cargo-cache, cache]
   artifacts:
     when: on_failure
     expire_in: '2 days'
@@ -39,7 +75,6 @@
       npm rebuild canvas --build-from-source
       node -e "require('canvas').createCanvas(1, 1).getContext('2d')"
       node -e "const Database = require('better-sqlite3'); const db = new Database(':memory:'); db.close();"
-    - ./.ci/e2e/repo-info.sh
 
 .template.enterprise:
   variables:
@@ -83,6 +118,7 @@
     KUBERNETES_MEMORY_REQUEST: '1Gi'
     KUBERNETES_CPU_REQUEST: '1'
     KUBERNETES_CPU_LIMIT: '5'
+  cache: !reference [.cargo-cache, cache]
   before_script:
     - !reference [.template.github-ssh-key, before_script]
     - |
@@ -111,6 +147,33 @@
 
 ################### JOBS ###################
 
+plugins:
+  stage: test
+  interruptible: true
+  image: gitlab.ics-it.ru:4567/ics/doc-reader/playwright:$USE_IMAGE_TAG
+  tags:
+    - kubernetes01-gramax-5ghz
+  rules:
+    - !reference [.rules, default-pipeline-guards]
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH =~ /^(develop|release\/.*)$/'
+      changes:
+        - plugins/**/*
+        - package.json
+        - bun.lock
+        - .ci/tests.yml
+        - .ci/build.yml
+  before_script:
+    - !reference [.template.github-ssh-key, before_script]
+    - HTTPS_PROXY=$RUNNER_HTTPS_PROXY ./install-deps.sh --ci --node
+  script:
+    - bun run --cwd plugins/sdk build
+    - bun run --cwd plugins/sdk test:types
+    - bun run --cwd plugins/sdk test:release
+    - |
+      for plugin in plugins/examples/*; do
+        bun run --cwd "$plugin" build
+      done
+
 tests-rust:
   stage: test
   interruptible: true
@@ -121,8 +184,13 @@ tests-rust:
     - !reference [.rules, tests, rust]
   script:
     - ./gx make-icons
-    - cargo test --all-targets -p spa --tests --manifest-path ./Cargo.toml
-    - cargo test --all-targets -p gramax-git --tests --manifest-path ./Cargo.toml
+    # `default-members` — gramax-git, gramax-fs, gramax-core, test-utils — instead of a per-crate
+    # `-p` list. A crate added to `members` only is still not covered; today that includes `gramax`
+    # itself, so `tests/print_to_pdf.rs` (apps/tauri/src-tauri) needs a manual `cargo test -p gramax`
+    # run — see the comment on `macos_print_test_support`. `spa` is not a default member and stays its
+    # own line.
+    - cargo test --all-targets --tests --manifest-path ./Cargo.toml
+    - cargo test --all-targets --tests -p spa --manifest-path ./Cargo.toml
 
 biome:
   stage: test
@@ -135,7 +203,6 @@ biome:
     KUBERNETES_MEMORY_REQUEST: '512Mi'
     KUBERNETES_CPU_REQUEST: '0.2'
     KUBERNETES_CPU_LIMIT: '3'
-    CI_JOB_MAX_DURATION: '300'
   rules:
     - if: '$CI_COMMIT_TITLE =~ /!?\[?(skip|no)[ -]biome\]?/i'
       when: never
@@ -184,20 +251,33 @@ trivy:
 tests:
   extends: .template.tests-enterprise
   variables:
-    CI_JOB_MAX_DURATION: '900'
+    KUBERNETES_CPU_REQUEST: '1'
+    KUBERNETES_CPU_LIMIT: '5'
+    KUBERNETES_MEMORY_REQUEST: '4Gi'
   script:
     - bun run tsc --incremental false
     - bun run test:unit
     - bun run test:int
+    # - bun run test:db Commented because @testcontainers/postgresql lib to run test db need NodeJS >= 22.19.0. Now CI use NodeJS 20
     # - bun run test:ges
 
 web-e2e-pw:
   extends: .template.e2e-pw
+  # Runs the stash suite alongside the rest: what it watches is a user's unpublished work, and those
+  # failures are the ones nobody notices until the change is already gone. It drives a real
+  # repository, hence the larger budget.
+  variables:
+    CI_JOB_MAX_DURATION: '3600'
+    KUBERNETES_MEMORY_REQUEST: '4Gi'
   script:
     - |
       nice -n 15 ionice -c 3 bun run --cwd e2e-pw web:build
       bun run --cwd e2e-pw web:start &
     - nice -n -15 bun run --cwd e2e-pw web:ci
+  # What the measured commands actually cost this time, in the log even when the suite went red — a
+  # budget nobody can read the numbers behind is a number nobody can raise on purpose.
+  after_script:
+    - bun run --cwd e2e-pw timings || true
 
 # web-e2e-pw-enterprise:
 #   extends: .template.e2e-pw-enterprise
@@ -212,25 +292,19 @@ web-e2e-pw:
 
 static-e2e-pw:
   extends: .template.e2e-pw
-  tags:
-    - kubernetes01-gramax
   variables:
-    CI_JOB_MAX_DURATION: '900'
     PORT: 6002
   script:
     - rm -rf services && cd apps/cli
-    - . "$CI_PROJECT_DIR/.ci/scripts/retry.sh" && retry 3 2 -- git clone https://git:$GX_E2E_GITLAB_TOKEN@$GX_E2E_GITLAB_URL/$GX_E2E_GITLAB_GROUP/$GX_E2E_GITLAB_TEST_REPO.git
+    - . "$CI_PROJECT_DIR/.ci/scripts/retry.sh" && retry 3 2 -- git clone https://git:$GX_E2E_GIT_TOKEN@$GX_E2E_GIT_HOST/$GX_E2E_GIT_GROUP/$GX_E2E_GIT_TEST_REPO.git
     - nice -n 20 ionice -c 3 bun run build
-    - nice -n 20 ionice -c 3 bun run dist/index.js build -s "$GX_E2E_GITLAB_TEST_REPO" --skip-check
-    # - npx http-server build &
-    # - nice -n -15 ionice -c 2 -n 3 npm --prefix e2e run test:static
+    - nice -n 20 ionice -c 3 bun run dist/index.js build -s "$GX_E2E_GIT_TEST_REPO" --skip-check
     - n use 20
-    - nice -n 20 ionice -c 2 -n 3 npx ./dist build -s "$GX_E2E_GITLAB_TEST_REPO" --skip-check
+    - nice -n 20 ionice -c 2 -n 3 npx ./dist build -s "$GX_E2E_GIT_TEST_REPO" --skip-check
 
 next-e2e-pw:
   extends: .template.e2e-pw
   variables:
-    CI_JOB_MAX_DURATION: '2000'
     PORT: 6003
     ADMIN_PASSWORD: 1
     ADMIN_LOGIN: 1
@@ -254,6 +328,59 @@ docportal-e2e-pw:
     - bun run --cwd e2e-pw docportal:start &
     - until curl -s --max-time 5 -o /dev/null http://127.0.0.1:6004/ 2>/dev/null; do sleep 1; done
     - nice -n -15 ionice -c 2 bun run --cwd e2e-pw docportal:ci
+
+web-e2e-pw-timings:
+  extends: .template.e2e-pw
+  # Never on its own, and nowhere but a merge request. The measuring cases cost far more than a
+  # pipeline should spend unasked, so they wait for someone to press this — which is also when their
+  # numbers are worth anything, since they are read against the change under review.
+  rules:
+    - !reference [.rules, default-pipeline-guards]
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true
+    - when: never
+  variables:
+    <<: *e2e-gitlab-env
+    CI_JOB_MAX_DURATION: '3600'
+    KUBERNETES_MEMORY_REQUEST: '4Gi'
+    # The catalog the measured commands run against: a snapshot of the real board, 3446 files, kept
+    # read-only and forked per run. Same data every time, which is what makes a budget mean anything.
+    # Set here and nowhere else: `command-measure` judges its budgets only against this fixture, and
+    # this is the one job quiet enough for a wall-clock budget to mean what it says.
+    GX_E2E_CMD_FIXTURE: gx/test/perf-board
+  artifacts:
+    # Unlike the gating suites this one is run for its numbers, so the timings come back either way.
+    when: always
+    expire_in: '7 days'
+    paths:
+      - e2e-pw/report
+      - e2e-pw/timings
+  script:
+    - |
+      nice -n 15 ionice -c 3 bun run --cwd e2e-pw web:build
+      bun run --cwd e2e-pw web:start &
+    - nice -n -15 bun run --cwd e2e-pw web:timings:ci
+  # In the log even when the suite went red: a case that failed still took the time it took, and
+  # that number is half of why this job exists.
+  after_script:
+    - bun run --cwd e2e-pw timings || true
+
+e2e-temp-cleanup:
+  stage: test
+  # Not interruptible: a half-cancelled cleanup leaves the group in the state it was meant to fix.
+  tags:
+    - kubernetes01-gramax
+  image: gitlab.ics-it.ru:4567/ics/doc-reader/base-image:$USE_IMAGE_TAG
+  # Scheduled runs only, and only the schedule that sets E2E_CLEANUP — without that variable every
+  # schedule would drag the whole pipeline along.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $E2E_CLEANUP == "true"
+  variables:
+    <<: *e2e-gitlab-env
+    GIT_DEPTH: 1
+  script:
+    - ./.ci/e2e/delete-repos.ts
 
 scan-containers:
   extends: container_scanning

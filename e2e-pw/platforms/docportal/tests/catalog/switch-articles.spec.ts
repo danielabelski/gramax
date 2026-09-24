@@ -1,11 +1,17 @@
 import { baseTest as test } from "@docportal/fixtures/base.fixture";
 import { expect } from "@playwright/test";
+import { getTestRepoInfoFromEnv } from "@utils/source";
 
-test.use({ source: "env", user: "env" });
+// isolated: false sends the worker-shared page back to startUrl before each test; each test starts from
+// the home page catalog card.
+test.use({ source: "env", user: "env", isolated: false });
+
+// The catalog folder takes its name from the cloned repository, so both come from the env.
+const repo = getTestRepoInfoFromEnv();
 
 const catalogs = [
-	{ name: "test-catalog", humanName: "Автотест", anchor: "Catalog" },
-	{ name: "test-catalog-no-index", humanName: "No Index", anchor: "Article H1" },
+	{ name: repo.testRepo, humanName: "Автотест", anchor: "Catalog" },
+	{ name: repo.testRepoNoIndex, humanName: "No Index", anchor: "Article H1" },
 ] as const;
 
 test.describe("switch articles", () => {

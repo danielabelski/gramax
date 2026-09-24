@@ -1,9 +1,6 @@
 import type { IconCode } from "@components/Atoms/Icon/LucideIcon";
 import ModalToOpenService from "@core-ui/ContextServices/ModalToOpenService/ModalToOpenService";
 import ModalToOpen from "@core-ui/ContextServices/ModalToOpenService/model/ModalsToOpen";
-import { cn } from "@core-ui/utils/cn";
-// biome-ignore lint/style/noRestrictedImports: idc
-import styled from "@emotion/styled";
 import t from "@ext/localization/locale/translate";
 import type { PropertyEditorProps } from "@ext/properties/components/Modals/PropertyEditor";
 import PropertyServiceProvider from "@ext/properties/components/PropertyService";
@@ -42,13 +39,6 @@ interface PropertyMenuGroupProps {
 	editor?: Editor;
 	isTemplate?: boolean;
 }
-
-const StyledDropdownMenuContent = styled(DropdownMenuSubContent)`
-	width: min(90dvw, 12rem);
-	max-height: min(45dvh, 20rem);
-	overflow-y: auto;
-	box-shadow: none;
-`;
 
 const Button = (props: ButtonProps) => {
 	const {
@@ -97,8 +87,8 @@ const Button = (props: ButtonProps) => {
 				<Icon icon={buttonIcon} />
 				{t("editor.property")}
 			</DropdownMenuSubTrigger>
-			<StyledDropdownMenuContent
-				className={cn("rounded-lg lg:shadow-hard-base")}
+			<DropdownMenuSubContent
+				className="w-[min(90dvw,12rem)] max-h-[min(45dvh,20rem)] overflow-y-auto"
 				onKeyDown={handleContentKeyDown}
 				ref={contentRef}
 				sideOffset={8}
@@ -144,7 +134,7 @@ const Button = (props: ButtonProps) => {
 						{t("properties.add")}
 					</DropdownMenuItem>
 				</div>
-			</StyledDropdownMenuContent>
+			</DropdownMenuSubContent>
 		</DropdownMenuSub>
 	);
 };

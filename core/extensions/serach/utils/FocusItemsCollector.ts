@@ -34,8 +34,11 @@ export class FocusItemsCollector {
 		return newIndex;
 	}
 
-	addLinkItem(item: { id: SearchItemRowId; url: Url; openSideEffect: LinkOpenSideEffectOptions }) {
-		this.addItem(createLinkFocusItem(item));
+	addLinkItem(
+		item: { id: SearchItemRowId; url: Url; openSideEffect: LinkOpenSideEffectOptions },
+		onClick: () => void,
+	) {
+		this.addItem(createLinkFocusItem(item, onClick));
 	}
 
 	addItem(item: CollectableFocusItem) {
@@ -44,22 +47,27 @@ export class FocusItemsCollector {
 	}
 }
 
-export function createLinkFocusItem(item: {
-	id: SearchItemRowId;
-	url: Url;
-	openSideEffect: LinkOpenSideEffectOptions;
-}): LinkFocusItem {
+export function createLinkFocusItem(
+	item: {
+		id: SearchItemRowId;
+		url: Url;
+		openSideEffect: LinkOpenSideEffectOptions;
+	},
+	onClick: () => void,
+): LinkFocusItem {
 	return {
 		type: "link",
 		id: item.id,
 		url: item.url,
 		pathname: item.openSideEffect.params.pathname,
 		fragmentInfo: item.openSideEffect.params.fragmentInfo,
+		onClick,
 	};
 }
 
 export interface FocusItemBase {
 	id: SearchItemRowId;
+	onClick: () => void;
 }
 
 export interface LinkFocusItem extends FocusItemBase {
@@ -72,7 +80,6 @@ export interface LinkFocusItem extends FocusItemBase {
 export interface ExpanderFocusItem extends FocusItemBase {
 	type: "expander";
 	count: number;
-	expand: () => void;
 }
 
 export interface TempFocusItem extends FocusItemBase {

@@ -28,6 +28,7 @@ class LinkHoverTooltip extends TooltipBase {
 	) {
 		const props = {
 			isOpen: false,
+			container: parentElement,
 			apiUrlCreator,
 			pageDataContext,
 			closeHandler: () => this.closeComponent(),
@@ -108,7 +109,7 @@ class LinkHoverTooltip extends TooltipBase {
 	}
 
 	deleteObserver(element: HTMLElement) {
-		if (element && element.removeEventListener) {
+		if (element?.removeEventListener) {
 			element.removeEventListener("mouseleave", this._mouseLeave.bind(this));
 		}
 	}

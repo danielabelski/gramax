@@ -1,6 +1,7 @@
 import { usePlatform } from "@core-ui/hooks/usePlatform";
 import { SectionContainer } from "@ext/catalog/actions/propsEditor/components/Sections/SectionContainer";
 import t from "@ext/localization/locale/translate";
+import SectionHeader from "@ext/settings/components/SectionHeader";
 import SettingField from "@ext/settings/components/SettingField";
 import { AppSettings } from "@ext/settings/levels/app-settings";
 import { getSchemaEntry } from "@ext/settings/logic/schemaUtils";
@@ -17,8 +18,6 @@ export const SERVICE_FIELDS = [
 	{ key: "git-proxy", placeholder: "https://develop.gram.ax/git-proxy" },
 ] as const;
 
-const labelClass = "w-72 max-w-full";
-
 const ServicesSection = ({
 	prefix = "services",
 	showReset = false,
@@ -32,7 +31,14 @@ const ServicesSection = ({
 	const target = ENVIRONMENT_TARGET[environment] ?? Target.all;
 
 	return (
-		<SectionContainer>
+		<SectionContainer
+			header={
+				<SectionHeader
+					description={t("app-settings.sections.services.description")}
+					title={t("app-settings.sections.services.title")}
+				/>
+			}
+		>
 			{SERVICE_FIELDS.filter(({ key }) => {
 				const entry = getSchemaEntry(AppSettings, `services.${key}.endpoint`);
 				return entry ? (entry.target & target) !== 0 : true;
@@ -49,8 +55,6 @@ const ServicesSection = ({
 					)}
 					description={t(`app-settings.services.${key}.description` as Parameters<typeof t>[0])}
 					key={key}
-					labelClassName={labelClass}
-					layout="vertical"
 					name={`${prefix}.${key}.endpoint`}
 					settingKey={`services.${key}.endpoint`}
 					title={t(`app-settings.services.${key}.title` as Parameters<typeof t>[0])}

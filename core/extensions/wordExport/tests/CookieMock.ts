@@ -1,6 +1,7 @@
 import Cookie from "@ext/cookie/Cookie";
 
 class CookieMock extends Cookie {
+	// biome-ignore lint/style/useNamingConvention: out of scope
 	private cookies: { [key: string]: string } = {};
 
 	constructor(secret: string) {

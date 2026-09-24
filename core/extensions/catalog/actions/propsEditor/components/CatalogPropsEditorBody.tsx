@@ -4,7 +4,7 @@ import { FORM_STYLES } from "@ext/catalog/actions/propsEditor/consts/form";
 import { useCatalogPropsEditorActions } from "@ext/catalog/actions/propsEditor/logic/useCatalogPropsEditorActions";
 import { useOpenExternalGitSourceButton } from "@ext/catalog/actions/propsEditor/logic/useOpenExternalGitSourceButton";
 import t from "@ext/localization/locale/translate";
-import { useRegisterSettingsSave, useReportSettingsDirty } from "@ext/settings/components/SettingsDirtyContext";
+import { useReportSettingsDirty } from "@ext/settings/components/SettingsDirtyContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@ui-kit/Button";
 import { Form, FormFooter } from "@ui-kit/Form";
@@ -29,7 +29,8 @@ const CatalogPropsEditorBody = ({
 	startUpdatingProps,
 }: CatalogPropsEditorBodyProps) => {
 	const [isFormLoading, setIsFormLoading] = useState(true);
-	const { allCatalogNames, getOriginalProps, onSubmit, isLoading } = useCatalogPropsEditorActions(onClose);
+	const { allCatalogNames, getOriginalProps, onSubmit, isLoading, onToggleAutoLfs, autoLfsChecking, lfsKnown } =
+		useCatalogPropsEditorActions(onClose);
 	const { gitButtonProps } = useOpenExternalGitSourceButton(useCallback(() => onClose?.(), [onClose]));
 
 	const formSchema = useMemo(
@@ -62,9 +63,6 @@ const CatalogPropsEditorBody = ({
 		onSubmitParent?.(await getOriginalProps());
 	}, [startUpdatingProps, form, onSubmit, onSubmitParent, getOriginalProps]);
 
-	// The unsaved-changes guard's "Save and close" submits this form.
-	useRegisterSettingsSave(submitForm);
-
 	const formSubmit = useCallback(
 		(e: React.FormEvent) => {
 			e.preventDefault();
@@ -78,7 +76,14 @@ const CatalogPropsEditorBody = ({
 			<div className="flex flex-col h-full min-h-0">
 				<Form asChild {...form}>
 					<form className="flex flex-col h-full min-h-0" onSubmit={formSubmit}>
-						<SectionComponent activeTab={activeTab} form={form} formProps={formProps} />
+						<SectionComponent
+							activeTab={activeTab}
+							autoLfsChecking={autoLfsChecking}
+							form={form}
+							formProps={formProps}
+							lfsKnown={lfsKnown}
+							onToggleAutoLfs={onToggleAutoLfs(form)}
+						/>
 						<FormFooter
 							className="flex-shrink-0"
 							primaryButton={

@@ -18,9 +18,12 @@ export default class PublishHealthcheckMiddleware extends Middleware {
 		const catalog = await workspace.getContextlessCatalog(catalogName);
 		if (!catalog) return this._next.Process(req, res);
 
-		const ctx = await buildContext(this._app, req, res);
 		const workspaceConfig = await workspace.config();
-		const healthcheck = await checkPublishHealth(this._app, ctx, catalog, getWorkspaceGesUrl(workspaceConfig));
+		const gesUrl = getWorkspaceGesUrl(workspaceConfig);
+		if (!gesUrl) return this._next.Process(req, res);
+
+		const ctx = await buildContext(this._app, req, res);
+		const healthcheck = await checkPublishHealth(this._app, ctx, catalog, gesUrl);
 
 		if (healthcheck.code === PublishHealthcheckCode.PermissionsUnavailable) {
 			throw new DefaultError(t("git.publish.error.permissions-unavailable"));

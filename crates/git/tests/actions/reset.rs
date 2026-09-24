@@ -119,3 +119,34 @@ fn restore_discards_executable_bit(sandbox: TempDir, #[with(&sandbox)] repo: Rep
 
 	Ok(())
 }
+
+/// A hard reset restores what git tracks and leaves alone what it does not.
+///
+/// Every caller of this is recovering from a failure — a pull that did not go through, a conflict
+/// the user aborted — and none of them is asking for the working copy to be cleaned out. Since the
+/// stash is built from the index, an untracked file is not in it either: removing it here would be
+/// the one remaining way for work to disappear with nobody told.
+#[rstest]
+fn hard_reset_keeps_untracked_and_ignored(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
+	let path = sandbox.path();
+
+	fs::write(path.join(".gitignore"), "ignored\n")?;
+	fs::write(path.join("tracked"), "committed")?;
+	repo.add_all()?;
+	let (commit, _) = repo.commit_debug()?;
+
+	fs::write(path.join("tracked"), "edited after the commit")?;
+	fs::write(path.join("untracked"), "never staged")?;
+	fs::write(path.join("ignored"), "ignored by .gitignore")?;
+
+	repo.reset(ResetOptions {
+		mode: ResetMode::Hard,
+		head: Some(OidInfo(commit.to_string())),
+	})?;
+
+	assert_eq!(fs::read_to_string(path.join("tracked"))?, "committed");
+	assert_eq!(fs::read_to_string(path.join("untracked"))?, "never staged");
+	assert_eq!(fs::read_to_string(path.join("ignored"))?, "ignored by .gitignore");
+
+	Ok(())
+}

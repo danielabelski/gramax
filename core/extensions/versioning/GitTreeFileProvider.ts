@@ -49,7 +49,7 @@ export default class GitTreeFileProvider implements ReadOnlyFileProvider {
 		return (await fs.readFile(unscoped.value)).toString();
 	}
 
-	@trace({ level: Level.Full })
+	@trace({ level: Level.Full, omitResult: true })
 	async readAsBinary(path: Path): Promise<Buffer> {
 		const [unscoped, fs] = this._fs(path);
 		try {

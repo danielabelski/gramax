@@ -3,13 +3,13 @@ import type Context from "@core/Context/Context";
 import Path from "@core/FileProvider/Path/Path";
 import CustomLogoDriver from "@core/utils/CustomLogoDriver";
 import EnterpriseApi from "@ext/enterprise/EnterpriseApi";
+import EnterpriseClientAuthManager from "@ext/enterprise/EnterpriseClientAuthManager";
 import EnterpriseUser from "@ext/enterprise/EnterpriseUser";
 import { EnterpriseErrorCode } from "@ext/enterprise/errors/getEnterpriseErrors";
 import type UserSettings from "@ext/enterprise/types/UserSettings";
 import type { ExportTemplate } from "@ext/enterprise/types/UserSettings";
 import DefaultError from "@ext/errorHandlers/logic/DefaultError";
 import t from "@ext/localization/locale/translate";
-import ClientAuthManager from "@ext/security/logic/ClientAuthManager";
 import Permission from "@ext/security/logic/Permission/Permission";
 import StrictPermissionMap from "@ext/security/logic/PermissionMap/StrictPermissionMap";
 import type UserInfo from "@ext/security/logic/User/UserInfo";
@@ -28,7 +28,8 @@ const addWorkspace: Command<{ ctx: Context; oneTimeCode: string }, UserSettings>
 	kind: ResponseKind.json,
 
 	async do({ ctx, oneTimeCode }) {
-		const { wm, em, am } = this._app;
+		const { wm, em, amp } = this._app;
+		const am = amp.current();
 		const enterpriseConfig = em.getConfig();
 		const gesUrl = enterpriseConfig.gesUrl;
 		if (!gesUrl) throw new DefaultError(t("enterprise.config-error"));
@@ -60,6 +61,7 @@ const addWorkspace: Command<{ ctx: Context; oneTimeCode: string }, UserSettings>
 			id: enterpriseWorkspace.id,
 			name: enterpriseWorkspace.name,
 			icon: enterpriseWorkspace.icon,
+			layout: enterpriseWorkspace.layout,
 			sections: enterpriseWorkspace.sections,
 			services: enterpriseWorkspace.services,
 			enterprise: {
@@ -91,7 +93,7 @@ const addWorkspace: Command<{ ctx: Context; oneTimeCode: string }, UserSettings>
 			sourceData.token,
 		);
 		am.setUser(ctx.cookie, user);
-		if (am instanceof ClientAuthManager) {
+		if (am instanceof EnterpriseClientAuthManager) {
 			await am.forceUpdateEnterpriseUser(ctx.cookie, user);
 		}
 

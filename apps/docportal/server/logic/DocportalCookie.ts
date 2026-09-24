@@ -1,4 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: expected */
+/** biome-ignore-all lint/style/useNamingConvention: out of scope */
 import Cookie from "@ext/cookie/Cookie";
 import { parseCookies, setCookie } from "nookies";
 import type DocportalApiRequest from "./DocportalApiRequest";

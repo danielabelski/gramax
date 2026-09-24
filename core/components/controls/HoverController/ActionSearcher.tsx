@@ -1,5 +1,6 @@
 import Tooltip from "@components/Atoms/Tooltip";
 import ListLayout from "@components/List/ListLayout";
+// biome-ignore lint/style/noRestrictedImports: pre-existing @emotion/styled import; the Tailwind migration is not this change's scope
 import styled from "@emotion/styled";
 
 interface ActionSearcherProps {
@@ -19,7 +20,7 @@ const ActionSearcher = (props: ActionSearcherProps) => {
 	};
 
 	return (
-		<Tooltip content={tooltipText} customStyle delay={[500, 0]}>
+		<Tooltip content={tooltipText} customStyle>
 			<div className={className}>
 				<ListLayout
 					appendTo={() => document.body}

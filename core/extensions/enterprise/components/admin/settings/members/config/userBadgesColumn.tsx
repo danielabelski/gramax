@@ -1,9 +1,9 @@
 import { WorkspaceOwnerBadge } from "@ext/enterprise/components/admin/settings/members/components/WorkspaceOwnerBadge";
 import t from "@ext/localization/locale/translate";
-import { Badge } from "@ui-kit/Badge";
 import type { ColumnDef } from "@ui-kit/DataTable";
-
-export const userBadgesColumnId = "userBadges";
+import { GesCommonUserBadge } from "../../../../../../enterpriseCommon/components/roleBadges/GesCommonUserBadge";
+import { userBadgesColumnId } from "../../../../../../enterpriseCommon/components/roleBadges/UserBadgesConfig";
+import { UserBadgesWrapper } from "../../../../../../enterpriseCommon/components/roleBadges/UserBadgesWrapper";
 
 export interface UserBadgesColumnOptions<T> {
 	header?: string;
@@ -22,9 +22,9 @@ export const userBadgesColumn = <T,>({
 		const item = row.original;
 
 		return (
-			<div className="flex items-center gap-1.5 whitespace-nowrap">
+			<UserBadgesWrapper>
 				{<UserBadges isEditor={isEditor?.(item)} isWorkspaceOwner={isWorkspaceOwner?.(item)} />}
-			</div>
+			</UserBadgesWrapper>
 		);
 	},
 });
@@ -36,11 +36,7 @@ interface MemberBadgesProps {
 
 const UserBadges = ({ isEditor, isWorkspaceOwner }: MemberBadgesProps) => (
 	<>
-		{isEditor && (
-			<Badge focus="low" size="sm">
-				{t("enterprise.admin.users.editor")}
-			</Badge>
-		)}
+		{isEditor && <GesCommonUserBadge label={t("enterprise.admin.users.editor")} />}
 		{isWorkspaceOwner && <WorkspaceOwnerBadge />}
 	</>
 );

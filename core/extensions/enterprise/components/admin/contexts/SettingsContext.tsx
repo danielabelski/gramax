@@ -13,6 +13,7 @@ import type {
 	SearchQueryDetailsResponse,
 	TableDataResponse,
 } from "@ext/enterprise/components/admin/settings/metrics/types";
+import { filterOutBuiltInPlugins } from "@ext/enterprise/components/admin/settings/plugins/filterOutBuiltInPlugins";
 import type { QuizTableFilters } from "@ext/enterprise/components/admin/settings/quiz/components/QuizTableControls";
 import type {
 	QuizTest,
@@ -26,7 +27,7 @@ import type {
 	RequestData,
 } from "@ext/enterprise/components/admin/ui-kit/table/LazyInfinityTable/LazyInfinityTable";
 import type EnterpriseService from "@ext/enterprise/EnterpriseService";
-import type { searchGroupInfo, searchUserInfo } from "@ext/enterprise/EnterpriseService";
+import type { LicenseInfo, searchGroupInfo, searchUserInfo } from "@ext/enterprise/EnterpriseService";
 import { type GesErrorCode, toGesErrorCode } from "@ext/enterprise/errors/GesError";
 import { type LoadableTab, type Settings, type TabKey, tabKeys } from "@ext/enterprise/types/EnterpriseAdmin";
 import type { Page } from "@ext/enterprise/types/Page";
@@ -160,6 +161,7 @@ export type SettingsContextType = {
 		limit?: number,
 		catalogFilter?: string[],
 	) => Promise<ArticleRatingsResponse | null>;
+	getLicenseInfo: () => Promise<LicenseInfo>;
 	isInitialLoading: (tab: TabKey) => boolean;
 	isRefreshing: (tab: TabKey) => boolean;
 	getTabError: (tab: TabKey) => GesErrorCode | null;
@@ -334,6 +336,8 @@ export function SettingsProvider({ children, enterpriseService, token }: Setting
 		[enterpriseService, token],
 	);
 
+	const getLicenseInfo = useCallback(() => enterpriseService.getLicenseInfo(token), [enterpriseService, token]);
+
 	const settingsWithBuiltInModules = useMemo((): SettingsState => {
 		const modulePlugins: PluginConfig[] = BUILT_IN_PLUGIN_DEFINITIONS.map((def) => {
 			const currentSettings = def.getSettings(settings);
@@ -354,7 +358,7 @@ export function SettingsProvider({ children, enterpriseService, token }: Setting
 				script: "",
 			};
 		});
-		const customPlugins = settings?.plugins?.plugins ?? [];
+		const customPlugins = filterOutBuiltInPlugins(settings?.plugins?.plugins ?? []);
 
 		return {
 			...settings,
@@ -397,6 +401,7 @@ export function SettingsProvider({ children, enterpriseService, token }: Setting
 				getSearchTableData,
 				getSearchQueryDetails,
 				getArticleRatings,
+				getLicenseInfo,
 				getMetricsUsers,
 				getMetricsCatalogs,
 				getSearchMetricsCatalogs,

@@ -4,8 +4,19 @@ import { type AliasEntry, aliasPathOf, normalizeAliasPath } from "./AliasIndex";
 export type { AliasEntry };
 export { aliasPathOf };
 
+// The single `moved` format the alias index accepts: UTC ISO-8601, whole seconds.
+// Anything the frontmatter or a client round trip hands us — a Date from an unquoted YAML
+// timestamp, an ISO string with milliseconds — is folded into it; garbage becomes undefined
+// so the caller writes no `moved` at all rather than a value the index reports as broken.
+export const canonicalMoved = (raw: unknown): string | undefined => {
+	if (raw === undefined || raw === null || raw === "") return undefined;
+	const date = raw instanceof Date ? raw : new Date(String(raw));
+	if (Number.isNaN(date.getTime())) return undefined;
+	return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+};
+
 export const nowMoved = (): string => {
-	return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+	return canonicalMoved(new Date());
 };
 
 export const isManualAlias = (entry: AliasEntry): boolean => {

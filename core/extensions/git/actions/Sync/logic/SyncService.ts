@@ -38,7 +38,21 @@ export default class SyncService {
 			return;
 		}
 
-		await SyncService._onFinish(data.syncData, apiUrlCreator, overrideResolve);
+		// Every listener that takes a "start" pairs it with "finish" or "error", so a sync that ends
+		// in neither leaks whatever that listener holds (spinner, busy flag, pending promise).
+		// _onFinish touches the editor and the page data, so a throw here is not hypothetical.
+		// Not rethrown: callers already treat a failed sync as a normal outcome (see the !resOk
+		// branch above) and some don't await sync() at all — traced() records the exception.
+		try {
+			await traced("sync-on-finish", () => SyncService._onFinish(data.syncData, apiUrlCreator, overrideResolve));
+		} catch (e) {
+			await SyncService.events.emit("error", {
+				error: e instanceof DefaultError ? e : new DefaultError(e?.message ?? String(e), e),
+				apiUrlCreator,
+			});
+			return;
+		}
+
 		await SyncService.events.emit("finish", { syncData: data.syncData });
 	}
 

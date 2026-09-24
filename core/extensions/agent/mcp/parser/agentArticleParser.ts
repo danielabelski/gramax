@@ -6,12 +6,13 @@ import type ContextualCatalog from "@core/FileStructue/Catalog/ContextualCatalog
 import type { Category } from "@core/FileStructue/Category/Category";
 import assert from "assert";
 import type { ArticleAdapter, ArticleAdapterContext } from "./adapters/adapter";
+import { LinkAdapter } from "./adapters/linkAdapter";
 import { MermaidAdapter } from "./adapters/mermaidAdapter";
 import { PropsAdapter } from "./adapters/propsAdapter";
 import { MarkdownDocumentParser, type MarkdownHeading } from "./markdownParser";
 
 export class AgentArticleParser {
-	private static readonly _adapters: ArticleAdapter[] = [new MermaidAdapter(), new PropsAdapter()];
+	private static readonly _adapters: ArticleAdapter[] = [new MermaidAdapter(), new PropsAdapter(), new LinkAdapter()];
 
 	private constructor(
 		private readonly _storageBody: string,

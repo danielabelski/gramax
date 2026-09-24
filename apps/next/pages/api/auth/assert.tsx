@@ -9,7 +9,7 @@ import { ApplyApiMiddleware } from "../../../logic/Api/ApplyMiddleware";
 export default ApplyApiMiddleware(
 	async function (req: ApiRequest, res: ApiResponse) {
 		const ctx = await this.app.contextFactory.fromNode({ req, res });
-		await this.app.am.assert(req, res, ctx.cookie, async (user: User) => {
+		await this.app.amp.current().assert(req, res, ctx.cookie, async (user: User) => {
 			await initEnterpriseDocportalSource(user, this.app.em.getConfig(), (data: SourceData) => {
 				this.commands.storage.sourceData.setSourceData.do({ ctx, ...data });
 			});

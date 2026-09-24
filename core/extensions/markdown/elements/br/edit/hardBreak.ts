@@ -43,7 +43,12 @@ const HardBreak = Node.create<HardBreakOptions>({
 								view.dispatch(view.state.tr.insertText("\n"));
 								return true;
 							}
-							splitBlock(view.state, view.dispatch);
+							if ($from.parent.type.name === "paragraph") {
+								const { hard_break } = view.state.schema.nodes;
+								view.dispatch(view.state.tr.replaceSelectionWith(hard_break.create()).scrollIntoView());
+								return true;
+							}
+							return splitBlock(view.state, view.dispatch);
 						}
 					},
 				},

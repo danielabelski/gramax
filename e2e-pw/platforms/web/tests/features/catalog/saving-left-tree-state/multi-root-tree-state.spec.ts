@@ -116,7 +116,7 @@ catalogTest.describe("Multi-root left tree state", () => {
 	});
 
 	catalogTest(
-		"saved collapse state wins over server hints when navigating directly to a deep leaf URL",
+		"direct navigation temporarily reveals a deep leaf without replacing the saved collapse state",
 		async ({ catalogPage, sharedPage }) => {
 			await toggle(sharedPage, "Must Stay Closed").click();
 			await expect(sharedPage.getByTitle("Child One", { exact: true })).not.toBeVisible();
@@ -125,9 +125,9 @@ catalogTest.describe("Multi-root left tree state", () => {
 			await sharedPage.goto("/-/-/-/-/multi-root/must-stay-closed/child-one/grand-child");
 			await catalogPage.waitForLoad();
 
-			await expect(sharedPage.getByTitle("Grand Child One", { exact: true })).not.toBeVisible();
+			await expect(sharedPage.getByTitle("Grand Child One", { exact: true })).toBeVisible();
+			await expect(sharedPage.getByTitle("Child One", { exact: true })).toBeVisible();
 			await expect(sharedPage.getByTitle("Grand Child Two", { exact: true })).not.toBeVisible();
-			await expect(sharedPage.getByTitle("Child One", { exact: true })).not.toBeVisible();
 
 			await sharedPage.getByTitle("For Testing", { exact: true }).click();
 			await sharedPage.waitForURL(/for-testing/);

@@ -11,3 +11,4 @@ export {
 } from "ics-ui-kit/components/input";
 export type { TextInputProps } from "ics-ui-kit/components/input/text-input/TextInput";
 export { InputGroupButton } from "./InputGroupButton";
+export { PopoverInput, type PopoverInputProps } from "./PopoverInput";

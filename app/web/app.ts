@@ -15,8 +15,8 @@ import { AiDataProvider } from "@ext/ai/logic/AiDataProvider";
 import EnterpriseManager from "@ext/enterprise/EnterpriseManager";
 import { EnterpriseWorkspace } from "@ext/enterprise/EnterpriseWorkspace";
 import MergeNotificationHandler from "@ext/enterprise/notifications/MergeNotificationHandler";
+import EnterpriseRouterPathEvents from "@ext/enterprise/pathname/EnterpriseRouterPathEvents";
 import { GesCloudManager } from "@ext/enterprise-cloud/GesCloudManager";
-import { ClientGesCloudAuthManager } from "@ext/enterprise-cloud/logic/ClientGesCloudAuthManager";
 import RepositoryProviderEventHandlers from "@ext/git/core/Repository/events/RepositoryProviderEventHandlers";
 import RepositoryProvider from "@ext/git/core/Repository/RepositoryProvider";
 import BugsnagLogger from "@ext/loggers/BugsnagLogger";
@@ -28,13 +28,10 @@ import MarkdownFormatter from "@ext/markdown/core/edit/logic/Formatter/Formatter
 import ParserEventHandlers from "@ext/markdown/core/Parser/events/ParserEventHandlers";
 import MarkdownParser from "@ext/markdown/core/Parser/Parser";
 import ParserContextFactory from "@ext/markdown/core/Parser/ParserContext/ParserContextFactory";
-import type AuthManager from "@ext/security/logic/AuthManager";
-import ClientAuthManager from "@ext/security/logic/ClientAuthManager";
 import { TicketManager } from "@ext/security/logic/TicketManager/TicketManager";
 import { createWebSearcherManager } from "@ext/serach/createSearcherManager";
 import SettingsResolver from "@ext/settings/logic/SettingsResolver";
 import { YamlSettingsStore } from "@ext/settings/logic/SettingsStore";
-import { migrateAppConfig } from "@ext/settings/migration/appMigration";
 import { SourceDataProvider } from "@ext/storage/logic/SourceDataProvider/logic/SourceDataProvider";
 import { TableDB } from "@ext/tableDB/table";
 import FSTemplateEvents from "@ext/templates/logic/FSTemplateEvents";
@@ -42,8 +39,10 @@ import { PdfTemplateManager } from "@ext/wordExport/PdfTemplateManager";
 import { WordTemplateManager } from "@ext/wordExport/WordTemplateManager";
 import WorkspaceManager from "@ext/workspace/WorkspaceManager";
 import setWorkerProxy from "../../apps/web/src/logic/setWorkerProxy";
+import { ClientAuthManagerProvider } from "../../core/extensions/security/logic/AuthManagerProvider";
 import { type AppConfig, type AppGlobalConfig, getConfig } from "../config/AppConfig";
 import type Application from "../types/Application";
+import resolveWorkspaceServices from "../utils/resolveWorkspaceServices";
 
 const init = async (config: AppConfig): Promise<Application> => {
 	if (isLoggingEnabled()) await registerOtel();
@@ -60,7 +59,19 @@ const init = async (config: AppConfig): Promise<Application> => {
 		new Path("config.yaml"),
 	);
 
-	await migrateAppConfig(fileConfig);
+	// TODO: remove this compatibility block after the next release.
+	const enterpriseSettings = fileConfig.get("settings")?.enterprise;
+	if (fileConfig.get("gesUrl") === undefined && enterpriseSettings?.endpoint) {
+		fileConfig.set("gesUrl", enterpriseSettings.endpoint);
+	}
+	if (
+		fileConfig.get("refreshInterval") === undefined &&
+		typeof enterpriseSettings?.["refresh-interval"] === "number"
+	) {
+		fileConfig.set("refreshInterval", enterpriseSettings["refresh-interval"] * 1000);
+	}
+	await fileConfig.saveIfDirty();
+
 	const appStore = new YamlSettingsStore(fileConfig);
 	const settings = new SettingsResolver(config, appStore);
 
@@ -93,6 +104,7 @@ const init = async (config: AppConfig): Promise<Application> => {
 		config,
 		fileConfig,
 	);
+	new EnterpriseRouterPathEvents(wm).mount();
 	tablesManager.mountWorkspaceManager(wm); // TODO: remove
 	parserContextFactory.mount(
 		wm,
@@ -106,8 +118,8 @@ const init = async (config: AppConfig): Promise<Application> => {
 
 	await wm.readWorkspaces();
 	const workspaceConfig = await wm.maybeCurrent()?.config();
-	const services = workspaceConfig?.services ?? config.services;
-	setWorkerProxy(services.gitProxy.url);
+	const services = resolveWorkspaceServices(config.services, workspaceConfig?.services);
+	setWorkerProxy(services.gitProxy.url || null);
 
 	const hashes = new HashItemProvider();
 	const ticketManager = new TicketManager(config.tokens.share);
@@ -124,11 +136,9 @@ const init = async (config: AppConfig): Promise<Application> => {
 
 	const enterpriseCloudManager = new GesCloudManager(config.enterpriseCloud, fileConfig);
 
-	const am: AuthManager =
-		enterpriseCloudManager.getConfig().url && enterpriseCloudManager.getConfig().enabled
-			? new ClientGesCloudAuthManager(enterpriseCloudManager)
-			: new ClientAuthManager(em);
-	const contextFactory = new ContextFactory(config.tokens.cookie, am);
+	const amp = new ClientAuthManagerProvider(enterpriseCloudManager, em, wm);
+
+	const contextFactory = new ContextFactory(config.tokens.cookie, amp);
 
 	const searcherManager = await createWebSearcherManager({
 		parser,
@@ -139,12 +149,12 @@ const init = async (config: AppConfig): Promise<Application> => {
 	});
 	const wtm = new WordTemplateManager(wm);
 	const ptm = new PdfTemplateManager(wm);
-	const agentManager = new AgentManager(config);
+	const agentManager = await AgentManager.create(config);
 
 	templateEventHandlers.withParser(parser, formatter, parserContextFactory);
 
 	return {
-		am,
+		amp,
 		wm,
 		em,
 		rp,
@@ -185,7 +195,7 @@ const init = async (config: AppConfig): Promise<Application> => {
 			bugsnagApiKey: config.bugsnagApiKey,
 
 			portalAi: {
-				enabled: false,
+				enabled: config.portalAi.enabled,
 			},
 
 			forceUiLangSync: config.forceUiLangSync,
@@ -200,6 +210,8 @@ const container = window as unknown as {
 const getApp = (): Promise<Application> => {
 	if (container.app != null) return container.app;
 	const config = getConfig();
+	// The e2e fixture's `isReadOnly` option: the web build has no read-only environment of its own.
+	if (window.localStorage.getItem("READ_ONLY") === "1") config.isReadOnly = true;
 	container.app = init(config);
 	return container.app;
 };

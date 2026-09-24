@@ -9,6 +9,9 @@ import { Command } from "../../../types/Command";
 const getShareLink: Command<{ ctx: Context; catalogName: string; filePath: string }, string> = Command.create({
 	path: "catalog/share/getShareLink",
 
+	// the returned URL carries the signed share ticket — never write it to a span
+	flags: ["otel-omit-result"],
+
 	kind: ResponseKind.plain,
 
 	middlewares: [new AuthorizeMiddleware(), new ReloadConfirmMiddleware()],

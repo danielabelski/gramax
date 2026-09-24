@@ -48,7 +48,12 @@ interface TraceOptions {
 	name?: string;
 	args?: unknown[];
 	links?: api.Link[];
+	/**
+	 * Do not capture arguments. Required when a credential is passed as a bare parameter: the decorator
+	 * hands the encoder a positional array, so property-name masking has no key to match on.
+	 */
 	omitArgs?: boolean;
+	/** Do not capture the return value. Required when it is, or embeds, a credential — a share URL, a token. */
 	omitResult?: boolean;
 	/** Verbosity of this span. Default `Level.Commands`. More verbose than the active min level → span not created. */
 	level?: Level;

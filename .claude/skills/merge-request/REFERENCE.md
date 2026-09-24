@@ -4,9 +4,32 @@ Concrete commands for the `merge-request` skill. Project `ics/doc-reader` (id `1
 
 ## Create / update MR
 
+Create it ready — a `Draft:` title skips the MR pipeline (only the manual stand jobs remain). Hand over when green (see *Hand over for review*):
+
 ```sh
-glab mr create --title "<title>" --description-from-file <file> -y
-glab mr update <iid> --description-from-file <file>
+glab mr create -s <branch> -b develop -y --title "<title>" --description "$(cat <file>)"
+glab mr update <iid> --description "$(cat <file>)"
+```
+
+`<title>` is the branch name plus what the MR does — shape and examples in [SKILL.md](SKILL.md) → *Title*.
+
+The installed `glab` has no `--description-from-file` flag (neither on `create` nor `update`) — only `-d`/`--description`. Feed the file through command substitution.
+
+## Hand over for review
+
+Ready + assignee `stanislav` in one call:
+
+```sh
+glab mr update <iid> --ready --assignee stanislav
+```
+
+The API has no `draft` field (`PUT` with `draft=false` is a 400): the `Draft:` title prefix *is* the flag, and `--ready` edits the title. Over curl that is `-d "title=<title without prefix>" -d "assignee_ids[]=81"`.
+
+Pipeline first — status, then the jobs that are not green:
+
+```sh
+glab api "projects/155/merge_requests/<iid>" | jq '.head_pipeline | {id, status, web_url}'
+glab api "projects/155/pipelines/<pipeline-id>/jobs?per_page=100" | jq -r '.[] | select(.status != "success") | "\(.id)\t\(.name)\t\(.status)"'
 ```
 
 ## Regular (non-inline) comment

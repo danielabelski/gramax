@@ -1,4 +1,6 @@
 import { classNames } from "@components/libs/classNames";
+import type { TooltipDelayTier } from "@core-ui/timings";
+// biome-ignore lint/style/noRestrictedImports: pre-existing @emotion/styled import; the Tailwind migration is not this change's scope
 import styled from "@emotion/styled";
 import { type CSSProperties, type ForwardedRef, forwardRef, type MouseEvent, type ReactNode } from "react";
 import type { Placement, Props } from "tippy.js";
@@ -17,7 +19,7 @@ export interface IconProps {
 	style?: CSSProperties;
 	viewBox?: string;
 	tooltipContent?: ReactNode;
-	tooltipDelay?: Props["delay"];
+	tooltipDelay?: TooltipDelayTier;
 	tooltipAppendTo?: Props["appendTo"];
 	onClick?: (event?: MouseEvent<HTMLElement>) => void;
 	onMouseUp?: (event?: MouseEvent<HTMLElement>) => void;

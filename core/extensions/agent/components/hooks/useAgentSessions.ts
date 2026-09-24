@@ -7,7 +7,6 @@ import {
 	clearActiveSessionId,
 	getActiveSessionId,
 	getSessions,
-	setApiKey,
 	removeSession as storeRemoveSession,
 	setActiveSessionId as storeSetActiveSessionId,
 	setSessions as storeSetSessions,
@@ -213,14 +212,8 @@ export const useAgentSessions = () => {
 		[activeSessionId, callDelete, ensureActiveSession, sessions, activate],
 	);
 
-	const saveApiKey = useCallback(async (key: string) => {
-		setApiKey(key);
-	}, []);
-
 	const deleteSessionRef = useRef(deleteSession);
 	deleteSessionRef.current = deleteSession;
-	const saveApiKeyRef = useRef(saveApiKey);
-	saveApiKeyRef.current = saveApiKey;
 	const createSessionRef = useRef(createSession);
 	createSessionRef.current = createSession;
 
@@ -230,7 +223,6 @@ export const useAgentSessions = () => {
 			onSelectSession: selectSession,
 			onNewSession: () => void createSessionRef.current(),
 			onCloseTab: (id) => void deleteSessionRef.current(id),
-			onSaveSettings: (key) => void saveApiKeyRef.current(key),
 		});
 	}, []);
 
@@ -246,6 +238,5 @@ export const useAgentSessions = () => {
 		createSession,
 		selectSession,
 		removeSession: deleteSession,
-		saveApiKey,
 	};
 };

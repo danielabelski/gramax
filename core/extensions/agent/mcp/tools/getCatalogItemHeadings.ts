@@ -1,8 +1,8 @@
-import Path from "@core/FileProvider/Path/Path";
 import type { Article } from "@core/FileStructue/Article/Article";
 import type { Category } from "@core/FileStructue/Category/Category";
-import { ItemType } from "@core/FileStructue/Item/ItemType";
+import AgentResourcesProvider from "../../core/agentResourcesProvider";
 import { AgentArticleParser } from "../parser";
+import { MarkdownDocumentParser } from "../parser/markdownParser";
 import { fail, ok, type ToolExecutionContext, type ToolExecutionResult } from "../tool";
 import { CatalogItemLookup } from "../utils/catalogPaths";
 
@@ -19,15 +19,22 @@ export async function runGetCatalogItemHeadings({
 }: ToolExecutionContext): Promise<ToolExecutionResult> {
 	const { catalogName, itemPath } = input as GetCatalogItemHeadingsInput;
 	try {
-		const catalog = await app.wm.current().getCatalog(catalogName, ctx);
-		const item = catalog.findItemByItemPath(new Path(Path.join(catalogName, itemPath))) as Article | Category;
-		if (!item) return fail(`Item not found`);
-		if (item.type !== ItemType.article && item.type !== ItemType.category) {
-			return fail(`Only article and category are supported, current type=${item.type}`);
+		const skill = await AgentResourcesProvider.getSkill(app, ctx, commands, catalogName, itemPath);
+		if (skill) {
+			const lookup = new CatalogItemLookup(catalogName, itemPath, skill.name);
+			return ok({
+				...lookup.asAgentJSON(),
+				headings: MarkdownDocumentParser.getHeadingHierarchy(skill.content),
+			});
 		}
-		const parser = await AgentArticleParser.open(app, ctx, commands, catalog, item);
+
+		const catalog = await app.wm.current().getCatalog(catalogName, ctx);
+		const resolved = await CatalogItemLookup.resolve(catalog, catalogName, itemPath);
+		if (!resolved) return fail(`Item not found`);
+		const { item, lookup } = resolved;
+		const parser = await AgentArticleParser.open(app, ctx, commands, catalog, item as Article | Category);
 		return ok({
-			...(await CatalogItemLookup.fromCatalogItem(catalog, item)).asJSON(),
+			...lookup.asAgentJSON(),
 			headings: await parser.getHeadingHierarchy(),
 		});
 	} catch (e) {

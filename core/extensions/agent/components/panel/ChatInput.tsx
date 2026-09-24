@@ -3,20 +3,19 @@ import { cn } from "@core-ui/utils/cn";
 import { useAutoFocusTextarea } from "@ext/agent/components/hooks/useAutoFocusTextarea";
 import { ChatToolsMenu } from "@ext/agent/components/panel/ChatToolsMenu";
 import { SessionContextUsage } from "@ext/agent/components/panel/SessionContextUsage";
-import useChatStore, { useChatDraft } from "@ext/agent/components/store/ChatStore";
+import useChatStore, { setQuote, useChatDraft, useChatQuote } from "@ext/agent/components/store/ChatStore";
 import type { AgentDraftAttachment } from "@ext/agent/components/types/chat";
 import { serializeAttachments } from "@ext/agent/components/utils/serializeAttachments";
+import { agentConfig } from "@ext/agent/core/agentConfig";
 import { AgentAttachmentStore } from "@ext/agent/core/attachmentStore";
 import t from "@ext/localization/locale/translate";
 import { Alert, AlertDescription, AlertIcon } from "@ui-kit/Alert";
 import { IconButton } from "@ui-kit/Button";
+import { Icon } from "@ui-kit/Icon";
 import { Tag } from "@ui-kit/Tag";
 import { AutogrowTextarea } from "@ui-kit/Textarea";
 import { OverflowTooltip, Tooltip, TooltipContent, TooltipText, TooltipTitle, TooltipTrigger } from "@ui-kit/Tooltip";
 import { type ChangeEvent, type KeyboardEvent, useCallback, useState } from "react";
-
-const MAX_ATTACHMENT_SIZE_MB = 50;
-const MAX_ATTACHMENT_SIZE = MAX_ATTACHMENT_SIZE_MB * 1024 * 1024;
 
 type Props = {
 	attachments: AgentDraftAttachment[];
@@ -48,6 +47,8 @@ const ChatInput = ({
 	onSkillTagClick,
 }: Props) => {
 	const { draft: value, onDraftChange: onChange } = useChatDraft();
+	const quote = useChatQuote();
+	const quotedText = quote?.text;
 	const { isTauri } = usePlatform();
 	const activeSessionId = useChatStore((s) => s.activeSessionId);
 	const containerRef = useAutoFocusTextarea(disabled);
@@ -64,8 +65,10 @@ const ChatInput = ({
 				setFileError(t("agent.input.file-invalid-format"));
 				return;
 			}
-			if (file.size > MAX_ATTACHMENT_SIZE) {
-				setFileError(t("agent.input.file-too-large").replace("{{maxSizeMb}}", String(MAX_ATTACHMENT_SIZE_MB)));
+			if (file.size > agentConfig.maxAttachmentBytes) {
+				setFileError(
+					t("agent.input.file-too-large").replace("{{maxSizeMb}}", String(agentConfig.maxAttachmentMb)),
+				);
 				return;
 			}
 			setFileError(null);
@@ -152,8 +155,34 @@ const ChatInput = ({
 					</Tooltip>
 				</Alert>
 			)}
-			<div className="w-full flex flex-col py-2 rounded-xl border-primary-border border-[0.5px] bg-background shadow-soft-sm">
-				<div className="pl-3.5 pr-2" ref={containerRef}>
+			{quotedText && (
+				<div className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-t-xl border-primary-border border-[0.5px] border-b-secondary-border bg-background">
+					<Icon className="size-3.5 shrink-0 text-muted-foreground" icon="corner-down-right" />
+					<OverflowTooltip className="truncate min-w-0 flex-1 text-sm text-muted-foreground">
+						{quotedText}
+					</OverflowTooltip>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<IconButton
+								className="shrink-0 p-0.5"
+								icon="x"
+								iconClassName="size-3.5"
+								onClick={() => setQuote(null)}
+								size="xs"
+								variant="ghost"
+							/>
+						</TooltipTrigger>
+						<TooltipContent>{t("agent.tooltips.remove-quote")}</TooltipContent>
+					</Tooltip>
+				</div>
+			)}
+			<div
+				className={cn(
+					"relative w-full flex flex-col py-1 bg-background shadow-soft-sm after:absolute after:inset-0 after:pointer-events-none after:rounded-[inherit] after:border-[0.5px] after:border-primary-border after:content-['']",
+					quotedText ? "rounded-b-xl after:border-t-0" : "rounded-xl",
+				)}
+			>
+				<div className="flex items-center flex-col py-2 px-2.5" ref={containerRef}>
 					{attachments.length > 0 && (
 						<div className="flex flex-wrap gap-1.5 mb-2">
 							{attachments.map((attachment, index) => (
@@ -180,10 +209,12 @@ const ChatInput = ({
 							"min-h-0 p-0 lg:p-0 rounded-none focus:rounded-none text-sm focus:bg-transparent focus:border-transparent w-full resize-none border-0 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus:border-0 shadow-none!",
 							"shadow-none shadow-soft-none hover:shadow-soft-none focus:shadow-soft-none active:shadow-soft-none invalid:shadow-soft-none aria-[invalid=true]:shadow-soft-none",
 							"hover:shadow-none focus:shadow-none active:shadow-none invalid:shadow-none aria-[invalid=true]:shadow-none",
+							"disabled:!border-transparent disabled:!bg-transparent disabled:!shadow-none disabled:opacity-100 disabled:cursor-default",
 						)}
+						disabled={disabled}
 						key={activeSessionId ?? ""}
 						maxRows={12}
-						minRows={2}
+						minRows={1}
 						onChange={(e) => onChange(e.target.value)}
 						onKeyDown={onKeyDown}
 						placeholder={t("agent.input.placeholder")}
@@ -191,8 +222,8 @@ const ChatInput = ({
 					/>
 				</div>
 
-				<div className="flex justify-between items-center gap-2 pl-2 pr-2">
-					<div className="flex min-w-0">
+				<div className="flex justify-between items-center gap-2 pl-1 pr-1">
+					<div className="flex min-w-0 h-7">
 						<div className="shrink-0">
 							<ChatToolsMenu
 								catalogName={catalogName}
@@ -202,20 +233,20 @@ const ChatInput = ({
 							/>
 						</div>
 
-						<div className="shrink-0 ml-1">
+						<div className="shrink-0 ml-1 h-7">
 							<Tooltip>
 								<TooltipTrigger asChild>
 									<span
-										className={cn("inline-block", !isTauri && "cursor-not-allowed")}
+										className={cn("inline-flex", !isTauri && "cursor-not-allowed")}
 										tabIndex={!isTauri ? 0 : undefined}
 									>
 										<IconButton
 											aria-label={t("agent.browser.allow")}
 											aria-pressed={browserAllowed}
-											className="rounded-full p-1"
+											className="p-1"
 											disabled={!isTauri}
 											icon="globe"
-											iconClassName="size-4"
+											iconClassName="h-4 w-4"
 											onClick={() => onBrowserAllowedChange(!browserAllowed)}
 											size="xs"
 											status={browserAllowed ? "info" : "default"}
@@ -259,7 +290,7 @@ const ChatInput = ({
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<IconButton
-									className="h-auto rounded-full"
+									className="h-auto"
 									disabled={isDisabled}
 									icon={sendButtonIcon}
 									iconClassName="h-4 w-4"

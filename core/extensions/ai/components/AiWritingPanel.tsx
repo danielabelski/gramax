@@ -1,13 +1,12 @@
 import { RequestStatus, useApi } from "@core-ui/hooks/useApi";
 import useMediaQuery from "@core-ui/hooks/useMediaQuery";
-import { cn } from "@core-ui/utils/cn";
 import { cssMedia } from "@core-ui/utils/cssUtils";
-import styled from "@emotion/styled";
 import { AiToolbarButton } from "@ext/ai/components/Helpers/AiToolbarButton";
 import type { ProviderItemProps } from "@ext/articleProvider/models/types";
 import t from "@ext/localization/locale/translate";
 import {
 	DropdownMenu,
+	DropdownMenuContent,
 	DropdownMenuEmptyItem,
 	DropdownMenuItem,
 	DropdownMenuSearchItem,
@@ -15,9 +14,9 @@ import {
 	DropdownMenuTrigger,
 	useSearchableMenu,
 } from "@ui-kit/Dropdown";
+import { GlassToolbar, GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 import { ComponentVariantProvider } from "@ui-kit/Providers";
 import { AutogrowTextarea } from "@ui-kit/Textarea";
-import { Toolbar, ToolbarDropdownMenuContent, ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
 import {
 	type ChangeEvent,
 	type Dispatch,
@@ -41,17 +40,6 @@ interface AiWritingPanelProps {
 interface PromptListProps {
 	onClick: (command: string) => void;
 }
-
-const StyledTextareaWrapper = styled.div`
-	& textarea {
-		border: none !important;
-		background: transparent !important;
-		box-shadow: none !important;
-		color: hsl(var(--inverse-primary-fg)) !important;
-		padding: 0;
-		border-radius: 0;
-	}
-`;
 
 const PromptList = ({ onClick }: PromptListProps) => {
 	const [list, setList] = useState<ProviderItemProps[]>([]);
@@ -90,31 +78,30 @@ const PromptList = ({ onClick }: PromptListProps) => {
 	);
 
 	return (
-		<ComponentVariantProvider variant="inverse">
+		<ComponentVariantProvider variant="glass">
 			<DropdownMenu onOpenChange={onOpenChange}>
 				<DropdownMenuTrigger asChild>
-					<ToolbarToggleButton
+					<GlassToolbarToggleButton
 						active={open}
 						className="flex-shrink-0"
 						focusable
 						tooltipText={t("ai.ai-prompts")}
 					>
-						<ToolbarIcon icon="list" />
-					</ToolbarToggleButton>
+						<GlassToolbarIcon icon="list" />
+					</GlassToolbarToggleButton>
 				</DropdownMenuTrigger>
-				<ToolbarDropdownMenuContent
-					contentClassName={cn(!open && "pointer-events-none", "lg:shadow-hard-base")}
-					contentStyle={{
+				<DropdownMenuContent
+					onKeyDown={handleContentKeyDown}
+					ref={contentRef}
+					side="top"
+					sideOffset={!isMobile ? 8 : 0}
+					style={{
 						maxWidth: "calc(min(14rem, var(--radix-popover-content-available-width, 100%)))",
 						height: !filteredPrompts.length ? "unset" : height,
 						maxHeight: !filteredPrompts.length ? "unset" : height,
 						overflowY: "auto",
 						boxShadow: "none",
 					}}
-					onKeyDown={handleContentKeyDown}
-					ref={contentRef}
-					side="top"
-					sideOffset={!isMobile ? 8 : 0}
 				>
 					<DropdownMenuSearchItem
 						onChange={(e) => setSearch(e.target.value)}
@@ -140,7 +127,7 @@ const PromptList = ({ onClick }: PromptListProps) => {
 							))
 						)}
 					</div>
-				</ToolbarDropdownMenuContent>
+				</DropdownMenuContent>
 			</DropdownMenu>
 		</ComponentVariantProvider>
 	);
@@ -176,17 +163,16 @@ export const AiWritingPanel = memo(({ closeHandler, onSubmit, placeholder }: AiW
 	);
 
 	return (
-		<Toolbar className="bg-inverse-primary-bg">
+		<GlassToolbar>
 			<div className="flex items-end gap-1 w-full">
-				<StyledTextareaWrapper className="flex w-full px-2 py-3.5" style={{ alignSelf: "center" }}>
-					<AutogrowTextarea
-						autoFocus
-						minRows={1}
-						onInput={onInput}
-						onKeyDown={onEnter}
-						placeholder={placeholder}
-					/>
-				</StyledTextareaWrapper>
+				<AutogrowTextarea
+					autoFocus
+					className="!shadow-none !bg-transparent !border-none !p-0 flex-1 self-center !px-2"
+					minRows={1}
+					onInput={onInput}
+					onKeyDown={onEnter}
+					placeholder={placeholder}
+				/>
 				<PromptList onClick={onClick} />
 				<AiToolbarButton
 					className="flex-shrink-0"
@@ -196,6 +182,6 @@ export const AiWritingPanel = memo(({ closeHandler, onSubmit, placeholder }: AiW
 					tooltipText={t("send")}
 				/>
 			</div>
-		</Toolbar>
+		</GlassToolbar>
 	);
 });

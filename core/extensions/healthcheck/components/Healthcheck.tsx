@@ -6,6 +6,7 @@ import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import IsReadOnlyHOC from "@core-ui/HigherOrderComponent/IsReadOnlyHOC";
 import { usePlatform } from "@core-ui/hooks/usePlatform";
 import { cn } from "@core-ui/utils/cn";
+// biome-ignore lint/style/noRestrictedImports: legacy panel styling; porting it to Tailwind is a redesign, out of scope for #915
 import styled from "@emotion/styled";
 import type { CatalogError, CatalogErrors } from "@ext/healthcheck/logic/Healthcheck";
 import t, { type TranslationKey } from "@ext/localization/locale/translate";
@@ -20,11 +21,16 @@ import Tooltip from "../../../components/Atoms/Tooltip";
 import Breadcrumb from "../../../components/Breadcrumbs/LinksBreadcrumb";
 import Code from "../../markdown/elements/code/render/component/Code";
 
+export interface ResourceErrorValue {
+	value: string;
+	hint?: string;
+}
+
 export interface ResourceError {
 	title: string;
 	logicPath: string;
 	editorLink: string;
-	values: string[];
+	values: ResourceErrorValue[];
 	isText?: boolean;
 }
 
@@ -39,6 +45,7 @@ const Healthcheck = ({ itemLinks, className, onClose }: HealthcheckProps) => {
 	const [isOpen, setIsOpen] = useState(true);
 	const [data, setData] = useState<CatalogErrors>(null);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: apiUrlCreator comes from a service, not a hook — keep it listed so a new creator rebuilds the loader
 	const loadData = useCallback(async () => {
 		const healthcheckUrl = apiUrlCreator.getHealthcheckUrl();
 		const res = await FetchService.fetch<CatalogErrors>(healthcheckUrl);
@@ -48,7 +55,7 @@ const Healthcheck = ({ itemLinks, className, onClose }: HealthcheckProps) => {
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	useEffect(() => {
-		loadData();
+		void loadData();
 	}, []);
 
 	const onOpenChange = (open: boolean) => {
@@ -108,20 +115,25 @@ export const groupResourceErrors = (data: CatalogError[]) => {
 			title: d.args.title,
 			logicPath: d.args.logicPath,
 			editorLink: d.args.editorLink,
-			values: [d.args.value],
+			values: [{ value: d.args.value, hint: d.args.hint }],
 			isText: d.args.isText,
 		};
 		const index = resourceErrors.findIndex((el) => el.logicPath === errorLink.logicPath);
 		if (index === -1) {
 			resourceErrors.push(errorLink);
 		} else {
-			resourceErrors[index].values.push(d.args.value);
+			resourceErrors[index].values.push({ value: d.args.value, hint: d.args.hint });
 		}
 	});
 	return resourceErrors;
 };
 
-const ResourceErrorComponent = ({ errorGroup, data, itemLinks, goToArticleOnClick }: ResourceErrorComponentProps) => {
+export const ResourceErrorComponent = ({
+	errorGroup,
+	data,
+	itemLinks,
+	goToArticleOnClick,
+}: ResourceErrorComponentProps) => {
 	const resourceErrors: ResourceError[] = groupResourceErrors(data);
 	const articleBreadcrumbDatas: { [logicPath: string]: { titles: string[]; links: CategoryLink[] } } = {};
 	const { isTauri } = usePlatform();
@@ -162,6 +174,7 @@ const ResourceErrorComponent = ({ errorGroup, data, itemLinks, goToArticleOnClic
 					<tbody>
 						{resourceErrors.map((resourceError, idx) => {
 							return (
+								// biome-ignore lint/suspicious/noArrayIndexKey: rows are rebuilt on every check run and never reordered in place
 								<tr className="link" key={`${resourceError.logicPath}-${resourceError.title}-${idx}`}>
 									<td>
 										<div className="article-name">
@@ -175,9 +188,12 @@ const ResourceErrorComponent = ({ errorGroup, data, itemLinks, goToArticleOnClic
 									</td>
 									<td className="flex">
 										<div className="values-container">
-											{resourceError.values.map((link) => (
-												<p className="value-item" key={link}>
-													{resourceError.isText ? <span>{link}</span> : <Code>{link}</Code>}
+											{resourceError.values.map(({ value, hint }, i) => (
+												// One article can carry two diagnostics for the same alias, so the hint is
+												// part of the key; the index is only the last resort.
+												<p className="value-item" key={`${value}-${hint ?? i}`}>
+													{resourceError.isText ? <span>{value}</span> : <Code>{value}</Code>}
+													{hint ? <span className="value-hint">{hint}</span> : null}
 												</p>
 											))}
 										</div>
@@ -311,6 +327,11 @@ export default styled(Healthcheck)`
 		.value-item {
 			line-height: 1.4;
 			font-size: 0.875em;
+		}
+
+		.value-hint {
+			margin-left: 0.5em;
+			color: var(--color-text-secondary);
 		}
 
 		> pre {

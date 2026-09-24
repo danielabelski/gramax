@@ -29,18 +29,18 @@ describe("compressOptionsFor", () => {
 });
 
 describe("optimalCompressRules", () => {
-	it("converts every supported source format to jpeg", () => {
+	it("converts every supported source format to webp", () => {
 		const rules = optimalCompressRules();
 
 		expect(rules.map((r) => r.source).sort()).toEqual(["jpeg", "png", "webp"]);
-		expect(rules.every((r) => r.target === "jpeg")).toBe(true);
+		expect(rules.every((r) => r.target === "webp")).toBe(true);
 	});
 
-	it("drives compressOptionsFor to jpeg for every image extension", () => {
+	it("drives compressOptionsFor to webp for every image extension", () => {
 		const rules = optimalCompressRules();
 
 		for (const extension of ["png", "jpg", "jpeg", "webp"]) {
-			expect(compressOptionsFor(rules, extension)?.target).toBe("jpeg");
+			expect(compressOptionsFor(rules, extension)?.target).toBe("webp");
 		}
 	});
 });

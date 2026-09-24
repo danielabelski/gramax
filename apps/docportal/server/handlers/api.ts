@@ -17,8 +17,8 @@ const api = async ({ path, req, res, app, commands }: ServerContext) => {
 
 	try {
 		const signal = req.bunReq.signal;
-		const ctx = await app.contextFactory.fromNode({ req, res });
 		const query = Object.fromEntries(path.searchParams);
+		const ctx = await app.contextFactory.fromNode({ req, res });
 
 		const params = command.params(ctx, query, await parseBody(req.bunReq), signal);
 		const result = await withContext(ctx, async () => await command.do(params));
@@ -134,9 +134,7 @@ const respond = async (req: Request, kind: ResponseKind, commandResult: any) => 
 
 	if (kind === ResponseKind.stream) {
 		const { mime, iterator } = commandResult;
-		const sink = new Bun.ArrayBufferSink();
-		for await (const item of iterator) sink.write(item);
-		return new Response(sink.end(), {
+		return new Response(generatorToReadableStream(iterator), {
 			headers: {
 				"Content-Type": mime ?? "application/octet-stream",
 				"Cache-Control": "no-store",
@@ -145,6 +143,25 @@ const respond = async (req: Request, kind: ResponseKind, commandResult: any) => 
 	}
 
 	throw new Error("Invalid ResponseKind");
+};
+
+const generatorToReadableStream = (iterator: AsyncGenerator<string, void, void>): ReadableStream<Uint8Array> => {
+	const encoder = new TextEncoder();
+
+	return new ReadableStream({
+		async pull(controller) {
+			const item = await iterator.next();
+			if (item.done === true) {
+				controller.close();
+				return;
+			}
+
+			controller.enqueue(encoder.encode(item.value));
+		},
+		async cancel() {
+			await iterator.return?.();
+		},
+	});
 };
 
 export default api;

@@ -12,6 +12,7 @@ import t from "@ext/localization/locale/translate";
 import { AvatarFallback, AvatarLabel, AvatarLabelAvatar, AvatarLabelTitle, getAvatarFallback } from "@ui-kit/Avatar";
 import { MenuItem } from "@ui-kit/MenuItem";
 import { Popover, PopoverAnchor, PopoverContent } from "@ui-kit/Popover";
+import { ComponentVariantProvider } from "@ui-kit/Providers";
 import { StepperIndicator, StepperItem, StepperSeparator, StepperTrigger } from "@ui-kit/Stepper";
 import { TextOverflowTooltip } from "@ui-kit/Tooltip";
 import { forwardRef, type HTMLAttributes, memo, useCallback } from "react";
@@ -173,7 +174,7 @@ export const RevisionListItem = memo((props: RevisionListItemProps) => {
 	}, [gotoRevision, revision.oid, status, onClick]);
 
 	return (
-		<>
+		<ComponentVariantProvider variant="glass">
 			<RevisionListItemComponent
 				{...revision}
 				aria-expanded={open}
@@ -214,6 +215,6 @@ export const RevisionListItem = memo((props: RevisionListItemProps) => {
 					/>
 				</PopoverContent>
 			</Popover>
-		</>
+		</ComponentVariantProvider>
 	);
 });

@@ -1,73 +1,23 @@
 import type { CommandTree } from "@app/commands";
 import type Application from "@app/types/Application";
 import type Context from "@core/Context/Context";
-import Path from "@core/FileProvider/Path/Path";
-import type { AgentSkill } from "../core/agentResourcesProvider";
 import type { AgentAttachment } from "../core/attachmentStore";
-import type { AgentEvent } from "../core/events";
+import type { AgentEvent, AgentQuote } from "../core/events";
+import { LinkAdapter } from "../mcp/parser/adapters/linkAdapter";
 import { CatalogItemLookup } from "../mcp/utils/catalogPaths";
 import { AGENT_PROMPT_MAP } from "./agentPromptMap";
 import { MCP_PROMPT_MAP } from "./mcpPromptMap";
+import type { AgentSkill } from "./skills/skill";
+import { SKILL_PROMPT_MAP } from "./skills/skillPromptMap";
+import { systemSkills } from "./skills/system-skills";
 
-export type ToolsDescriptions = typeof MCP_PROMPT_MAP;
-
-export function getToolsDescriptions(): ToolsDescriptions {
+export function getToolsDescriptions() {
 	return MCP_PROMPT_MAP;
 }
 
-export async function getCurrentContextDescription(
-	app: Application,
-	ctx: Context,
-	catalogName?: string,
-	itemPath?: string,
-): Promise<string> {
-	if (!catalogName || !itemPath) return "";
-	const catalog = await app.wm.current().getCatalog(catalogName, ctx);
-	const item = catalog.findItemByItemPath(new Path(Path.join(catalogName, itemPath)));
-	if (!item) return "";
-	const resolved = (await CatalogItemLookup.fromCatalogItem(catalog, item)).asJSON();
-	return `${AGENT_PROMPT_MAP.openItemPreamble}\n${JSON.stringify(resolved, null, 2)}`;
-}
-
-export async function getSystemPrompt(
-	app: Application,
-	ctx: Context,
-	commands: CommandTree,
-	catalogName?: string,
-	skills?: AgentSkill[],
-	browserAllowed?: boolean,
-): Promise<string> {
-	let systemText: string = AGENT_PROMPT_MAP.system;
-
-	if (catalogName) {
-		const catalogObj = await app.wm.current().getCatalog(catalogName, ctx);
-		if (catalogObj) {
-			const promptOverride = await catalogObj.customProviders.agentResourcesProvider.getSystemPrompt();
-			systemText = promptOverride ?? AGENT_PROMPT_MAP.system;
-		}
-	}
-
-	const skillsDescription = await getAgentSkillsDescriptions(app, ctx, commands, catalogName, skills);
-	return [
-		systemText,
-		browserAllowed ? AGENT_PROMPT_MAP.browserPreamble : "",
-		AGENT_PROMPT_MAP.formattingRules,
-		skillsDescription,
-	]
-		.filter(Boolean)
-		.join("\n\n");
-}
-
-export function getAttachmentsDescription(attachments: AgentAttachment[] = []): string {
-	if (!attachments.length) {
-		return "";
-	}
-
-	const attachmentItems = attachments.map((attachment) => ({
-		attachmentName: attachment.originalFilename,
-	}));
-
-	return `${AGENT_PROMPT_MAP.attachmentsPreamble}\n${JSON.stringify(attachmentItems, null, 2)}`;
+export function getSecretsDescription(names: string[] = []): string {
+	const vars = names.map((name) => `\${${name}}`).join(", ");
+	return `${AGENT_PROMPT_MAP.secretsPreamble} ${vars || "—"}.`;
 }
 
 export async function getAgentSkills(
@@ -84,74 +34,139 @@ export async function getAgentSkills(
 	return catalog.customProviders.agentResourcesProvider.getSkills(app, ctx, commands);
 }
 
-export async function getAgentSkill(
+async function resolveItemContext(
 	app: Application,
 	ctx: Context,
-	commands: CommandTree,
-	catalogName: string,
-	skillName: string,
-): Promise<AgentSkill | null> {
+	catalogName?: string,
+	itemPath?: string,
+): Promise<string | null> {
+	if (!catalogName || !itemPath) return null;
 	const catalog = await app.wm.current().getCatalog(catalogName, ctx);
 	if (!catalog) return null;
-
-	return catalog.customProviders.agentResourcesProvider.getSkillByName(app, ctx, commands, skillName);
+	const item = CatalogItemLookup.findItem(catalog, itemPath);
+	if (!item) return null;
+	return JSON.stringify(CatalogItemLookup.fromCatalogItem(catalog, item).asAgentJSON(), null, 2);
 }
 
-export async function getAgentSkillsDescriptions(
+export async function getOpenCatalogItemDescription(
 	app: Application,
 	ctx: Context,
-	commands: CommandTree,
 	catalogName?: string,
-	skills?: AgentSkill[],
+	itemPath?: string,
 ): Promise<string> {
-	const list = skills ?? (await getAgentSkills(app, ctx, commands, catalogName));
-	const skillsList = list.map((skill) => `- ${skill.name}: ${skill.description}`).join("\n");
-
-	if (!skillsList) return "";
-	return `${AGENT_PROMPT_MAP.skillsPreamble}\n${skillsList}`;
+	const resolved = await resolveItemContext(app, ctx, catalogName, itemPath);
+	if (!resolved) return "";
+	return `${AGENT_PROMPT_MAP.openItemPreamble}\n${resolved}`;
 }
 
-export async function getForcedSkillDescription(
-	app: Application,
-	ctx: Context,
-	commands: CommandTree,
-	catalogName?: string,
-	useSkill?: string,
-	skills?: AgentSkill[],
-): Promise<string> {
-	if (!useSkill || !catalogName) return "";
-	const skill = skills
-		? (skills.find((item) => item.name === useSkill) ?? null)
-		: await getAgentSkill(app, ctx, commands, catalogName, useSkill);
-	if (!skill) {
-		console.warn(`getForcedSkillDescription: unknown skill "${useSkill}" in catalog "${catalogName}"`);
-		return "";
-	}
+export async function getQuoteDescription(app: Application, ctx: Context, quote: AgentQuote): Promise<string> {
+	const quotedText = quote.text
+		.split("\n")
+		.map((line) => `> ${line}`)
+		.join("\n");
 
-	return `${AGENT_PROMPT_MAP.forcedSkillPreamble}\n- ${skill.name}: ${skill.description}\n\n${skill.content}`;
+	if (!quote.catalogName) return `${AGENT_PROMPT_MAP.quotedTextPreamble}\n${quotedText}`;
+
+	const articleContext =
+		(await resolveItemContext(app, ctx, quote.catalogName, quote.itemPath)) ??
+		JSON.stringify({ catalogName: quote.catalogName, itemPath: quote.itemPath ?? "" }, null, 2);
+	return `${AGENT_PROMPT_MAP.quotedArticlePreamble}\n${articleContext}\n${AGENT_PROMPT_MAP.quotedFragmentLabel}\n${quotedText}`;
 }
 
-export async function getUserMessage(
+export async function getCurrentContextDescription(
 	app: Application,
 	ctx: Context,
-	commands: CommandTree,
 	event: Extract<AgentEvent, { type: "user_message" }>,
-	skills?: AgentSkill[],
 ): Promise<string> {
-	const currentContextDescription = await getCurrentContextDescription(
+	const openItemDescription = await getOpenCatalogItemDescription(
 		app,
 		ctx,
 		event.openCatalogName,
 		event.openItemPath,
 	);
-	const forcedSkillDescription = await getForcedSkillDescription(
-		app,
-		ctx,
-		commands,
-		event.openCatalogName,
-		event.useSkill,
-		skills,
-	);
+	const quoteDescription = event.quote?.text ? await getQuoteDescription(app, ctx, event.quote) : "";
+	return [openItemDescription, quoteDescription].filter(Boolean).join("\n\n");
+}
+
+export async function getSystemPrompt(
+	app: Application,
+	ctx: Context,
+	catalogName?: string,
+	skills?: AgentSkill[],
+	browserAllowed?: boolean,
+): Promise<string> {
+	let systemText: string = AGENT_PROMPT_MAP.system;
+
+	if (catalogName) {
+		const catalogObj = await app.wm.current().getCatalog(catalogName, ctx);
+		if (catalogObj) {
+			const promptOverride = await catalogObj.customProviders.agentResourcesProvider.getSystemPrompt();
+			systemText = promptOverride ?? AGENT_PROMPT_MAP.system;
+		}
+	}
+
+	const skillsDescription = getAgentSkillsDescriptions(catalogName, skills);
+	const secretsDescription = getSecretsDescription(Object.keys(app.agentManager.secrets.refs()));
+	return [systemText, browserAllowed ? AGENT_PROMPT_MAP.browserPreamble : "", secretsDescription, skillsDescription]
+		.filter(Boolean)
+		.join("\n\n");
+}
+
+export function getAttachmentsDescription(attachments: AgentAttachment[] = []): string {
+	if (!attachments.length) {
+		return "";
+	}
+
+	const attachmentItems = attachments.map((attachment) => ({
+		attachmentItemPath: LinkAdapter.toAgentAttachmentItemPath(attachment.originalFilename),
+	}));
+
+	return `${AGENT_PROMPT_MAP.attachmentsPreamble}\n${JSON.stringify(attachmentItems, null, 2)}`;
+}
+
+function getSystemSkillsDescriptions(): string {
+	const skillsList = systemSkills.map((skill) => `- ${skill.itemPath}: ${skill.description}`).join("\n");
+	if (!skillsList) return "";
+	return `${SKILL_PROMPT_MAP.systemSkillsPreamble}\n${skillsList}`;
+}
+
+function getCatalogSkillsDescriptions(catalogName: string | undefined, skills: AgentSkill[] | undefined): string {
+	if (!catalogName || !skills) return "";
+	const skillsList = skills.map((skill) => `- ${skill.itemPath}: ${skill.description}`).join("\n");
+	if (!skillsList) return "";
+	return `${SKILL_PROMPT_MAP.catalogSkillsPreamble} catalogName: "${catalogName}".\n${skillsList}`;
+}
+
+export function getAgentSkillsDescriptions(catalogName: string | undefined, skills: AgentSkill[] | undefined): string {
+	const sections = [getSystemSkillsDescriptions(), getCatalogSkillsDescriptions(catalogName, skills)].filter(Boolean);
+
+	if (!sections.length) return "";
+	return `${SKILL_PROMPT_MAP.skillsPreamble}\n\n${sections.join("\n\n")}`;
+}
+
+export function getForcedSkillDescription(
+	catalogName: string | undefined,
+	forcedSkill: string | undefined,
+	skills: AgentSkill[] | undefined,
+): string {
+	if (!forcedSkill || !catalogName) return "";
+	const skill = skills?.find((item) => item.name === forcedSkill) ?? null;
+	if (!skill) {
+		console.warn(`getForcedSkillDescription: unknown skill "${forcedSkill}" in catalog "${catalogName}"`);
+		return "";
+	}
+
+	return `${SKILL_PROMPT_MAP.forcedSkillPreamble}\n- ${skill.itemPath}: ${skill.description}\n\n${skill.content}`;
+}
+
+export async function getUserMessage(
+	app: Application,
+	ctx: Context,
+	event: Extract<AgentEvent, { type: "user_message" }>,
+	skills?: AgentSkill[],
+): Promise<string> {
+	const currentContextDescription = await getCurrentContextDescription(app, ctx, event);
+	const forcedSkillDescription = getForcedSkillDescription(event.openCatalogName, event.useSkill, skills);
 	const attachmentsDescription = getAttachmentsDescription(event.attachments ?? []);
 	return [currentContextDescription, forcedSkillDescription, attachmentsDescription, event.content]
 		.filter(Boolean)

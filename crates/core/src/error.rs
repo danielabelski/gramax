@@ -8,6 +8,11 @@ pub enum Error {
 	#[error("io error: {0}")]
 	Io(String),
 
+	/// Kept apart from `Io` because the frontend acts on it: a directory the OS refuses is
+	/// something the user can fix by granting access, unlike every other I/O failure.
+	#[error("permission denied: {0}")]
+	PermissionDenied(String),
+
 	#[error("git error: {0}")]
 	Git(String),
 
@@ -29,7 +34,10 @@ pub enum Error {
 
 impl From<gramaxfs::error::IoError> for Error {
 	fn from(value: gramaxfs::error::IoError) -> Self {
-		Error::Io(format!("{value:?}"))
+		match value {
+			gramaxfs::error::IoError::PermissionDenied { message } => Error::PermissionDenied(message),
+			other => Error::Io(format!("{other:?}")),
+		}
 	}
 }
 
@@ -46,7 +54,10 @@ impl From<gramaxgit::error::Error> for Error {
 
 impl From<std::io::Error> for Error {
 	fn from(value: std::io::Error) -> Self {
-		Error::Io(value.to_string())
+		match value.kind() {
+			std::io::ErrorKind::PermissionDenied => Error::PermissionDenied(value.to_string()),
+			_ => Error::Io(value.to_string()),
+		}
 	}
 }
 

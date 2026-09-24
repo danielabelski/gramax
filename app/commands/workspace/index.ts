@@ -3,6 +3,7 @@ import create from "./create";
 import edit from "./edit";
 import getUninitializedCatalogList from "./getUninitializedCatalogList";
 import remove from "./remove";
+import saveSections from "./saveSections";
 import setDefaultPath from "./setDefaultPath";
 import Switch from "./switch";
 
@@ -14,4 +15,5 @@ export default {
 	setDefaultPath,
 	assets,
 	getUninitializedCatalogList,
+	saveSections,
 };

@@ -1,27 +1,21 @@
-import ArticlePageActions from "@components/Article/ArticlePageActions";
 import Button, { TextSize } from "@components/Atoms/Button/Button";
 import { ButtonStyle } from "@components/Atoms/Button/ButtonStyle";
+import { ArticlePropertiesSection } from "@components/Layouts/CatalogLayout/RightNavigation/sections/ArticlePropertiesSection";
+import { CatalogSection } from "@components/Layouts/CatalogLayout/RightNavigation/sections/CatalogSection";
+import { LinksSection } from "@components/Layouts/CatalogLayout/RightNavigation/sections/LinksSection";
 import IconLink from "@components/Molecules/IconLink";
-import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
-import { getCatalogLinks, useGetArticleLinks } from "@core-ui/getRigthSidebarLinks";
 import { usePlatform } from "@core-ui/hooks/usePlatform";
 import { useArticlePropsStore } from "@core-ui/stores/ArticlePropsStore/ArticlePropsStore.provider";
-import { cn } from "@core-ui/utils/cn";
-import { CatalogView } from "@ext/catalog/views/components/CatalogView";
-import SwitchContentLanguage from "@ext/localization/actions/SwitchContentLanguage";
 import t from "@ext/localization/locale/translate";
 import TableOfContents from "@ext/navigation/article/render/TableOfContents";
-import { QuizNavigationInfo } from "@ext/quiz/components/QuizNavigationInfo";
-import { ReviewList } from "@ext/review/components/ReviewList";
-import { useReviewListControl } from "@ext/review/logic/hooks/useReviewListControl";
-import PublishStatusPanel from "@ext/static/components/PublishStatusPanel";
-import SwitchVersion from "@ext/versioning/components/SwitchVersion";
 import { useRef } from "react";
 import { tv } from "tailwind-variants";
-import Links from "../../layoutComponents";
+import { VIEWPORT_PADDING } from "../../../../ui-kit/lib/floating";
+import { useCanSeeNavigationBottom } from "../useCanSeeNavigationBottom";
+import { RIGHT_NAVIGATION_PANEL_INSET, RIGHT_NAVIGATION_WIDTH } from "./constants";
 
 const asideStyles = tv({
-	base: "w-full text-[var(--color-primary-general)] flex flex-col min-h-0 overflow-hidden",
+	base: "flex min-h-0 w-full flex-1 flex-col space-y-6 overflow-hidden",
 });
 
 const gramaxLinkStyles = tv({
@@ -36,30 +30,27 @@ const RightNavigation = (): JSX.Element => {
 	const ref = useRef<HTMLDivElement>(null);
 	const errorCode = useArticlePropsStore((s) => s.data?.errorCode);
 	const showArticleActions = errorCode !== 500;
-	const articleLinks = useGetArticleLinks();
 	const { isNext } = usePlatform();
-	const cloudServiceUrl = PageDataContextService.value.conf.cloudServiceUrl;
-	const showReview = useReviewListControl();
+	const canSeeNavigationBottom = useCanSeeNavigationBottom();
 
 	return (
 		<div
-			className="article-right-sidebar"
+			className="article-right-sidebar ml-auto flex h-full min-h-0 flex-1 flex-col bg-[var(--color-article-bg)]"
 			ref={ref}
-			style={{ display: "flex", flexDirection: "column", flexGrow: "1", minHeight: "0" }}
+			style={{
+				paddingTop: RIGHT_NAVIGATION_PANEL_INSET,
+				paddingBottom: canSeeNavigationBottom ? RIGHT_NAVIGATION_PANEL_INSET : VIEWPORT_PADDING,
+				paddingLeft: VIEWPORT_PADDING,
+				marginRight: VIEWPORT_PADDING,
+				width: RIGHT_NAVIGATION_WIDTH + VIEWPORT_PADDING,
+			}}
 		>
-			<aside className={asideStyles({ className: showReview ? "max-h-[40dvh] overflow-y-auto" : "" })}>
-				<div className="space-y-4">
-					<ArticlePageActions />
-					<SwitchVersion />
-					<SwitchContentLanguage />
-					<CatalogView />
-				</div>
-				{showArticleActions && <TableOfContents className={cn("min-h-0 flex-1 overflow-y-auto")} />}
-				<Links articleLinks={articleLinks} catalogLinks={getCatalogLinks()} />
-				{cloudServiceUrl && <PublishStatusPanel />}
-				<QuizNavigationInfo />
+			<aside className={asideStyles()}>
+				<CatalogSection />
+				{showArticleActions && <ArticlePropertiesSection />}
+				{showArticleActions && <TableOfContents className="min-h-0 overflow-y-auto px-3" />}
+				<LinksSection />
 			</aside>
-			{showReview && <ReviewList />}
 			{isNext && (
 				<div className={gramaxLinkStyles()}>
 					<Button buttonStyle={ButtonStyle.transparent} textSize={TextSize.XS}>

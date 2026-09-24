@@ -9,8 +9,9 @@ import { usePlatform } from "@core-ui/hooks/usePlatform";
 import { cn } from "@core-ui/utils/cn";
 import { relocateToUrl } from "@ext/enterprise/components/SingInOut/hooks/useSignIn";
 import t from "@ext/localization/locale/translate";
+import { Root as VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@ui-kit/Button";
-import { Dialog, DialogContent } from "@ui-kit/Dialog";
+import { Dialog, DialogContent, DialogTitle } from "@ui-kit/Dialog";
 import { ContentDivider } from "@ui-kit/Divider";
 import { useCallback, useState } from "react";
 import { Logo, TopContainerWrapper } from "../../../components/HomePage/Welcome/Editor";
@@ -18,6 +19,7 @@ import { Logo, TopContainerWrapper } from "../../../components/HomePage/Welcome/
 interface SignInGesCloudFormProps {
 	allowContinueWithoutAccount: boolean;
 	className?: string;
+	gesCloudUrl?: string;
 }
 
 interface SignInGesCloudFormModalProps extends SignInGesCloudFormProps {
@@ -36,7 +38,7 @@ function getGesCloudSignInUrl(gesUrl: string, provider: "google" | "yandex", isT
 }
 
 export const GesCloudSignInFormModal = (props: SignInGesCloudFormModalProps) => {
-	const { allowContinueWithoutAccount, onClose, className } = props;
+	const { allowContinueWithoutAccount, onClose, className, gesCloudUrl } = props;
 	const [open, setOpen] = useState(true);
 
 	const onOpenChangeHandler = useCallback(
@@ -50,10 +52,14 @@ export const GesCloudSignInFormModal = (props: SignInGesCloudFormModalProps) => 
 	return (
 		<Dialog onOpenChange={onOpenChangeHandler} open={open}>
 			<DialogContent data-modal-root>
+				<VisuallyHidden>
+					<DialogTitle>{t("welcome.editor.title")}</DialogTitle>
+				</VisuallyHidden>
 				<div className="p-4">
 					<SignInGesCloudForm
 						allowContinueWithoutAccount={allowContinueWithoutAccount}
 						className={className}
+						gesCloudUrl={gesCloudUrl}
 					/>
 				</div>
 			</DialogContent>
@@ -61,9 +67,14 @@ export const GesCloudSignInFormModal = (props: SignInGesCloudFormModalProps) => 
 	);
 };
 
-export const SignInGesCloudForm = ({ allowContinueWithoutAccount, className }: SignInGesCloudFormProps) => {
+export const SignInGesCloudForm = ({
+	allowContinueWithoutAccount,
+	className,
+	gesCloudUrl: gesCloudUrlOverride,
+}: SignInGesCloudFormProps) => {
 	const breakpoint = useBreakpoint();
-	const { url: gesCloudUrl } = PageDataContextService.value.conf.enterpriseCloud;
+	const { url: contextGesCloudUrl } = PageDataContextService.value.conf.enterpriseCloud;
+	const gesCloudUrl = gesCloudUrlOverride ?? contextGesCloudUrl;
 	const apiUrlCreator = ApiUrlCreatorService.value;
 	const router = useRouter();
 
@@ -76,7 +87,7 @@ export const SignInGesCloudForm = ({ allowContinueWithoutAccount, className }: S
 			if (isTauri) await resolveFrontendModule("gesCloudLogin")(url, apiUrlCreator, router, gesCloudUrl);
 			else relocateToUrl(url);
 		},
-		[apiUrlCreator, router, isTauri, gesCloudUrl],
+		[router, isTauri, gesCloudUrl],
 	);
 
 	const yandexAuthUrl = getGesCloudSignInUrl(gesCloudUrl, "yandex", isTauri);
@@ -92,7 +103,7 @@ export const SignInGesCloudForm = ({ allowContinueWithoutAccount, className }: S
 	const handleContinueWithoutAccount = useCallback(async () => {
 		await FetchService.fetch(apiUrlCreator.getDisableCloudUrl());
 		refreshPage();
-	}, [apiUrlCreator]);
+	}, []);
 
 	return (
 		<div className={cn("flex flex-col gap-6 form-wrap", className)}>

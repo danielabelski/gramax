@@ -94,17 +94,8 @@ impl<C: ActualCreds> RemoteConnect for Repo<'_, C> {
 		let head = self.0.head()?;
 		let mut remote = self.ensure_remote_has_postfix(self.0.find_remote("origin")?)?;
 
-		let local_name = head.shorthand().or_utf8_err()?;
-		let remote_name = format!("origin/{}", local_name);
-
 		let mut local_branch = self.0.find_branch(head.shorthand().or_utf8_err()?, BranchType::Local)?;
-		let has_corresponding_remote_branch = self.0.find_branch(&remote_name, BranchType::Remote).is_ok();
-		let has_upstream = local_branch.upstream().is_ok();
-
-		if !has_upstream && has_corresponding_remote_branch {
-			info!(target: TAG, "set upstream for branch {:?} (remote branch already exists)", head.shorthand().or_utf8_err()?);
-			local_branch.set_upstream(Some(&remote_name))?;
-		}
+		self.track_remote_branch_of_same_name(&mut local_branch)?;
 
 		self.push_lfs_objects(
 			&remote,
@@ -117,10 +108,7 @@ impl<C: ActualCreds> RemoteConnect for Repo<'_, C> {
 		info!(target: TAG, "pushing refspecs: {refspec}");
 		remote.push(&[refspec], Some(&mut push_opts))?;
 
-		if !has_upstream && !has_corresponding_remote_branch {
-			info!(target: TAG, "set upstream for branch {:?} (remote branch created)", head.shorthand().or_utf8_err()?);
-			local_branch.set_upstream(Some(&remote_name))?;
-		}
+		self.track_remote_branch_of_same_name(&mut local_branch)?;
 
 		drop(cancel_token);
 		Ok(())
@@ -153,6 +141,11 @@ impl<C: ActualCreds> RemoteConnect for Repo<'_, C> {
 
 		remote.fetch(&refspec, Some(&mut opts), None)?;
 
+		let head = self.0.head().ok().filter(|head| head.is_branch());
+		if let Some(head_name) = head.as_ref().and_then(|head| head.shorthand()) {
+			self.track_remote_branch_of_same_name(&mut self.0.find_branch(head_name, BranchType::Local)?)?;
+		}
+
 		if !self.is_lazy_lfs_enabled()? {
 			self.pull_lfs_objects_by_head(make_lfs_callback(on_progress.clone(), cancel_token.clone()), cancel_token.clone())?;
 		} else {
@@ -179,6 +172,35 @@ impl<C: ActualCreds> RemoteConnect for Repo<'_, C> {
 		if !remote.connected() {
 			let cbs = self.create_remote_callbacks();
 			remote.connect_auth(direction, Some(cbs), Some(create_proxy_options()))?;
+		}
+
+		Ok(())
+	}
+}
+
+impl<C: Creds> Repo<'_, C> {
+	/// Pull merges the upstream, push writes to `origin/<same name>` — the two must be one branch.
+	/// The git CLI leaves `origin/master` as the upstream of `git checkout -b feature origin/master`.
+	fn track_remote_branch_of_same_name(&self, branch: &mut git2::Branch) -> Result<()> {
+		let local_name = branch.name()?.or_utf8_err()?.to_owned();
+		let own_remote_name = format!("origin/{local_name}");
+		let has_own_remote = self.0.find_branch(&own_remote_name, BranchType::Remote).is_ok();
+		let upstream = branch
+			.upstream()
+			.ok()
+			.and_then(|upstream| upstream.name().ok().flatten().map(str::to_owned));
+
+		match (upstream, has_own_remote) {
+			(Some(upstream), true) if upstream == own_remote_name => {}
+			(None, false) => {}
+			(upstream, true) => {
+				info!(target: TAG, "branch {local_name} tracked {upstream:?}; tracking {own_remote_name} instead");
+				branch.set_upstream(Some(&own_remote_name))?;
+			}
+			(Some(upstream), false) => {
+				warn!(target: TAG, "branch {local_name} tracked another branch {upstream}; tracking nothing until {own_remote_name} exists");
+				branch.set_upstream(None)?;
+			}
 		}
 
 		Ok(())

@@ -1,5 +1,5 @@
 import { DropdownMenuItem as UiKitDropdownMenuItem } from "ics-ui-kit/components/dropdown";
-import type { FC } from "react";
+import { forwardRef } from "react";
 import { tv } from "tailwind-variants";
 import type { ExtractComponentGeneric } from "../../lib/extractComponentGeneric";
 
@@ -18,8 +18,8 @@ const dropdownMenuItemVariants = tv({
 	},
 });
 
-export const DropdownMenuItem: FC<UiKitDropdownMenuItemProps> = ({ type, className, ...props }) => {
-	return (
+export const DropdownMenuItem = forwardRef<HTMLDivElement, UiKitDropdownMenuItemProps>(
+	({ type, className, ...props }, ref) => (
 		<UiKitDropdownMenuItem
 			{...props}
 			className={dropdownMenuItemVariants({ type, className })}
@@ -27,6 +27,7 @@ export const DropdownMenuItem: FC<UiKitDropdownMenuItemProps> = ({ type, classNa
 			data-dropdown-menu-item
 			data-qa="qa-clickable"
 			data-testid="dropdown-item"
+			ref={ref}
 		/>
-	);
-};
+	),
+);

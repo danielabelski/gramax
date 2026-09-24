@@ -52,10 +52,12 @@ homeTest.describe("Top Bar", () => {
 		const [workspace, dropdown] = await homePage.topBar.getSwitchWorkspace();
 		await dropdown.open();
 
-		dropdown.assertHasItems([{ title: "Test Space" }, { title: "Add space" }]);
+		// "Default Space" is what an untouched context carries. Asserting the workspace another spec
+		// file happens to leave behind makes this test depend on the order the worker picks files in.
+		dropdown.assertHasItems([{ title: "Default Space" }, { title: "Add space" }]);
 
-		await workspace.assertWorkspaces([{ name: "Test Space", icon: "layers" }]);
-		await workspace.assertCurrentWorkspace({ name: "Test Space", icon: "layers" });
+		await workspace.assertWorkspaces([{ name: "Default Space", icon: "layers" }]);
+		await workspace.assertCurrentWorkspace({ name: "Default Space", icon: "layers" });
 
 		await dropdown.close();
 		expect(await dropdown.isOpen()).toBe(false);

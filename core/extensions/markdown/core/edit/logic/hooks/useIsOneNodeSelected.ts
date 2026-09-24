@@ -3,7 +3,7 @@ import type { Editor } from "@tiptap/react";
 import { useEffect, useState } from "react";
 
 export const useIsOneNodeSelected = (editor: Editor) => {
-	const [isSelected, setIsSelected] = useState(false);
+	const [isSelected, setIsSelected] = useState(() => Boolean(editor && getIsSelectedOneNode(editor.state)));
 
 	useEffect(() => {
 		if (!editor) return;

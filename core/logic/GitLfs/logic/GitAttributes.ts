@@ -14,20 +14,25 @@ export default class GitAttributes implements ToSpan {
 		private _attrs: GitAttributesMap,
 		private _fp: FileProvider,
 		private _path: Path,
+		private _onSave?: (path: Path) => Promise<void>,
 	) {}
 
-	static async parse(fp: FileProvider, rootPath: Path): Promise<GitAttributes> {
+	static async parse(
+		fp: FileProvider,
+		rootPath: Path,
+		onSave?: (path: Path) => Promise<void>,
+	): Promise<GitAttributes> {
 		const path = rootPath.join(GIT_ATTRIBUTES_PATH);
 		const exists = await fp.exists(path);
 
-		if (!exists) return new GitAttributes(new Map(), fp, path);
+		if (!exists) return new GitAttributes(new Map(), fp, path, onSave);
 
 		const raw = await fp.read(path);
 		const attrs = new Map(
 			parseGitAttributes(raw).map((e) => [e.pattern, { attributes: e.attributes, disabled: e.disabled }]),
 		);
 
-		return new GitAttributes(attrs, fp, path);
+		return new GitAttributes(attrs, fp, path, onSave);
 	}
 
 	findPatternsByAttr(attr: string): string[] {
@@ -85,6 +90,10 @@ export default class GitAttributes implements ToSpan {
 	async save() {
 		if (!this._dirty) return;
 		await this._fp.write(this._path, this.serialize());
+		this._dirty = false;
+		// The clean filter reads attributes from the index, not the working copy, so a mask only on disk
+		// does not apply to the very file it was written for. Staging here is what makes the next `add` work.
+		await this._onSave?.(this._path);
 	}
 
 	toSpan() {

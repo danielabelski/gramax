@@ -1,18 +1,27 @@
 import { cn } from "@core-ui/utils/cn";
 import { useAgentChatIsOpen } from "@ext/agent/components/store/AgentChatIsOpenStore";
 import { useChatMessages } from "@ext/agent/components/store/ChatStore";
+import t from "@ext/localization/locale/translate";
+import {
+	PanelEmptyState,
+	PanelEmptyStateDescription,
+	PanelEmptyStateIcon,
+	PanelEmptyStateTitle,
+} from "@ui-kit/FloatingPanel";
 import { ScrollShadowContainer } from "@ui-kit/ScrollShadowContainer";
 import { memo, useMemo, useRef } from "react";
+import { ScrollGuardProvider } from "../context/scrollGuardContext";
 import { useScrollToBottom } from "../hooks/useScrollToBottom";
 import type { ChatMessage } from "../types/chat";
 import { MessageGroup } from "./MessageGroup";
 import { type Section, SectionBlock } from "./SectionBlock";
+import { SelectionQuoteTooltip } from "./SelectionQuoteTooltip";
 
 export const MessageList = memo(() => {
 	const { messages, streamingMessageId, showAgentThinking } = useChatMessages();
 	const isOpen = useAgentChatIsOpen();
 
-	const { scrollContainerRef, innerContentRef } = useScrollToBottom(messages, isOpen);
+	const { scrollContainerRef, innerContentRef, scrollGuardStore } = useScrollToBottom(messages, isOpen);
 
 	const prevSectionsRef = useRef<Section[]>([]);
 	const prevPreambleRef = useRef<ChatMessage[]>([]);
@@ -61,29 +70,41 @@ export const MessageList = memo(() => {
 			className="overflow-x-hidden min-h-0 flex-1 h-full [&>div]:h-full [overflow-anchor:none]"
 			ref={scrollContainerRef}
 		>
-			<div className="flex h-full w-full min-w-0 flex-1 flex-col px-4" ref={innerContentRef}>
-				{preamble.length > 0 && (
-					<div className={cn("flex flex-col gap-2", sections.length > 0 && "mb-2")}>
-						<MessageGroup
-							messages={preamble}
-							streamingMessageId={sections.length === 0 ? streamingMessageId : null}
-						/>
-					</div>
-				)}
+			<SelectionQuoteTooltip containerRef={innerContentRef} />
+			<ScrollGuardProvider store={scrollGuardStore}>
+				<div className="flex h-full w-full min-w-0 flex-1 flex-col px-4" ref={innerContentRef}>
+					{messages.length === 0 && (
+						<PanelEmptyState>
+							<PanelEmptyStateIcon icon="sparkles" />
+							<PanelEmptyStateTitle>{t("agent.empty-state.title")}</PanelEmptyStateTitle>
+							<PanelEmptyStateDescription className="max-w-64 whitespace-pre-line">
+								{t("agent.empty-state.description")}
+							</PanelEmptyStateDescription>
+						</PanelEmptyState>
+					)}
+					{preamble.length > 0 && (
+						<div className={cn("flex flex-col gap-2", sections.length > 0 && "mb-2")}>
+							<MessageGroup
+								messages={preamble}
+								streamingMessageId={sections.length === 0 ? streamingMessageId : null}
+							/>
+						</div>
+					)}
 
-				{sections.map((section, index) => {
-					const isLast = index === sections.length - 1;
-					return (
-						<SectionBlock
-							isLast={isLast}
-							key={section.user.id}
-							section={section}
-							showThinking={isLast && showAgentThinking}
-							streamingMessageId={isLast ? streamingMessageId : null}
-						/>
-					);
-				})}
-			</div>
+					{sections.map((section, index) => {
+						const isLast = index === sections.length - 1;
+						return (
+							<SectionBlock
+								isLast={isLast}
+								key={section.user.id}
+								section={section}
+								showThinking={isLast && showAgentThinking}
+								streamingMessageId={isLast ? streamingMessageId : null}
+							/>
+						);
+					})}
+				</div>
+			</ScrollGuardProvider>
 		</ScrollShadowContainer>
 	);
 });

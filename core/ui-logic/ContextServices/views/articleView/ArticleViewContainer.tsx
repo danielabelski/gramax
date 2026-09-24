@@ -7,7 +7,7 @@ const ArticleViewContainer = ({ data, children }: { data: ArticlePageData; child
 	const ArticleView = ArticleViewService.value;
 	const ArticleBottomView = ArticleViewService.getBottomView();
 
-	usePluginEvent("article:open", { data });
+	usePluginEvent("article:open", data);
 
 	return (
 		<>

@@ -9,8 +9,9 @@ import { Button } from "@ui-kit/Button";
 import { useState } from "react";
 
 const resolveLabelText = (status: UploadStatus["status"]) => {
-	if (!status) return t("cloud.upload-modal.status.building");
+	if (status === "error") return t("cloud.upload-modal.status.error");
 	if (status === "uploading") return t("cloud.upload-modal.status.publishing");
+	return t("cloud.upload-modal.status.building");
 };
 
 const UploadCloudProgress = ({ progress }: Pick<UploadStatus, "progress">) => {
@@ -26,7 +27,7 @@ const UploadButton = ({ actionText, onUpload }: { actionText: string; onUpload: 
 	const [startUploading, setStartUploading] = useState(false);
 
 	const apiUrlCreator = ApiUrlCreatorService.value;
-	const { status, error, progress } = useUploadProgress(startUploading);
+	const { status, progress } = useUploadProgress(startUploading);
 
 	const onClick = async () => {
 		setStartUploading(true);

@@ -46,7 +46,7 @@ const useClonePublic = () => {
 
 			return await startClone({ storageData, branch: shareData.branch, redirectOnClone: redirect });
 		},
-		[startClone, pageDataContext?.shareData, isReadOnly, router],
+		[startClone, isReadOnly],
 	);
 };
 
@@ -55,17 +55,25 @@ const usePathnameCloneHandler = () => {
 	const pageDataContext = PageDataContextService.value;
 	const startClonePublic = useClonePublic();
 	const { isReadOnly } = pageDataContext.conf;
+	const { shareData } = pageDataContext;
 
 	useEffect(() => {
-		const shareData = pageDataContext.shareData;
 		if (!router || !shareData) return;
+
+		const mutable: { handled?: boolean } = {};
+		if (!isReadOnly) RouterPathProvider.events.emitSync("unresolved-path", { path: router.path, mutable });
+		if (mutable.handled) {
+			pageDataContext.shareData = null;
+			void router.pushPath("/");
+			return;
+		}
 
 		const isPublic = shareData.isPublic;
 
 		if (isPublic) {
 			if (isReadOnly) return;
 			if (typeof window !== "undefined" && !window.desktopOpened) {
-				startClonePublic(shareData as GitShareData);
+				void startClonePublic(shareData as GitShareData);
 			}
 		} else {
 			ModalToOpenService.setValue<ComponentProps<typeof CloneHandler>>(ModalToOpen.CloneHandler, {
@@ -73,7 +81,7 @@ const usePathnameCloneHandler = () => {
 			});
 			pageDataContext.shareData = null;
 		}
-	}, [pageDataContext.shareData, router, isReadOnly]);
+	}, [shareData, router, isReadOnly, startClonePublic]);
 };
 
 export default usePathnameCloneHandler;

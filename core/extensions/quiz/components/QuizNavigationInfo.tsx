@@ -74,7 +74,7 @@ const CollapsibleInfo = ({ answeredCount, totalCount, state, questions, setFocus
 
 	return (
 		<Collapsible onOpenChange={setOpen} open={open}>
-			<GroupHeader>
+			<GroupHeader className="opacity-70 uppercase">
 				<CollapsibleTrigger
 					className="w-full flex justify-between items-center"
 					style={{ textTransform: "uppercase" }}
@@ -138,7 +138,7 @@ const Statistics = () => {
 
 	return (
 		<>
-			<GroupHeader style={{ marginTop: 0 }}>
+			<GroupHeader className="opacity-70 uppercase">
 				<div>{t("quiz.info.statistics.title")}</div>
 			</GroupHeader>
 			<ul style={{ paddingLeft: "0" }}>

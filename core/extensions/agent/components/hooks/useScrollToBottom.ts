@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import type { ChatMessage } from "../types/chat";
+import { createScrollGuardStore } from "./scrollGuardStore";
 
 export const useScrollToBottom = (messages: ChatMessage[], isOpen: boolean) => {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -7,6 +8,7 @@ export const useScrollToBottom = (messages: ChatMessage[], isOpen: boolean) => {
 	const prevLastUserIdRef = useRef<string | null>(null);
 	const isUserScrolledUp = useRef(false);
 	const isProgrammaticScroll = useRef(false);
+	const scrollGuardStore = useMemo(() => createScrollGuardStore(), []);
 
 	useEffect(() => {
 		const root = scrollContainerRef.current;
@@ -87,11 +89,11 @@ export const useScrollToBottom = (messages: ChatMessage[], isOpen: boolean) => {
 
 		let rafId: number | null = null;
 		const mo = new MutationObserver(() => {
-			if (!alive || isUserScrolledUp.current) return;
+			if (!alive || isUserScrolledUp.current || scrollGuardStore.hasOpenGuard()) return;
 			if (rafId !== null) return;
 			rafId = requestAnimationFrame(() => {
 				rafId = null;
-				if (!alive || isUserScrolledUp.current) return;
+				if (!alive || isUserScrolledUp.current || scrollGuardStore.hasOpenGuard()) return;
 				scrollToEnd("instant");
 			});
 		});
@@ -103,7 +105,7 @@ export const useScrollToBottom = (messages: ChatMessage[], isOpen: boolean) => {
 			if (scrollEndTimeoutId !== null) clearTimeout(scrollEndTimeoutId);
 			mo.disconnect();
 		};
-	}, [lastUserMessageId]);
+	}, [lastUserMessageId, scrollGuardStore]);
 
-	return { scrollContainerRef, innerContentRef };
+	return { scrollContainerRef, innerContentRef, scrollGuardStore };
 };

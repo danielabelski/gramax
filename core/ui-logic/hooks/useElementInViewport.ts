@@ -1,6 +1,6 @@
 import ViewportIntersectionService from "@core-ui/ContextServices/ViewportIntersection";
 import { useScrollPositionStore } from "@core-ui/stores/ScrollPositionStore";
-import { type RefObject, useCallback, useEffect, useMemo, useState } from "react";
+import { type RefObject, useCallback, useEffect, useState } from "react";
 
 interface UseElementInViewportOptions {
 	/** Margin around the viewport used to grow the intersection box, e.g. "600px 0px" to preload before entry. */
@@ -22,10 +22,7 @@ const useElementInViewport = (
 ): boolean => {
 	const viewportIntersectionService = ViewportIntersectionService.value;
 	const isRestoringScrollPosition = useScrollPositionStore((state) => state.isRestoringScrollPosition);
-	const canObserve = useMemo(
-		() => enabled && !isRestoringScrollPosition && typeof IntersectionObserver !== "undefined",
-		[enabled, isRestoringScrollPosition],
-	);
+	const canObserve = enabled && !isRestoringScrollPosition && typeof IntersectionObserver !== "undefined";
 	const [hasEnteredViewport, setHasEnteredViewport] = useState(false);
 	const markAsEntered = useCallback(() => setHasEnteredViewport(true), []);
 

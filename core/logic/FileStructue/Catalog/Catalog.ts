@@ -343,8 +343,8 @@ export class Catalog<P extends CatalogProps = CatalogProps>
 		this._update(arg.catalog);
 	}
 
-	async updateItemProps(props: UpdateItemProps, makeResourceUpdater: MakeResourceUpdater) {
-		const item: Item = this.findArticle(props.logicPath, []);
+	/** The item is passed in, not looked up by path: a path changes on rename and repeats between items. */
+	async updateItemProps(item: Item, props: UpdateItemProps, makeResourceUpdater: MakeResourceUpdater) {
 		if (!item) return;
 		const ref = { ...item.ref };
 		await item.updateProps(props, makeResourceUpdater(this), this);
@@ -469,8 +469,11 @@ export class Catalog<P extends CatalogProps = CatalogProps>
 		const item = this.findItemByItemRef<Article>(from);
 		assert(item, `Item '${from.path.value}' wasn't found in catalog ${this.basePath.value}`);
 
-		const shouldRecordAlias = isRoot && !silent && !NEW_ARTICLE_REGEX.test(item.getFileName());
-		const aliasFrom = shouldRecordAlias ? this.relativeLogicPath(item.logicPath) : null;
+		// every language version is moved by its own moveItem call, and only the item that owns aliases
+		// (the main-language one) records the move — a translation leaves it to its twin
+		const ownsAliases = this.aliases.ownerOf(item) === item;
+		const shouldRecordAlias = isRoot && ownsAliases && !NEW_ARTICLE_REGEX.test(item.getFileName());
+		const aliasFrom = shouldRecordAlias ? this.aliases.relativePath(item.logicPath) : null;
 		if (shouldRecordAlias) this.aliases.assertNotManual(aliasFrom, item);
 
 		if (!item.props.shouldBeCreated) await item.getContent();
@@ -499,9 +502,14 @@ export class Catalog<P extends CatalogProps = CatalogProps>
 			await resourceUpdater.updateOtherArticlesBatch(collect, innerRefs);
 		}
 
-		if (shouldRecordAlias) {
+		if (isRoot) {
+			// The item now lives at its destination, so nobody else may keep an auto alias
+			// pointing there. Not gated on shouldRecordAlias: moving a brand-new article records
+			// no alias of its own, but it occupies the path all the same.
 			const aliasTo = this.relativeLogicPath(movedItem.logicPath);
-			if (aliasFrom && aliasFrom !== aliasTo) {
+			await this.aliases.stealAuto(aliasTo, movedItem);
+
+			if (shouldRecordAlias && aliasFrom && aliasFrom !== aliasTo) {
 				await this.aliases.stealAuto(aliasFrom, movedItem);
 				recordMoveAlias(movedItem.props, aliasFrom, aliasTo);
 				await movedItem.save();

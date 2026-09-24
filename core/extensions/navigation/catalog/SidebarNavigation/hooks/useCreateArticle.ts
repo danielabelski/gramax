@@ -2,6 +2,7 @@ import { useRouter } from "@core/Api/useRouter";
 import FetchService from "@core-ui/ApiServices/FetchService";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import { refreshPage } from "@core-ui/utils/initGlobalFuncs";
+import { followRenamedPath, whenRenameSettled } from "@core-ui/utils/renameInFlight";
 import NavigationEvents from "@ext/navigation/NavigationEvents";
 import { useCallback, useEffect, useRef } from "react";
 import { navigationTreeStore, useNavigationTreeStore } from "../store/navigationTreeStore";
@@ -26,12 +27,17 @@ export const useProvideCreateArticle = () => {
 	apiUrlCreatorRef.current = apiUrlCreator;
 
 	const createArticle = useCallback(async (parentId?: string, afterId?: string) => {
-		const url = apiUrlCreatorRef.current.createArticle(parentId, afterId);
+		// The tree still names the file a rename in flight has already left, and the server refuses to
+		// place an article next to a path that is gone — the click would be lost without a word.
+		const moved = await whenRenameSettled();
+		const follow = (id?: string) => (moved && id ? followRenamedPath(id, moved) : id);
+
+		const url = apiUrlCreatorRef.current.createArticle(follow(parentId), follow(afterId));
 		const response = await FetchService.fetch(url);
 		if (!response.ok) return refreshPage();
 
 		const path = await response.text();
-		if (parentId) navigationTreeStore.getState().toggleExpanded(parentId, true);
+		if (parentId) navigationTreeStore.getState().toggleExpanded(follow(parentId), true);
 
 		const mutable = { preventGoto: false };
 		await NavigationEvents.emit("item-create", { path, mutable });

@@ -4,7 +4,110 @@ import type { PreTransformerFunc } from "@ext/markdown/core/Parser/Transformer/p
 import { COL_MIN_WIDTH } from "@ext/markdown/elements/table/edit/model/nodes/customTable";
 import type Token from "markdown-it/lib/token";
 
-const tableTransform: PreTransformerFunc = ({ tokens, ...otherProps }) => {
+// Tags that make up a table. Written one per line they are tokenized as block tokens, but
+// written several to a line (`<tr><td>a</td></tr>`) they land inside a paragraph's inline
+// token instead. A table split across both forms cannot be transformed, so lift the tags of
+// the inline half up to block level first and keep the whole table in one token stream.
+const TABLE_TAGS = ["table", "tr", "td", "th"];
+
+const isHoistableTableTag = (token: Token) =>
+	(token.type === "tag_open" || token.type === "tag_close") && TABLE_TAGS.includes(token.meta?.tag);
+
+const isBlank = (token: Token) => token.type === "softbreak" || (token.type === "text" && !token.content.trim());
+
+const hoistInlineTableTags = (tokens: Token[]): Token[] => {
+	const result: Token[] = [];
+
+	for (let idx = 0; idx < tokens.length; idx++) {
+		const token = tokens[idx];
+		if (token.type !== "inline" || !token.children?.some(isHoistableTableTag)) {
+			result.push(token);
+			continue;
+		}
+
+		const inParagraph = tokens[idx - 1]?.type === "paragraph_open" && tokens[idx + 1]?.type === "paragraph_close";
+		if (inParagraph) {
+			result.pop();
+			idx++;
+		}
+
+		let chunk: Token[] = [];
+		const flushChunk = () => {
+			const children = chunk;
+			chunk = [];
+			if (children.every(isBlank)) return;
+
+			result.push({ type: "paragraph_open", tag: "p", nesting: 1 } as Token);
+			result.push({ ...token, children, content: children.map((child) => child.content).join("") } as Token);
+			result.push({ type: "paragraph_close", tag: "p", nesting: -1 } as Token);
+		};
+
+		for (const child of token.children) {
+			if (!isHoistableTableTag(child)) {
+				chunk.push(child);
+				continue;
+			}
+			flushChunk();
+			result.push(child);
+		}
+		flushChunk();
+	}
+
+	return result;
+};
+
+// A row holds cells and nothing else, but Markdown can put a block between them: content
+// indented by four spaces after a blank line, for instance, is tokenized as a code block.
+// Such a row cannot be built as a table, so keep the content and give it a cell of its own.
+const wrapRowContentInCell = (tokens: Token[]): Token[] => {
+	const result: Token[] = [];
+	let inRow = false;
+	let inCell = false;
+	let orphans: Token[] = [];
+
+	const flushOrphans = () => {
+		const children = orphans;
+		orphans = [];
+		if (!children.length || children.every(isBlank)) return;
+
+		result.push({
+			type: "tag_open",
+			tag: "",
+			info: "td",
+			nesting: 1,
+			meta: { tag: "td", attributes: [] },
+		} as Token);
+		result.push(...children);
+		result.push({ type: "tag_close", tag: "", info: "/td", nesting: -1, meta: { tag: "td" } } as Token);
+	};
+
+	for (const token of tokens) {
+		const tagName = isHoistableTableTag(token) ? token.meta.tag : null;
+		if (tagName) {
+			flushOrphans();
+			if (tagName === "table") inRow = inCell = false;
+			if (tagName === "tr") {
+				inRow = token.type === "tag_open";
+				inCell = false;
+			}
+			if (tagName === "td" || tagName === "th") inCell = token.type === "tag_open";
+			result.push(token);
+			continue;
+		}
+
+		if (inRow && !inCell) {
+			orphans.push(token);
+			continue;
+		}
+		result.push(token);
+	}
+	flushOrphans();
+
+	return result;
+};
+
+const tableTransform: PreTransformerFunc = ({ tokens: rawTokens, ...otherProps }) => {
+	const tokens = wrapRowContentInCell(hoistInlineTableTags(rawTokens));
 	let depth = -1;
 	const tableStates: {
 		isCell: boolean;
@@ -74,6 +177,14 @@ const tableTransform: PreTransformerFunc = ({ tokens, ...otherProps }) => {
 			continue;
 		}
 		if (token.type === "tag_close" && token.info === "/table") {
+			// A close with no open belongs to no table: dropping it keeps the rest of the
+			// article readable, while closing one more level would run past tableStates.
+			if (depth === -1) {
+				tokens.splice(idx, 1);
+				idx--;
+				continue;
+			}
+
 			tokens.splice(
 				idx,
 				1,

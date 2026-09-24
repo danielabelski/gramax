@@ -39,8 +39,10 @@ export default abstract class BaseCatalog<P extends CatalogProps = CatalogProps,
 	private _isReadOnly: boolean;
 	private _rootCategoryRef: ItemRef;
 	private _repo: Repository;
+	private _pathnameEvents: FileStructure["events"];
 
 	constructor(init: BaseCatalogInitProps) {
+		this._pathnameEvents = init.fs.events;
 		this._name = init.name;
 		this._basePath = init.basePath;
 		this._isReadOnly = init.isReadOnly;
@@ -101,9 +103,12 @@ export default abstract class BaseCatalog<P extends CatalogProps = CatalogProps,
 	}
 
 	async getPathname(item?: Item<I>): Promise<string> {
-		return this._isReadOnly
-			? Promise.resolve(RouterPathProvider.getReadOnlyPathname(item ? item.logicPath : this._name))
-			: RouterPathProvider.getPathname(await this.getPathnameData(item)).value;
+		if (this._isReadOnly) return RouterPathProvider.getReadOnlyPathname(item ? item.logicPath : this._name);
+
+		const pathnameData = await this.getPathnameData(item);
+		const mutable = { pathname: RouterPathProvider.getPathname(pathnameData).value };
+		await this._pathnameEvents.emit("catalog-pathname-resolve", { pathnameData, mutable });
+		return mutable.pathname;
 	}
 
 	async getPathnameData(item?: Item<I>): Promise<PathnameData> {
@@ -122,7 +127,7 @@ export default abstract class BaseCatalog<P extends CatalogProps = CatalogProps,
 			console.error(e);
 		}
 
-		return {
+		const pathnameData: PathnameData = {
 			sourceName: await this.repo.storage.getSourceName(),
 			group,
 			repo: await this.repo.storage.getName(),
@@ -130,6 +135,7 @@ export default abstract class BaseCatalog<P extends CatalogProps = CatalogProps,
 			catalogName: this.name,
 			itemLogicPath,
 		};
+		return pathnameData;
 	}
 
 	async updateProps(props: CatalogEditProps | CatalogProps, _makeResourceUpdater: MakeResourceUpdater) {

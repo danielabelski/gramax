@@ -4,7 +4,6 @@ import { buildGroupChanges } from "@ext/enterprise/components/admin/settings/gro
 import { nameColumn } from "@ext/enterprise/components/admin/settings/members/config/nameColumn";
 import { userBadgesColumn } from "@ext/enterprise/components/admin/settings/members/config/userBadgesColumn";
 import { userColumn, userColumnId } from "@ext/enterprise/components/admin/settings/members/config/userColumn";
-import { useEditorSheet } from "@ext/enterprise/components/admin/settings/members/hooks/useEditorSheet";
 import { useLinkedItems } from "@ext/enterprise/components/admin/settings/members/hooks/useLinkedItems";
 import { useMemberAccessDraft } from "@ext/enterprise/components/admin/settings/members/hooks/useMemberAccessDraft";
 import type { AccessChange } from "@ext/enterprise/components/admin/settings/members/model/AccessChange";
@@ -22,6 +21,7 @@ import { useGroupRoleRules } from "@ext/enterprise/components/admin/settings/mem
 import { repoColumnId } from "@ext/enterprise/components/admin/settings/resources/model/repoColumn";
 import { GroupSource } from "@ext/enterprise/components/admin/settings/workspace/components/access/components/group/types/GroupTypes";
 import { useRowSelectionWithData } from "@ext/enterprise/components/admin/ui-kit/table/useRowSelection";
+import { useEditorSheet } from "@ext/enterpriseCommon/hooks/useEditorSheet";
 import t from "@ext/localization/locale/translate";
 import type { ColumnDef } from "@ui-kit/DataTable";
 import { useCallback, useMemo, useState } from "react";
@@ -36,6 +36,7 @@ interface UseGroupCardArgs {
 export const useGroupCard = ({ group, aggregate, onApply, onClose }: UseGroupCardArgs) => {
 	const isAdd = !group;
 	const isSystemOrSso = !isAdd && (!group || isSystemGroup(group));
+	const isSso = group?.source === GroupSource.SSO_GROUPS;
 
 	const { ssoUsersEnabled } = useSettings();
 
@@ -44,13 +45,13 @@ export const useGroupCard = ({ group, aggregate, onApply, onClose }: UseGroupCar
 	const [submitAttempted, setSubmitAttempted] = useState(false);
 
 	const wasWorkspaceOwner = group?.isWorkspaceOwner ?? false;
-	const [isOwner, setIsOwner] = useState(wasWorkspaceOwner);
+	const [isOwner, setIsOwner] = useState(isSso ? false : wasWorkspaceOwner);
 	const groupId = isAdd ? name : group.id;
 
 	const accessPickerState = useOpenState({ keyBase: "access" });
 	const userPickerState = useOpenState({ keyBase: "user" });
 
-	const { roleRules } = useGroupRoleRules();
+	const { roleRules } = useGroupRoleRules(group?.source);
 	const originalAccesses = useMemo(
 		() => (group ? (aggregate.groupAccesses.get(group.id) ?? []) : []),
 		[group, aggregate],
@@ -59,7 +60,7 @@ export const useGroupCard = ({ group, aggregate, onApply, onClose }: UseGroupCar
 	const [accessRowsMap, setAccessRowsMap] = useState(() => {
 		const res = new Map<string, MemberAccess>();
 		originalAccesses.forEach((x) => {
-			res.set(x.resourceId, x);
+			res.set(x.resourceId, isSso ? { ...x, role: "reader" } : x);
 		});
 		return res;
 	});
@@ -231,6 +232,7 @@ export const useGroupCard = ({ group, aggregate, onApply, onClose }: UseGroupCar
 			onNameBlur: handleNameBlur,
 			nameReadonly: !isAdd,
 			isWorkspaceOwner: isOwner,
+			isWorkspaceOwnerDisabled: isSso,
 			setWorkspaceOwner: setIsOwner,
 		},
 		access: {

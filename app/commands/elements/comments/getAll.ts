@@ -28,7 +28,10 @@ const getAllComments: Command<
 		assert(catalog, "Catalog not found");
 
 		const article = catalog.findItemByItemPath<Article>(articlePath);
-		assert(article, `Article ${articlePath.value} not found`);
+		// A stale getAll can arrive for a path that no longer exists (article just renamed or
+		// deleted). A missing article simply has no comments — return empty instead of throwing a
+		// user-facing "Article not found" error.
+		if (!article) return {};
 
 		const context = await parserContextFactory.fromArticle(
 			article,

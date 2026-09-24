@@ -34,7 +34,7 @@ const WebOpenSourceTopMenu = ({ section }: { section?: Section }) => {
 				{hasWorkspace && <TopMenuSearch section={section} />}
 				<TopMenuSwitchUiLanguageButton />
 				<TopMenuThemeToggle />
-				<UserMenu />
+				<UserMenu showHomeLayoutControls />
 			</TopMenuRightSide>
 		</TopMenuWrapper>
 	);
@@ -43,7 +43,7 @@ const WebOpenSourceTopMenu = ({ section }: { section?: Section }) => {
 const WebOpenSourceHomePage = ({ data }: { data: HomePageData }) => {
 	return (
 		<HomePageWrapper>
-			<WebOpenSourceTopMenu section={data.section} />
+			<WebOpenSourceTopMenu section={data.views.global.section} />
 			<HomePageCatalogListContent data={data} />
 			<BottomInfo />
 			<GlobalAudioToolbar />

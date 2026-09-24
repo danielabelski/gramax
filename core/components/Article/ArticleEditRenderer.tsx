@@ -4,8 +4,10 @@ import { ArticleParent } from "@components/Article/ArticleRenderer";
 import { useRouter } from "@core/Api/useRouter";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import ResourceService from "@core-ui/ContextServices/ResourceService/ResourceService";
+import { useArticleViewKey } from "@core-ui/ContextServices/views/articleView/ArticleViewKey";
 import Workspace from "@core-ui/ContextServices/Workspace";
 import { useDebounce } from "@core-ui/hooks/useDebounce";
+import useRenameAwareWrites from "@core-ui/hooks/useRenameAwareWrites";
 import useWatch from "@core-ui/hooks/useWatch";
 import { transliterate } from "@core-ui/languageConverter/transliterate";
 import { useArticlePropsStore } from "@core-ui/stores/ArticlePropsStore/ArticlePropsStore.provider";
@@ -26,6 +28,7 @@ import type { Editor } from "@tiptap/core";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import ContentEditor from "../../extensions/markdown/core/edit/components/ContentEditor";
 import getExtensions from "../../extensions/markdown/core/edit/logic/getExtensions";
+import { useArticleTitleUpdateQueue } from "./ArticleTitleUpdateQueue";
 import ArticleUpdater from "./ArticleUpdater/ArticleUpdater";
 
 export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps<"edit">) => {
@@ -47,26 +50,28 @@ export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps
 
 	const propertyService = PropertyService.value;
 
-	const apiUrlCreatorRef = useRef(apiUrlCreator);
-	const articlePropsRef = useRef(articleProps);
-	const propertyServiceRef = useRef(propertyService);
+	const view = useArticleViewKey();
+	const { articlePropsRef, apiUrlCreatorRef, sendContext, trackRename } = useRenameAwareWrites({
+		articleProps,
+		updateArticleProps,
+		apiUrlCreator,
+		propertyService,
+		view,
+	});
+
 	const editorUpdateContent = createOnUpdateCallback();
-	const updateTitle = createUpdateTitleFunction();
+	const updateTitle = useMemo(() => createUpdateTitleFunction(), []);
 	const editorHandlePaste = createHandlePasteCallback(resourceService);
-
-	const pendingPromise = useRef(Promise.resolve());
-	const lastUpdateRef = useRef<{ filename?: string }>({});
-
-	useWatch(() => {
-		apiUrlCreatorRef.current = apiUrlCreator;
-		articlePropsRef.current = articleProps;
-		propertyServiceRef.current = propertyService;
-	}, [apiUrlCreator, articleProps, propertyService.articleProperties]);
 
 	// Title the article had when it was opened. A placeholder file (untitled/new_article_*)
 	// is renamed to the title slug only after the user actually edits the title — cloned
 	// catalogs may legitimately contain such files, and renaming them on mere focus loss
 	// leaves the rest of the UI holding a stale article path.
+	// Which article this editor was opened for. Taken once: `ref.path` is an address, and a rename
+	// moves it under the same open article — read live, it would tell the document sync that another
+	// article arrived, and the sync replaces the whole editor state. Another article remounts this.
+	const articleId = useRef(articleProps.ref.path).current;
+
 	const loadedTitleRef = useRef(articleProps.title);
 	useWatch(() => {
 		loadedTitleRef.current = articleProps.title;
@@ -74,33 +79,30 @@ export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps
 
 	const updateContent = useCallback(
 		async (editor: Editor) => {
-			await editorUpdateContent({
-				editor,
-				apiUrlCreator: apiUrlCreatorRef.current,
-				articleProps: articlePropsRef.current,
-			});
+			const { apiUrlCreator, articleProps } = await sendContext();
+			await editorUpdateContent({ editor, apiUrlCreator, articleProps });
 		},
-		[editorUpdateContent],
+		[editorUpdateContent, sendContext],
 	);
 
 	const { start: debouncedUpdateContent, cancel: cancelDebouncedUpdateContent } = useDebounce(updateContent, 500);
+	const enqueueTitleUpdate = useArticleTitleUpdateQueue(async (newTitle, fileName) => {
+		// Taken only after earlier title updates finish, so a rename always uses the latest path.
+		const context = await sendContext();
+		const update = updateTitle(context, router, newTitle, fileName);
+		await (fileName ? trackRename(update) : update);
+	});
 
 	const { start: debouncedUpdateTitle, cancel: cancelDebouncedUpdateTitle } = useDebounce(
 		async (newTitle: string, fileName?: string) => {
-			await updateTitle(
-				{
-					apiUrlCreator: apiUrlCreatorRef.current,
-					articleProps: articlePropsRef.current,
-					propertyService: propertyServiceRef.current,
-				},
-				router,
-				newTitle,
-				fileName,
-			);
+			await enqueueTitleUpdate(newTitle, fileName);
 		},
 		500,
 	);
 
+	// Pending saves are cancelled when the article closes, and only then. The file path as a dependency
+	// would mean "another article", but it also changes under the same one — on rename — and the
+	// cleanup would then cancel the save of the text just typed. Another article remounts this anyway.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	useEffect(() => {
 		return () => {
@@ -108,10 +110,12 @@ export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps
 			cancelDebouncedUpdateContent();
 			cancelDebouncedUpdateTitle();
 		};
-	}, [cancelDebouncedUpdateContent, cancelDebouncedUpdateTitle, apiUrlCreator, articleProps.ref.path]);
+	}, []);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: refs are read here, not depended on
 	const onTitleNeedsUpdate = useCallback(
-		({ newTitle, apiUrlCreator }: { newTitle: string } & BaseEditorContext) => {
+		({ newTitle }: { newTitle: string } & BaseEditorContext) => {
+			cancelDebouncedUpdateTitle();
 			const maybeKebabName =
 				newTitle &&
 				newTitle !== loadedTitleRef.current &&
@@ -120,23 +124,9 @@ export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps
 					: undefined;
 
 			if (maybeKebabName || newTitle !== articlePropsRef.current?.title)
-				pendingPromise.current = pendingPromise.current.finally(async () => {
-					if (lastUpdateRef.current.filename === maybeKebabName) return;
-
-					lastUpdateRef.current = { filename: maybeKebabName };
-					await updateTitle(
-						{
-							articleProps: articlePropsRef.current,
-							apiUrlCreator,
-							propertyService: propertyServiceRef.current,
-						},
-						router,
-						newTitle,
-						maybeKebabName,
-					);
-				});
+				void enqueueTitleUpdate(newTitle, maybeKebabName);
 		},
-		[updateTitle, router],
+		[cancelDebouncedUpdateTitle, enqueueTitleUpdate],
 	);
 
 	const onContentUpdate = ({ editor }: { editor: Editor }) => {
@@ -153,7 +143,9 @@ export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps
 		}
 	};
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
+	// A new array here rebuilds the editor from scratch (ContentEditor keys useEditor on it), so it
+	// must track what the extensions are actually built from — not the article path. Opening another
+	// article remounts this component anyway; a rename changes the path under the same open editor.
 	const extensions = useMemo(
 		() =>
 			getExtensions({
@@ -161,7 +153,7 @@ export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps
 				includeQuestions: isGES && gesModules?.quiz,
 				...(articleProps.template && { isTemplateInstance: true }),
 			}),
-		[articleProps.ref.path, articleProps.template, isGES, gesModules?.quiz],
+		[articleProps.template, isGES, gesModules?.quiz],
 	);
 
 	return (
@@ -169,6 +161,7 @@ export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps
 			<ArticleParent>
 				<ContentEditor
 					apiUrlCreatorRef={apiUrlCreatorRef}
+					articleId={articleId}
 					articlePropsRef={articlePropsRef}
 					content={content}
 					extensions={extensions}

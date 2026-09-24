@@ -8,6 +8,7 @@ import type { ReadonlyCatalog } from "@core/FileStructue/Catalog/ReadonlyCatalog
 import type { Item } from "@core/FileStructue/Item/Item";
 import debounceFunction from "@core-ui/debounceFunction";
 import { resolveRootCategory } from "@ext/localization/core/catalogExt";
+import { traced } from "@ext/loggers/opentelemetry";
 import type { PropertyValue } from "@ext/properties/models";
 import {
 	normalizeArticleProperties,
@@ -26,6 +27,7 @@ import type {
 	SearchArticleItemMetadata,
 	SearchArticleKey,
 } from "@ext/serach/modulith/SearchArticle";
+import type { SearchRuntimeHealth } from "@ext/serach/modulith/SearchHealthchecker";
 import type {
 	SearchResult as ClientSearchResult,
 	SearchResultItem as ClientSearchResultItem,
@@ -73,6 +75,7 @@ export interface ModulithServiceOptions {
 	sap: SearchArticleParser;
 	immediateIndexing?: boolean;
 	resourceSearchEnabled?: boolean;
+	failOnRemoteError?: boolean;
 }
 
 const PROGRESS_UPDATE_TIMEOUT_MS = 500;
@@ -101,20 +104,30 @@ export class ModulithService {
 		if (getExecutingEnvironment() === "cli" || global?.VITE_ENVIRONMENT === "test") return;
 
 		_options.wm.onCatalogChange(({ catalog }) => {
-			void this._onCatalogChange(catalog);
+			void traced("search-catalog-change", () => this._onCatalogChange(catalog)).catch(() => {});
 		});
 
 		_options.wm.onCatalogAdd(({ catalog }) => {
-			void this._onCatalogChange(catalog);
+			void traced("search-catalog-add", () => this._onCatalogChange(catalog)).catch(() => {});
 		});
 
 		_options.wm.onCatalogRemove(({ name }) => {
-			void this._onCatalogRemove(name);
+			void traced("search-catalog-remove", () => this._onCatalogRemove(name)).catch(() => {});
 		});
 
 		if (_options.immediateIndexing) {
 			void this._readAllCatalogs();
 		}
+	}
+
+	getSearchHealth(): SearchRuntimeHealth {
+		const workspace = this._options.wm.maybeCurrent();
+		if (!workspace) return { phase: "no-data" };
+
+		const state = this._stateByWorkspace.get(workspace.path());
+		if (!state) return { phase: "no-data" };
+
+		return state.getSearchHealth(workspace.getAllCatalogs().keys());
 	}
 
 	async updateIndex({ force, catalogName }: UpdateIndexArgs): Promise<void> {
@@ -132,11 +145,17 @@ export class ModulithService {
 		}
 	}
 
-	async updateCatalog(catalogName: string, overridePath?: string) {
+	async updateCatalog(catalogName: string, overridePath?: string, progressCallback?: ProgressCallback) {
 		const ws = this._options.wm.current();
 		const state = await this._getOrCreateState(ws);
 		const catalog = await ws.getContextlessCatalog(BaseCatalog.parseName(catalogName).name);
-		await this._actualizeCatalog(state, overridePath ?? state.path, ws.getFileProvider(), catalog);
+		await this._actualizeCatalog(
+			state,
+			overridePath ?? state.path,
+			ws.getFileProvider(),
+			catalog,
+			progressCallback,
+		);
 	}
 
 	async *progress({ resourceFilter, signal }: ProgressArgs): SearcherProgressGenerator {
@@ -479,6 +498,7 @@ export class ModulithService {
 		await this._removeCatalogFromIndex(state, catalogName);
 		state.keyPhraseSearcher.removeCatalog(catalogName);
 		state.resetIndexedCatalog(catalogName);
+		state.removeCatalogHealthcheck(catalogName);
 	}
 
 	private async _removeCatalogFromIndex(state: WorkspaceState, catalogName: string): Promise<void> {
@@ -571,11 +591,14 @@ export class ModulithService {
 
 		const release = await state.startCatalogIndexing(catalog.name);
 		if (!release) return;
+		state.startCatalogHealthcheck(catalog.name);
 
 		try {
-			await this._actualizeCatalogImpl(state, wsPath, fp, catalog, progressCallback, resourceProgressCallback);
+			await traced("search-catalog-actualize", () =>
+				this._actualizeCatalogImpl(state, wsPath, fp, catalog, progressCallback, resourceProgressCallback),
+			);
 		} catch (error) {
-			console.error(error);
+			state.markCatalogIndexingFailed(catalog.name);
 			throw error;
 		} finally {
 			release();
@@ -731,6 +754,10 @@ export class ModulithService {
 		const updateResourceArticlesPromise = state.resourceSearchEnabled
 			? this._updateResourceSearchArticles(state, wsPath, catalog, resourcesInfo, resourceProgressCallback)
 			: Promise.resolve();
+		const settledResourceArticles = updateResourceArticlesPromise.then(
+			() => ({ failed: false }) as const,
+			(error) => ({ failed: true, error }) as const,
+		);
 
 		const filter: SearchArticleFilter = {
 			metadata: andFilter<SearchArticleKey>([
@@ -759,7 +786,8 @@ export class ModulithService {
 			},
 		});
 
-		await updateResourceArticlesPromise;
+		const resourceResult = await settledResourceArticles;
+		if (resourceResult.failed) throw resourceResult.error;
 	}
 
 	private async _updateResourceSearchArticles(
@@ -904,7 +932,7 @@ export class ModulithService {
 			onChange: (p) => progressCallback?.(p),
 		});
 
-		await Promise.allSettled([
+		const [localResult, remoteResult] = await Promise.allSettled([
 			this._options.localClient.update({
 				articles,
 				filter,
@@ -914,13 +942,14 @@ export class ModulithService {
 				articles: remoteArticles ?? [],
 				filter,
 				progressCallback: aggProgress.getProgressCallback(1),
+				throwOnError: this._options.failOnRemoteError,
 			}),
 		]);
 
 		aggProgress.setProgress(0, 1);
-		if (this._options.remoteClient) {
-			aggProgress.setProgress(1, 1);
-		}
+		if (this._options.remoteClient) aggProgress.setProgress(1, 1);
+		if (localResult.status === "rejected") throw localResult.reason;
+		if (this._options.failOnRemoteError && remoteResult.status === "rejected") throw remoteResult.reason;
 	}
 
 	private _beginUpdate(): void {

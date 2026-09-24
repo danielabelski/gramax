@@ -7,6 +7,7 @@ import getNotifications from "./notifications/get";
 import updateNotifications from "./notifications/update";
 import quiz from "./quiz";
 import refreshWorkspace from "./refreshWorkspace";
+import saveSections from "./saveSections";
 import setGesUrl from "./setGesUrl";
 
 const enterprise = {
@@ -17,6 +18,7 @@ const enterprise = {
 	quiz,
 	modules,
 	refreshWorkspace,
+	saveSections,
 	setGesUrl,
 	notifications: {
 		get: getNotifications,

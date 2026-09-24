@@ -110,6 +110,7 @@ export const getTokens = (context?: PrivateParserContext): { [name: string]: Par
 		hr: { node: "horizontal_rule" },
 
 		hardbreak: { node: "hard_break" },
+		softbreak: { node: "soft_break" },
 		s: { mark: "s" },
 		em: { mark: "em" },
 		inlineMd: { mark: "inlineMd" },

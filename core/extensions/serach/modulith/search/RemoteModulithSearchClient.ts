@@ -43,6 +43,7 @@ export interface RemoteUpdateArgs {
 	articles: RemoteSearchArticle[];
 	filter?: SearchArticleFilter;
 	progressCallback?: ProgressCallback;
+	throwOnError?: boolean;
 }
 
 const RAG_PLUGIN_NAME = "@ics/modulith-rag";
@@ -67,11 +68,11 @@ export class RemoteModulithSearchClient {
 		});
 	}
 
-	static async create(options: RemoteModulithSearcherOptions): Promise<RemoteModulithSearchClient> {
+	static async create(options: RemoteModulithSearcherOptions) {
 		const client = new RemoteModulithSearchClient(options);
 		const { serverAvailable, authAvailable } = await client._checkConnectionImpl();
 		if (serverAvailable && authAvailable) await client._init();
-		return client;
+		return { client, serverAvailable, authAvailable };
 	}
 
 	get version(): SemVer | null {
@@ -80,10 +81,6 @@ export class RemoteModulithSearchClient {
 
 	async checkConnection(): Promise<boolean> {
 		const { serverAvailable, authAvailable } = await this._checkConnectionImpl();
-
-		if (!serverAvailable) console.log("AI Server is not available");
-		if (serverAvailable && !authAvailable) console.log("AI Token is invalid");
-
 		return serverAvailable && authAvailable;
 	}
 
@@ -95,19 +92,20 @@ export class RemoteModulithSearchClient {
 		return await this._apiClient.checkAuth();
 	}
 
-	async healthcheck() {
-		return await this._apiClient.healthcheck();
+	async healthcheck(signal?: AbortSignal) {
+		return await this._apiClient.healthcheck({ signal });
 	}
 
-	async update({ articles, filter, progressCallback }: RemoteUpdateArgs): Promise<void> {
+	async update({ articles, filter, progressCallback, throwOnError }: RemoteUpdateArgs): Promise<void> {
 		try {
 			const articlesForRemote = convertArticlesForRemote(articles);
 			const res = await this._apiClient.updateArticles<SearchArticleMetadata, SearchArticleKey | string>(
 				articlesForRemote,
 				filter,
 			);
-			if (res.done === false) await this._waitUntilDone(res.taskId, progressCallback);
+			if (res.done === false) await this._waitUntilDone(res.taskId, progressCallback, throwOnError);
 		} catch (e) {
+			if (throwOnError) throw e;
 			console.error(e);
 		} finally {
 			progressCallback?.(1);
@@ -192,9 +190,19 @@ export class RemoteModulithSearchClient {
 		return { serverAvailable: serverAvailable.ok, authAvailable: authAvailable?.ok ?? false };
 	}
 
-	private async _waitUntilDone(taskId: RagTaskId, progressCallback?: ProgressCallback) {
+	private async _waitUntilDone(taskId: RagTaskId, progressCallback?: ProgressCallback, throwOnError?: boolean) {
+		const assertDone = () => {
+			if (throwOnError)
+				throw new Error(`Remote indexing task ${taskId} did not finish within ${STATUS_POLLING_TIMEOUT_MS}ms`);
+		};
+
 		if (this._taskStatusPoller) {
-			return await waitForTaskDone(this._taskStatusPoller, taskId, progressCallback, STATUS_POLLING_TIMEOUT_MS);
+			await waitForTaskDone(this._taskStatusPoller, taskId, progressCallback, STATUS_POLLING_TIMEOUT_MS);
+			if (throwOnError) {
+				const status = await this._apiClient.taskStatus(taskId);
+				if (!status.done) assertDone();
+			}
+			return;
 		}
 
 		let done: boolean = false;
@@ -204,8 +212,11 @@ export class RemoteModulithSearchClient {
 			await new Promise((resolve) => setTimeout(resolve, STATUS_POLLING_INTERVAL_MS));
 			const status = await this._apiClient.taskStatus(taskId);
 			done = status.done;
+			if (status.done === true) return;
+
 			const elapsedMs = performance.now() - startedTime;
-			if (status.done === true || elapsedMs > STATUS_POLLING_TIMEOUT_MS) {
+			if (elapsedMs > STATUS_POLLING_TIMEOUT_MS) {
+				assertDone();
 				return;
 			}
 

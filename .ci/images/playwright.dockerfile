@@ -34,7 +34,12 @@ RUN apt-get update && \
 	apt-get install -y --no-install-recommends caddy && \
 	rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://bun.com/install | bash -s "bun-v1.3.13" && \
+RUN mkdir -p /root/.bun/bin && \
+	curl -fsSL -o /tmp/bun.zip https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-x64-baseline.zip && \
+	unzip -q -o /tmp/bun.zip -d /tmp/bun-extract && \
+	mv /tmp/bun-extract/bun-linux-x64-baseline/bun /root/.bun/bin/bun && \
+	chmod +x /root/.bun/bin/bun && \
+	rm -rf /tmp/bun.zip /tmp/bun-extract && \
 	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
 	curl -fsSL -o /usr/local/bin/n https://raw.githubusercontent.com/tj/n/master/bin/n && \
 	chmod +x /usr/local/bin/n && \

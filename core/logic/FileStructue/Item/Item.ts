@@ -1,6 +1,6 @@
 import { NEW_ARTICLE_REGEX } from "@app/config/const";
 import { createEventEmitter, type Event } from "@core/Event/EventEmitter";
-import { type AliasEntry, aliasPathOf } from "@core/FileStructue/Alias/AliasIndex";
+import type { AliasEntry } from "@core/FileStructue/Alias/AliasIndex";
 import { recordMoveAlias } from "@core/FileStructue/Alias/aliasAutowrite";
 import type { Catalog } from "@core/FileStructue/Catalog/Catalog";
 import { roundedOrderAfter } from "@core/FileStructue/Item/ItemOrderUtils";
@@ -13,7 +13,6 @@ import type { InboxProps } from "@ext/inbox/models/types";
 import t from "@ext/localization/locale/translate";
 import type { ToSpan } from "@ext/loggers/opentelemetry";
 import { FileStatus } from "@ext/Watchers/model/FileStatus";
-import assert from "assert";
 import type IPermission from "../../../extensions/security/logic/Permission/IPermission";
 import Permission from "../../../extensions/security/logic/Permission/Permission";
 import type { ClientArticleProps } from "../../SitePresenter/SitePresenter";
@@ -47,7 +46,7 @@ declare module "@core/FileStructue/Item/Item" {
 	}
 }
 
-export type UpdateItemProps = (ItemProps & { fileName?: never; logicPath: string }) | ClientArticleProps | InboxProps;
+export type UpdateItemProps = (ItemProps & { fileName?: never }) | ClientArticleProps | InboxProps;
 
 // Props that define the item's place in navigation: changing one requires a nav re-scan,
 // it cannot be patched into already-built ItemLinks.
@@ -168,43 +167,32 @@ export abstract class Item<P extends ItemProps = ItemProps> implements Hashable,
 		fileNameOnly = false,
 	): Promise<Item<P>> {
 		!fileNameOnly && this._updateProps(props);
-		if (!fileNameOnly && catalog && "aliases" in props) this._applyAliases(props.aliases, catalog);
+		if (!fileNameOnly && catalog && "aliases" in props) await catalog.aliases.apply(this, props.aliases);
 
 		const previousFilename = this.getFileName();
 		const previousLogicPath = this.logicPath;
 		const shouldUpdateFilename = props.fileName && previousFilename !== props.fileName;
 		const shouldRecordAlias =
 			shouldUpdateFilename && !fileNameOnly && !!catalog && !NEW_ARTICLE_REGEX.test(previousFilename);
-		if (shouldRecordAlias) catalog.aliases.assertNotManual(catalog.relativeLogicPath(previousLogicPath), this);
+		// resolved before the rename: afterwards the main-language twin is no longer reachable by this path
+		const aliasOwner = shouldRecordAlias ? (catalog.aliases.ownerFor(previousLogicPath) ?? this) : null;
+		if (shouldRecordAlias)
+			catalog.aliases.assertNotManual(catalog.aliases.relativePath(previousLogicPath), aliasOwner);
 		if (props.fileName) await this._updateFilename(props.fileName, resourceUpdater, catalog);
 		if (shouldUpdateFilename) await this.events.emit("item-changed", { item: this, status: FileStatus.delete });
+		// The item now lives at its new path, so nobody else may keep an auto alias pointing
+		// there. Not gated on shouldRecordAlias: renaming a brand-new article records no alias
+		// of its own, but it occupies the path all the same.
+		if (shouldUpdateFilename && catalog && this.logicPath !== previousLogicPath)
+			await catalog.aliases.stealAuto(catalog.relativeLogicPath(this.logicPath), this);
 		if (shouldRecordAlias && this.logicPath !== previousLogicPath) {
-			const from = catalog.relativeLogicPath(previousLogicPath);
-			await catalog.aliases.stealAuto(from, this);
-			recordMoveAlias(this._props, from, catalog.relativeLogicPath(this.logicPath));
+			const from = catalog.aliases.relativePath(previousLogicPath);
+			await catalog.aliases.stealAuto(from, aliasOwner);
+			recordMoveAlias(aliasOwner.props, from, catalog.aliases.relativePath(this.logicPath));
+			if (aliasOwner !== this) await aliasOwner.save();
 		}
 		await this._save(shouldUpdateFilename);
 		return this;
-	}
-
-	private _applyAliases(raw: ItemProps["aliases"], catalog: Catalog): void {
-		if (!Array.isArray(raw) || !raw.length) {
-			delete this._props.aliases;
-			return;
-		}
-		const own = catalog.relativeLogicPath(this.logicPath);
-		const seen = new Set<string>();
-		const entries: ItemProps["aliases"] = [];
-		for (const entry of raw) {
-			const path = aliasPathOf(entry);
-			if (!path || seen.has(path)) continue;
-			seen.add(path);
-			assert(path !== own, `Alias '${path}' equals the item's own path`);
-			catalog.aliases.assertFree(path, this);
-			entries.push(typeof entry === "string" ? path : { ...entry, path });
-		}
-		if (entries.length) this._props.aliases = entries;
-		else delete this._props.aliases;
 	}
 
 	protected abstract _updateFilename(filename: string, ru: ResourceUpdater, catalog: Catalog): Promise<this>;

@@ -199,9 +199,10 @@ export class CommentsSearchCache {
 		return hasher.digest();
 	}
 
-	private _clearCache() {
+	private async _clearCache() {
 		this._searchCache.clear();
-		this._load = null;
+		this._load = Promise.resolve();
+		await this._cache.delete(CommentsSearchCache._CACHE_KEY);
 	}
 
 	private _clearArticle(articlePath: string) {
@@ -267,13 +268,7 @@ export class CommentsSearchCache {
 			this._onItemPathChanged(ref.path, item.ref.path),
 		);
 
-		let checkoutToken = null;
-		let syncToken = null;
-		this._catalog.events.on("repository-set", ({ catalog }) => {
-			if (checkoutToken) catalog.repo.events.off(checkoutToken);
-			if (syncToken) catalog.repo.events.off(syncToken);
-			checkoutToken = catalog.repo.events.on("checkout", () => this._clearCache());
-			syncToken = catalog.repo.events.on("sync", () => this._clearCache());
-		});
+		this._catalog.events.on("checkout", () => this._clearCache());
+		this._catalog.events.on("sync", () => this._clearCache());
 	}
 }

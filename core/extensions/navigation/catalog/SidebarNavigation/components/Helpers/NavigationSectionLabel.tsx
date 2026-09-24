@@ -1,5 +1,6 @@
 import type { IconCode } from "@components/Atoms/Icon/LucideIcon";
 import { useRouter } from "@core/Api/useRouter";
+import { NAVIGATION_HOVER_ID_ATTR } from "@ext/navigation/catalog/SidebarNavigation/store/navigationTreeStore";
 import type { ItemLink } from "@ext/navigation/NavigationLinks";
 import { Icon } from "@ui-kit/Icon";
 import { SidebarGroupLabel } from "@ui-kit/Sidebar";
@@ -13,7 +14,7 @@ interface NavigationSectionLabelProps {
 	icon?: IconCode;
 }
 
-export const NavigationSectionLabel = ({ data, icon = "layers3" }: NavigationSectionLabelProps) => {
+export const NavigationSectionLabel = ({ data, icon = "layers-3" }: NavigationSectionLabelProps) => {
 	const router = useRouter();
 
 	const handleClick = useCallback(() => {
@@ -22,6 +23,7 @@ export const NavigationSectionLabel = ({ data, icon = "layers3" }: NavigationSec
 
 	return (
 		<SidebarGroupLabel
+			{...{ [NAVIGATION_HOVER_ID_ATTR]: data.ref.path }}
 			className="group/nav mb-0.5 h-8 select-none cursor-pointer gap-2 p-2 pr-1.5 text-muted hover:bg-secondary-bg-hover hover:text-secondary-fg"
 			onClick={handleClick}
 		>

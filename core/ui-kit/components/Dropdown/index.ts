@@ -6,7 +6,6 @@ export {
 	DropdownMenuSeparator,
 	DropdownMenuSub,
 	DropdownMenuTrigger,
-	DropdownMenuTriggerButton,
 } from "ics-ui-kit/components/dropdown";
 export { DropdownEmpty } from "./DropdownEmpty";
 export { DropdownIndicator } from "./DropdownIndicator";
@@ -20,6 +19,8 @@ export { DropdownMenuRadioItem } from "./DropdownMenuRadioItem";
 export { DropdownMenuShortcut } from "./DropdownMenuShortcut";
 export { DropdownMenuSubContent } from "./DropdownMenuSubContent";
 export { DropdownMenuSubTrigger } from "./DropdownMenuSubTrigger";
+export { DropdownMenuTriggerButton } from "./DropdownMenuTriggerButton";
+export { useFrozenDropdownPosition } from "./hooks/useFrozenDropdownPosition";
 export { useHoverDropdown } from "./hooks/useHoverDropdown";
 export { useSearchableMenu } from "./hooks/useSearchableMenu";
 export { isInDropdown } from "./utils/isInDropdown";

@@ -15,17 +15,19 @@ type Options = {
 	minDepth: number;
 	maxDepth: number;
 	levelOffset: number;
+	isHovered?: boolean;
 	onParentHover?: (depth: number | null) => void;
 };
 
-export function useInsertionLine({ minDepth, maxDepth, levelOffset, onParentHover }: Options) {
+export function useInsertionLine({ minDepth, maxDepth, levelOffset, isHovered, onParentHover }: Options) {
 	const [hoverDepth, setHoverDepth] = useState<number | null>(null);
 	const [isOverTail, setIsOverTail] = useState(false);
+	const overhang = isHovered ? Math.max(0, -iconLeft(minDepth, levelOffset)) : 0;
 
 	const handleMouseMove = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>) => {
 			const rect = e.currentTarget.getBoundingClientRect();
-			const offsetX = e.clientX - rect.left;
+			const offsetX = e.clientX - rect.left - overhang;
 			const depth = depthFromMouseX(offsetX, maxDepth, minDepth, levelOffset);
 			const maxIconRightEdge = iconLeft(maxDepth, levelOffset) + INSERTION_BUTTON_SIZE;
 			const overTail = offsetX > maxIconRightEdge;
@@ -33,7 +35,7 @@ export function useInsertionLine({ minDepth, maxDepth, levelOffset, onParentHove
 			setIsOverTail(overTail);
 			onParentHover?.(overTail ? null : depth);
 		},
-		[maxDepth, minDepth, levelOffset, onParentHover],
+		[maxDepth, minDepth, levelOffset, onParentHover, overhang],
 	);
 
 	const handleMouseLeave = useCallback(() => {
@@ -66,5 +68,5 @@ export function useInsertionLine({ minDepth, maxDepth, levelOffset, onParentHove
 	const isTailSolid = hoverDepth !== null && !isOverTail;
 	const clickableDepth = hoverDepth !== null && !isOverTail ? hoverDepth : null;
 
-	return { items, tailLeft, isTailSolid, clickableDepth, handleMouseMove, handleMouseLeave };
+	return { items, tailLeft, isTailSolid, clickableDepth, overhang, handleMouseMove, handleMouseLeave };
 }

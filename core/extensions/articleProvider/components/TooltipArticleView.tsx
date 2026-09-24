@@ -97,6 +97,7 @@ const editorButtons: InlineToolbarButtons = {
 		file: false,
 		comment: false,
 		prettify: false,
+		discuss: false,
 		link: false,
 	},
 };

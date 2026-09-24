@@ -1,5 +1,7 @@
 pub mod add;
+pub mod assume_unchanged;
 pub mod branch;
+pub mod checkout;
 pub mod commit;
 pub mod diff;
 pub mod merge;
@@ -8,5 +10,8 @@ pub mod refs;
 pub mod remote;
 pub mod reset;
 pub mod stash;
+pub mod stash_restore;
 pub mod status;
 pub mod tags;
+mod stash_break;
+mod stash_break2;

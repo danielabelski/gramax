@@ -9,6 +9,7 @@ import SourceDataCtx from "@ext/storage/logic/SourceDataProvider/logic/SourceDat
 import SourceType from "@ext/storage/logic/SourceDataProvider/model/SourceType";
 import type { Workspace } from "@ext/workspace/Workspace";
 import type WorkspaceManager from "@ext/workspace/WorkspaceManager";
+import { AutoPullHealthchecker } from "./AutoPullHealthchecker";
 import { releasePull, shouldSkipAutoPull, tryAcquirePull } from "./PullDebounce";
 
 const DEFAULT_AUTO_PULL_INTERVAL = 180;
@@ -131,13 +132,27 @@ export type PullCycleSummary = {
 	upToDate: number;
 	skipped: number;
 	failed: number;
+	failedCatalogs: string[];
 };
 
-const countOutcome = (summary: PullCycleSummary, outcome: PullOutcome): void => {
+export type AutoPullState = {
+	mode: "disabled" | "webhook-only" | "interval";
+	pullInterval?: number;
+	lastAttemptAt?: number;
+	lastSuccessAt?: number;
+	nextRunAt?: number;
+	lastSummary?: PullCycleSummary;
+	lastCycleFailed: boolean;
+	startFailed: boolean;
+};
+
+const countOutcome = (summary: PullCycleSummary, outcome: PullOutcome, catalogName: string): void => {
 	if (outcome === "pulled") summary.pulled++;
 	else if (outcome === "up-to-date") summary.upToDate++;
-	else if (outcome === "error") summary.failed++;
-	else summary.skipped++;
+	else if (outcome === "error") {
+		summary.failed++;
+		summary.failedCatalogs.push(catalogName);
+	} else summary.skipped++;
 };
 
 export class AutoPull {
@@ -145,6 +160,25 @@ export class AutoPull {
 	private _logger: Logger;
 	private _pullInterval: number;
 	private _pullDelay: number;
+	private _state: AutoPullState = {
+		mode: "disabled",
+		lastCycleFailed: false,
+		startFailed: false,
+	};
+
+	markStartFailed(): void {
+		this._state.startFailed = true;
+	}
+
+	getState(): AutoPullState {
+		return {
+			...this._state,
+			...(this._state.mode === "interval" ? { pullInterval: this._pullInterval } : {}),
+			lastSummary: this._state.lastSummary
+				? { ...this._state.lastSummary, failedCatalogs: [...this._state.lastSummary.failedCatalogs] }
+				: undefined,
+		};
+	}
 
 	@trace({ level: Level.Commands })
 	async start(app: Promise<Application>): Promise<void> {
@@ -152,6 +186,7 @@ export class AutoPull {
 		this._logger = logger;
 
 		if (!env("AUTO_PULL_TOKEN")) {
+			this._state.mode = "disabled";
 			addEvent("auto-pull", Level.Important, { status: "disabled", reason: "no token set" });
 			logger.logWarning("AUTO_PULL_TOKEN is not set. Auto-pull is disabled");
 			return;
@@ -159,6 +194,7 @@ export class AutoPull {
 
 		const intervalMs = resolveAutoPullIntervalMs(env("AUTO_PULL_INTERVAL"));
 		if (intervalMs === null) {
+			this._state.mode = "webhook-only";
 			addEvent("auto-pull", Level.Important, { status: "disabled", reason: "negative interval" });
 			logger.logInfo(
 				"AUTO_PULL_INTERVAL is negative. Timed auto-pull is disabled; catalogs update via webhook only",
@@ -167,6 +203,7 @@ export class AutoPull {
 		}
 
 		this._wm = wm;
+		this._state.mode = "interval";
 		this._pullInterval = intervalMs;
 		this._pullDelay = Number(env("AUTO_PULL_DELAY")) || DEFAULT_AUTO_PULL_DELAY;
 
@@ -184,6 +221,7 @@ export class AutoPull {
 	}
 
 	private _scheduleNextCycle(): void {
+		this._state.nextRunAt = Date.now() + this._pullInterval;
 		setTimeout(() => void this._runPullCycle(), this._pullInterval);
 	}
 
@@ -191,15 +229,20 @@ export class AutoPull {
 	// NoActiveWorkspace when no workspace is selected, and any throw before the re-arm used to end the chain
 	// for good — auto-pull then stayed dead until the process restarted, silently and for the whole uptime.
 	private async _runPullCycle(): Promise<void> {
+		this._state.lastAttemptAt = Date.now();
 		try {
 			const summary = await traced("auto-pull-cycle", { level: Level.Commands }, () =>
 				this._pullCatalogs(this._wm.current()),
 			);
+			this._state.lastSummary = summary;
+			this._state.lastCycleFailed = false;
+			if (summary.failed === 0) this._state.lastSuccessAt = Date.now();
 			this._logger.logInfo(
 				`Auto-pull cycle done: ${summary.pulled} pulled, ${summary.upToDate} up to date, ` +
 					`${summary.skipped} skipped, ${summary.failed} failed of ${summary.total} catalogs`,
 			);
 		} catch (error) {
+			this._state.lastCycleFailed = true;
 			// The span itself is already gone by now — `traced` recorded the exception on it. Only the log line
 			// is left to write, and it is the one an operator without an OTel exporter will actually see.
 			this._logger.logWarning(`Auto-pull cycle failed: ${error}`);
@@ -221,6 +264,7 @@ export class AutoPull {
 			upToDate: 0,
 			skipped: 0,
 			failed: 0,
+			failedCatalogs: [],
 		};
 
 		for (const catalogEntry of catalogEntries) {
@@ -238,9 +282,10 @@ export class AutoPull {
 			}
 			// One broken catalog must not cost the remaining ones their pull.
 			try {
-				countOutcome(summary, await this._pullCatalog(catalogEntry));
+				countOutcome(summary, await this._pullCatalog(catalogEntry), catalogEntry.name);
 			} catch (error) {
 				summary.failed++;
+				summary.failedCatalogs.push(catalogEntry.name);
 				addEvent("pull", Level.Commands, {
 					catalog: catalogEntry.name,
 					status: "error",
@@ -258,8 +303,15 @@ export class AutoPull {
 	}
 }
 
-const initAutoPull = async (app: Promise<Application>): Promise<void> => {
-	await new AutoPull().start(app);
+const initAutoPull = async (application: Application): Promise<void> => {
+	const autoPull = new AutoPull();
+	application.healthcheckRegistry?.register(new AutoPullHealthchecker(autoPull));
+	try {
+		await autoPull.start(Promise.resolve(application));
+	} catch (error) {
+		autoPull.markStartFailed();
+		application.logger.logWarning(`Auto-pull init failed: ${error}`);
+	}
 };
 
 export default initAutoPull;

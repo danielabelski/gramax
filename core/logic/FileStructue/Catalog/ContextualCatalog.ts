@@ -157,8 +157,8 @@ export default class ContextualCatalog<P extends CatalogProps = CatalogProps> im
 		await this.deref.updateNeededPermission(permissions);
 	}
 
-	async updateItemProps(props: UpdateItemProps, rc: ResourceUpdaterFactory): Promise<Item> {
-		return await this.deref.updateItemProps(props, rc.withContext(this._ctx));
+	async updateItemProps(item: Item, props: UpdateItemProps, rc: ResourceUpdaterFactory): Promise<Item> {
+		return await this.deref.updateItemProps(item, props, rc.withContext(this._ctx));
 	}
 
 	async updateProps(props: CatalogEditProps | CatalogProps, rc: ResourceUpdaterFactory): Promise<ReadonlyCatalog<P>> {

@@ -5,6 +5,7 @@ import { DesktopModeMiddleware } from "@core/Api/middleware/DesktopModeMiddlewar
 import type Context from "@core/Context/Context";
 import Path from "@core/FileProvider/Path/Path";
 import type { Catalog } from "@core/FileStructue/Catalog/Catalog";
+import { seedAutoLfsProps } from "@core/GitLfs/logic/workspaceManagedLfs";
 import { uniqueName } from "@core/utils/uniqueName";
 import { resolveArticleUniqueNamePair } from "@ext/article/utils/resolveArticleUniqueNamePair";
 import { Syntax } from "@ext/markdown/core/edit/logic/Formatter/Formatters/typeFormats/model/Syntax";
@@ -60,6 +61,7 @@ const getNameAfterMove: Command<GetNameAfterMoveProps, GetNameAfterMoveResult> =
 			targetCatalog = await current.getFileStructure().createCatalog({
 				url: uniqueName(NEW_CATALOG_NAME, Array.from(current.getAllCatalogs().keys())),
 				syntax: Syntax.xml,
+				lfs: await seedAutoLfsProps(current),
 			});
 
 			await current.addCatalog(targetCatalog);

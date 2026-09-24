@@ -24,7 +24,7 @@ pub struct CommitFilterOptions {
 	pub authors: Option<Vec<String>>,
 	pub before_date: Option<String>,
 	pub after_date: Option<String>,
-	pub paths: Option<Vec<String>>,
+	pub pathspecs: Option<Vec<String>>,
 }
 
 #[napi(object, use_nullable = true)]
@@ -45,7 +45,7 @@ impl From<CommitInfoOpts> for gramaxgit::ext::history::CommitInfoOpts {
 				authors: f.authors,
 				before_date: f.before_date,
 				after_date: f.after_date,
-				paths: f.paths,
+				pathspecs: f.pathspecs,
 			}),
 			include_changed_files: val.include_changed_files,
 		}

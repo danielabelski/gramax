@@ -187,13 +187,23 @@ pub(crate) fn get_remote(_otel: OtelContext, repo_path: &Path) -> Result<Option<
 }
 
 #[command(async)]
-pub(crate) fn stash(_otel: OtelContext, repo_path: &Path, message: Option<&str>, creds: AccessTokenCreds) -> Result<Option<String>> {
-	git::stash(repo_path, message, creds)
+pub(crate) fn stash(_otel: OtelContext, repo_path: &Path, message: Option<&str>) -> Result<Option<String>> {
+	git::stash(repo_path, message)
 }
 
 #[command(async)]
 pub(crate) fn stash_apply(_otel: OtelContext, repo_path: &Path, oid: &str) -> Result<MergeResult> {
 	git::stash_apply(repo_path, oid)
+}
+
+#[command(async)]
+pub(crate) fn stash_restore(_otel: OtelContext, repo_path: &Path, oid: &str) -> Result<MergeResult> {
+	git::stash_restore(repo_path, oid)
+}
+
+#[command(async)]
+pub(crate) fn stash_list(_otel: OtelContext, repo_path: &Path) -> Result<Vec<StashInfo>> {
+	git::stash_list(repo_path)
 }
 
 #[command(async)]
@@ -247,8 +257,21 @@ pub(crate) fn get_draft_merge_request(_otel: OtelContext, repo_path: &Path) -> R
 }
 
 #[command(async)]
-pub(crate) fn get_all_commit_authors(_otel: OtelContext, repo_path: &Path) -> Result<Vec<CommitAuthorInfo>> {
-	git::get_all_commit_authors(repo_path)
+pub(crate) fn get_commit_authors(
+	_otel: OtelContext,
+	repo_path: &Path,
+	pathspecs: Option<Vec<String>>,
+) -> Result<Vec<CommitAuthorInfo>> {
+	git::get_commit_authors(repo_path, pathspecs)
+}
+
+#[command(async)]
+pub(crate) fn get_commit_range(
+	_otel: OtelContext,
+	repo_path: &Path,
+	pathspecs: Option<Vec<String>>,
+) -> Result<Option<CommitRangeInfo>> {
+	git::get_commit_range(repo_path, pathspecs)
 }
 
 #[command(async)]

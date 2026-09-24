@@ -8,7 +8,7 @@ import useRemoteProgress from "@ext/git/actions/Clone/logic/useRemoteProgress";
 import t from "@ext/localization/locale/translate";
 import type { CatalogLink } from "@ext/navigation/NavigationLinks";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import Link from "../Atoms/Link";
 import CardView from "./CardView";
 
@@ -75,7 +75,7 @@ const GxCard = ({ link, className, onClick, name }: CardProps) => {
 
 	if (error)
 		return (
-			<Tooltip delayDuration={0}>
+			<Tooltip>
 				<TooltipTrigger asChild>{card}</TooltipTrigger>
 				<TooltipContent>
 					<span>{t("clickToViewDetails")}</span>
@@ -100,4 +100,8 @@ const GxCard = ({ link, className, onClick, name }: CardProps) => {
 	);
 };
 
-export default GxCard;
+/**
+ * Memoized because every drag move re-renders the sortable wrapper around it, and a card is expensive: clone progress
+ * polling, logo resolution, card-store and workspace subscriptions. Callers must keep `onClick` identity-stable.
+ */
+export default memo(GxCard);

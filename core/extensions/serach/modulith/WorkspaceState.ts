@@ -5,6 +5,7 @@ import {
 	NullProgressManager,
 	type ProgressManager,
 } from "@ext/serach/modulith/ProgressManager";
+import type { SearchRuntimeHealth } from "@ext/serach/modulith/SearchHealthchecker";
 import type { ResourceFilter } from "@ext/serach/Searcher";
 import type { WorkspacePath } from "@ext/workspace/WorkspaceConfig";
 import { Lock, MultiLock, SemaphoreLock } from "@ics/article-search-utils";
@@ -21,6 +22,10 @@ export class WorkspaceState {
 	private readonly _indexingProgressManager = new DefaultProgressManager();
 	private readonly _resourceIndexingProgressManager = new DefaultProgressManager();
 	private readonly _indexedCatalogs = new Set<string>();
+	private readonly _indexingCatalogs = new Set<string>();
+	private readonly _failedCatalogs = new Set<string>();
+	private _indexingStarted = false;
+	private _lastIndexingActivityAt?: number;
 	private readonly _keyPhraseSearcher = new KeyPhraseArticleSearcher();
 
 	constructor(
@@ -77,10 +82,47 @@ export class WorkspaceState {
 
 	markIndexedCatalog(catalogName: string): void {
 		this._indexedCatalogs.add(catalogName);
+		this._indexingCatalogs.delete(catalogName);
+		this._failedCatalogs.delete(catalogName);
 	}
 
 	resetIndexedCatalog(catalogName: string): void {
 		this._indexedCatalogs.delete(catalogName);
+	}
+
+	startCatalogHealthcheck(catalogName: string): void {
+		this._indexingStarted = true;
+		this._lastIndexingActivityAt = Date.now();
+		this._indexingCatalogs.add(catalogName);
+		this._failedCatalogs.delete(catalogName);
+	}
+
+	markCatalogIndexingFailed(catalogName: string): void {
+		this._indexingCatalogs.delete(catalogName);
+		this._failedCatalogs.add(catalogName);
+	}
+
+	removeCatalogHealthcheck(catalogName: string): void {
+		this._indexingCatalogs.delete(catalogName);
+		this._failedCatalogs.delete(catalogName);
+	}
+
+	getSearchHealth(configuredCatalogs: Iterable<string>): SearchRuntimeHealth {
+		const catalogs = [...configuredCatalogs];
+		if (catalogs.length === 0 || !this._indexingStarted) return { phase: "no-data" };
+		if (catalogs.some((catalog) => this._failedCatalogs.has(catalog))) return { phase: "failed" };
+		if (catalogs.some((catalog) => this._indexingCatalogs.has(catalog))) return this._indexingHealth();
+		if (catalogs.every((catalog) => this._indexedCatalogs.has(catalog))) return { phase: "ready" };
+
+		return this._indexingHealth();
+	}
+
+	private _indexingHealth(): SearchRuntimeHealth {
+		return {
+			phase: "indexing",
+			progress: this._indexingProgressManager.getTotalProgress(),
+			lastProgressAt: this._indexingProgressManager.getLastProgressAt() ?? this._lastIndexingActivityAt,
+		};
 	}
 
 	getCombinedProgressManager(resourceFilter?: ResourceFilter): CombinedProgressManager {

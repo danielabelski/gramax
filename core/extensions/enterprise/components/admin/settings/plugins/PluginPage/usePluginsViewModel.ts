@@ -2,6 +2,7 @@ import type DefaultModal from "@core-ui/ContextServices/ModalToOpenService/compo
 import ModalToOpenService from "@core-ui/ContextServices/ModalToOpenService/ModalToOpenService";
 import ModalToOpen from "@core-ui/ContextServices/ModalToOpenService/model/ModalsToOpen";
 import { BUILT_IN_PLUGIN_DEFINITIONS, useSettings } from "@ext/enterprise/components/admin/contexts/SettingsContext";
+import { filterOutBuiltInPlugins } from "@ext/enterprise/components/admin/settings/plugins/filterOutBuiltInPlugins";
 import {
 	getPluginsTableColumns,
 	type PluginTableRow,
@@ -11,6 +12,7 @@ import { GesError, toGesErrorCode } from "@ext/enterprise/errors/GesError";
 import { getSaveErrorText } from "@ext/enterprise/errors/getGesErrorText";
 import type { PluginsSettings } from "@ext/enterprise/types/PluginsSettings";
 import t from "@ext/localization/locale/translate";
+import { showPluginCompatibilityToast } from "@plugins/components/showPluginCompatibilityToast";
 import { PluginFileParser } from "@plugins/core/PluginFileParser";
 import { pluginValidator } from "@plugins/core/PluginValidator";
 import type { PluginConfig } from "@plugins/types";
@@ -35,8 +37,7 @@ export const usePluginsViewModel = () => {
 
 	const savePlugins = useCallback(
 		async (plugins: PluginConfig[]) => {
-			const realPlugins = plugins.filter((p) => !BUILT_IN_MODULE_HANDLERS.has(p.metadata.id));
-			const settingsToSave: PluginsSettings = { plugins: realPlugins };
+			const settingsToSave: PluginsSettings = { plugins: filterOutBuiltInPlugins(plugins) };
 			await update("plugins", settingsToSave);
 		},
 		[update],
@@ -46,6 +47,15 @@ export const usePluginsViewModel = () => {
 		async (pluginId: string, isDisabled: boolean) => {
 			try {
 				const newDisabled = !isDisabled;
+				const pluginToEnable = serverPluginsMap.get(pluginId);
+				if (
+					!newDisabled &&
+					pluginToEnable &&
+					!pluginValidator.validateSdkCompatibility(pluginToEnable.metadata).compatible
+				) {
+					showPluginCompatibilityToast(pluginToEnable.metadata.name);
+					return;
+				}
 
 				const moduleDef = BUILT_IN_MODULE_HANDLERS.get(pluginId);
 				if (moduleDef) {
@@ -137,6 +147,10 @@ export const usePluginsViewModel = () => {
 			try {
 				const pluginConfig = await PluginFileParser.parseFromFiles(files);
 				const validationResult = pluginValidator.validateFiles(pluginConfig);
+				if (validationResult.sdkCompatibility) {
+					showPluginCompatibilityToast(pluginConfig.metadata.name);
+					return;
+				}
 				if (!validationResult.valid) throw new Error(validationResult.errors.join("; "));
 				assert(
 					serverPlugins.some((p) => p.metadata.id === pluginConfig.metadata.id) === false,

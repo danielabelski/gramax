@@ -32,10 +32,21 @@ export interface UseUserAccessPickerDialogContentArgs {
 	rowsMap: Map<string, RepoUserAccess>;
 	setRowsMap: Dispatch<SetStateAction<Map<string, RepoUserAccess>>>;
 	setSelection: Dispatch<SetStateAction<RowSelectionState>>;
+	showEnterpriseElements: boolean;
 }
 
 export const useUserAccessPickerDialogContent = (args: UseUserAccessPickerDialogContentArgs) => {
-	const { repoId, aggregate, preselected, rowsMap, selection, selectedIds, setRowsMap, setSelection } = args;
+	const {
+		repoId,
+		aggregate,
+		preselected,
+		rowsMap,
+		selection,
+		selectedIds,
+		setRowsMap,
+		setSelection,
+		showEnterpriseElements,
+	} = args;
 	const { ssoUsersEnabled, searchBranches } = useSettings();
 
 	const [addNewOpen, setAddNewOpen] = useState(false);
@@ -157,7 +168,7 @@ export const useUserAccessPickerDialogContent = (args: UseUserAccessPickerDialog
 	const headerControls = (
 		<>
 			<ChangeRoleButton count={selectedIds.length} onChange={bulkRoleChange} rules={roleRules} />
-			{!ssoUsersEnabled && (
+			{!ssoUsersEnabled && showEnterpriseElements && (
 				<>
 					<Button
 						className="pl-2.5 pr-3"

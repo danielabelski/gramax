@@ -1,8 +1,10 @@
 import { MinimizedArticleStyled } from "@components/Article/MiniArticle";
-import Anchor from "@components/controls/Anchor";
 import { classNames } from "@components/libs/classNames";
-import ArticleTooltipService from "@core-ui/ContextServices/ArticleTooltip";
 import { cn } from "@core-ui/utils/cn";
+import { AgentChatLink } from "@ext/agent/components/message/AgentChatLink";
+import { AgentChatTooltipProvider } from "@ext/agent/components/message/AgentChatTooltipProvider";
+import { highlightSecretsInChatMessage } from "@ext/agent/components/utils/secret/secretChatHighlight";
+import { useAgentSecretNames } from "@ext/agent/components/utils/secret/useAgentSecretNames";
 import SimpleMarkdownParser from "@ext/markdown/core/Parser/SimpleMarkdownParser";
 import getComponents from "@ext/markdown/core/render/components/getComponents/getComponents";
 import Renderer from "@ext/markdown/core/render/components/Renderer";
@@ -18,7 +20,8 @@ type Props = {
 
 export const AssistantMarkdown = ({ text, className }: Props) => {
 	const [renderTree, setRenderTree] = useState<RenderableTreeNodes | null>(null);
-	const components = useMemo(() => ({ ...getComponents(), a: Anchor }), []);
+	const components = useMemo(() => ({ ...getComponents(), a: AgentChatLink }), []);
+	const knownSecretNames = useAgentSecretNames();
 
 	useEffect(() => {
 		let disposed = false;
@@ -31,7 +34,7 @@ export const AssistantMarkdown = ({ text, className }: Props) => {
 			.parse(text)
 			.then((tree) => {
 				if (!disposed) {
-					setRenderTree(tree);
+					setRenderTree(highlightSecretsInChatMessage(tree, knownSecretNames ?? []));
 				}
 			})
 			.catch(() => {
@@ -42,7 +45,7 @@ export const AssistantMarkdown = ({ text, className }: Props) => {
 		return () => {
 			disposed = true;
 		};
-	}, [text]);
+	}, [text, knownSecretNames]);
 
 	if (!renderTree) {
 		return (
@@ -63,13 +66,13 @@ export const AssistantMarkdown = ({ text, className }: Props) => {
 				className={cn("article group-data-[gray]:!text-muted-foreground", className)}
 				style={{ background: "transparent" }}
 			>
-				<ArticleTooltipService.Provider>
+				<AgentChatTooltipProvider>
 					<MinimizedArticleStyled>
 						<div className={classNames("article-body", {}, ["popup-article"])}>
 							{Renderer(renderTree, { components })}
 						</div>
 					</MinimizedArticleStyled>
-				</ArticleTooltipService.Provider>
+				</AgentChatTooltipProvider>
 			</div>
 		</div>
 	);

@@ -1,4 +1,4 @@
-import { getConfig } from "@app/config/AppConfig";
+import { type AppConfig, getConfig } from "@app/config/AppConfig";
 import resolveBackendModule from "@app/resolveModule/backend";
 import { getExecutingEnvironment } from "@app/resolveModule/env";
 import type Application from "@app/types/Application";
@@ -6,13 +6,16 @@ import type DiskFileProvider from "@core/FileProvider/DiskFileProvider/DiskFileP
 import Path from "@core/FileProvider/Path/Path";
 import type { Catalog } from "@core/FileStructue/Catalog/Catalog";
 import { joinTitles } from "@core-ui/getPageTitle";
+import { ContentLanguage } from "@ext/localization/core/model/Language";
 import { createModulithFileProviders, createModulithService } from "@ext/serach/modulith/createModulithService";
+import { RemoteModulithSearchClient } from "@ext/serach/modulith/search/RemoteModulithSearchClient";
 import { getRawEnabledFeatures } from "@ext/toggleFeatures/features";
 import assert from "assert";
 import crypto from "crypto-js";
 import { dirname } from "path";
 import type { HtmlData } from "./ArticleTypes";
-import { logStep, logStepWithErrorSuppression } from "./cli/utils/logger";
+import CliUserError from "./CliUserError";
+import { logStep, logStepWithErrorSuppression, logStepWithProgress } from "./cli/utils/logger";
 import {
 	type DirectoryInfoBasic,
 	type FileInfoBasic,
@@ -25,6 +28,7 @@ import StaticRenderer, { STATIC_WORKSPACE_PATH } from "./StaticRenderer";
 import generateStaticSeo from "./StaticSeoGenerator";
 
 const htmlTags = {
+	lang: "<!--html-lang-->",
 	base: "<!--base-tag-->",
 	title: "<!--title-content-->",
 	description: "<!--description-content-->",
@@ -35,6 +39,16 @@ const htmlTags = {
 	styles: "<!--app-styles-->",
 };
 
+// Kept in sync with the `lang` written into apps/cli/index.html before the
+// placeholder was introduced: a catalog that declares no language builds
+// exactly as it did before.
+const DEFAULT_HTML_LANG = ContentLanguage.ru;
+
+// `language` comes from user-authored .doc-root.yaml and is typed, not validated,
+// so anything unknown falls back instead of landing inside the lang attribute.
+const resolveHtmlLang = (language?: string) =>
+	language && (Object.values(ContentLanguage) as string[]).includes(language) ? language : DEFAULT_HTML_LANG;
+
 const CUSTOM_STYLE_FILENAME = "styles.css";
 const CUSTOM_STYLE_LINK_ID = "custom-style-link";
 
@@ -43,6 +57,7 @@ const isWeb = getExecutingEnvironment() === "web";
 interface StaticSiteGenerationOptions {
 	baseUrl?: string;
 	customStyles?: string;
+	aiPublicToken?: string;
 	copyTemplate?: {
 		copyWordTemplatesFunction?: CopyTemplatesFunction;
 		copyPdfTemplatesFunction?: CopyTemplatesFunction;
@@ -68,7 +83,7 @@ class StaticSiteBuilder {
 	}
 
 	async generate(catalog: Catalog, targetDir: Path, options: StaticSiteGenerationOptions) {
-		const { copyTemplate, customStyles, baseUrl } = options;
+		const { copyTemplate, customStyles, baseUrl, aiPublicToken } = options;
 		const catalogName = catalog.name;
 
 		const directoryCopier = new StaticContentCopier(this._params.fp, this._params.app);
@@ -77,16 +92,18 @@ class StaticSiteBuilder {
 		);
 		const { directoryTree, wordTemplates, pdfTemplates } = await directoryCopier.copyWordTemplates(copyTemplate);
 
-		const { rendered, searchDirectoryTree } = await logStepWithErrorSuppression(
-			"Rendering HTML pages",
-			async () => {
-				return {
-					rendered: await new StaticRenderer(this._params.app, { wordTemplates, pdfTemplates }).render(
-						catalogName,
-					),
-					searchDirectoryTree: await this._createSearchIndexes(catalog, targetDir),
-				};
-			},
+		const aiConfig = this._getStaticPortalAiConfig(aiPublicToken);
+
+		const rendered = await logStepWithErrorSuppression("Rendering HTML pages", () =>
+			new StaticRenderer(this._params.app, {
+				wordTemplates,
+				pdfTemplates,
+				aiEnabled: aiConfig.enabled,
+			}).render(catalogName),
+		);
+
+		const searchDirectoryTree = await logStepWithProgress("Building search index", (onProgress) =>
+			this._createSearchIndexes(catalog, targetDir, aiConfig.enabled, onProgress),
 		);
 		const catalogDirectory = directoryTree.children.find((v) => v.name === catalogName) as DirectoryInfoBasic;
 		assert(catalogDirectory, "not found catalog directory in directory tree");
@@ -107,14 +124,19 @@ class StaticSiteBuilder {
 		await this._params.fp.write(targetDir.join(new Path([catalogName, dataJsFilename])), dataJsContent);
 
 		await logStep("Writing rendered HTML files", () =>
-			this._writingRenderedHtmlFiles(rendered, targetDir, catalogName, dataJsFilename, zipFilename),
+			this._writingRenderedHtmlFiles(rendered, targetDir, catalogName, dataJsFilename, zipFilename, aiConfig),
 		);
 
 		if (baseUrl)
 			await logStep("Creating sitemap.xml & robots.txt", () => this._writeSEOFiles(baseUrl, catalog, targetDir));
 	}
 
-	private _createSearchIndexes = async (catalog: Catalog, targetDir: Path) => {
+	private _createSearchIndexes = async (
+		catalog: Catalog,
+		targetDir: Path,
+		aiEnabled: boolean,
+		onProgress?: (progress: number) => void,
+	) => {
 		const { cacheFileProvider, articleStorageFileProvider } =
 			this._params.getCache.fp?.() ?? createModulithFileProviders(targetDir.join(new Path(catalog.name)));
 		const client = await resolveBackendModule("getModulithSearchClient")({
@@ -128,16 +150,33 @@ class StaticSiteBuilder {
 			wm: this._params.app.wm,
 			resourceParseClient: undefined,
 			localClient: client,
+			remoteClient: await this._createRemoteSearchClient(aiEnabled),
 			tablesManager: this._params.app.tablesManager,
 			resourceSearchEnabled: this._params.app.conf.search.resourceSearchEnabled,
+			failOnRemoteError: aiEnabled,
 		});
 
-		await modulithService.updateCatalog(catalog.name, STATIC_WORKSPACE_PATH);
+		await modulithService.updateCatalog(catalog.name, STATIC_WORKSPACE_PATH, onProgress);
 		await modulithService.terminate();
 
 		const tree = await this._params.getCache.tree();
 		return tree;
 	};
+
+	private async _createRemoteSearchClient(aiEnabled: boolean): Promise<RemoteModulithSearchClient | undefined> {
+		if (!aiEnabled) return undefined;
+		const { portalAi } = getConfig();
+		const { client, serverAvailable, authAvailable } = await RemoteModulithSearchClient.create({
+			apiUrl: portalAi.apiUrl,
+			apiKey: portalAi.token,
+			collectionName: portalAi.instanceName,
+		});
+
+		if (!serverAvailable || !authAvailable)
+			throw new CliUserError(`AI server ${portalAi.apiUrl} is unavailable or the token is invalid`);
+
+		return client;
+	}
 
 	private _writingRenderedHtmlFiles = async (
 		htmlDatas: HtmlData[],
@@ -145,14 +184,23 @@ class StaticSiteBuilder {
 		catalogName: string,
 		dataJsFilename: string,
 		zipFilename: string,
+		aiConfig?: AppConfig["portalAi"],
 	) => {
 		const config = getConfig();
 		config.isProduction = true;
 		config.isReadOnly = true;
-		(config as StaticConfig).features = getRawEnabledFeatures();
+
+		const staticConfig: StaticConfig = {
+			...config,
+			features: getRawEnabledFeatures(),
+			portalAi: aiConfig,
+		};
 
 		const templateHtml = this._params.html
-			.replace(htmlTags.config, `window.${InitialDataKeys.CONFIG} = ${this._stringifyDataSafely(config) ?? "{}"}`)
+			.replace(
+				htmlTags.config,
+				`window.${InitialDataKeys.CONFIG} = ${this._stringifyDataSafely(staticConfig) ?? "{}"}`,
+			)
 			.replace(
 				htmlTags.fs,
 				`<script src="${catalogName}/${dataJsFilename}"></script>\n` +
@@ -182,15 +230,19 @@ class StaticSiteBuilder {
 				htmlData.initialData.data.catalogProps.title,
 			);
 
-			const html = templateHtml
-				.replace(htmlTags.base, `<base href="${calculatedBasePath}">`)
-				.replace(htmlTags.title, title)
-				.replace(htmlTags.description, () =>
-					renderDescriptionMetaTag(htmlData.initialData.data.articlePageData.articleProps.description),
-				)
-				.replace(htmlTags.data, dataKey + initialData)
-				.replace(htmlTags.body, htmlData.htmlContent.body ?? "")
-				.replace(htmlTags.styles, htmlData.htmlContent.styles ?? "");
+			const html = StaticSiteBuilder.buildArticleHtml(templateHtml, {
+				base: String(calculatedBasePath),
+				title,
+				description: htmlData.initialData.data.articlePageData.articleProps.description,
+				data: dataKey + initialData,
+				body: htmlData.htmlContent.body ?? "",
+				styles: htmlData.htmlContent.styles ?? "",
+				// ctx.contentLanguage is filled only for multi-language catalogs;
+				// a single-language catalog carries its language in catalogProps
+				// (same fallback idiom as parseContent / SitePresenter).
+				contentLanguage:
+					htmlData.initialData.context?.language?.content || htmlData.initialData.data.catalogProps?.language,
+			});
 
 			const filePath = targetDir.join(logicPath);
 			await this._params.fp.mkdir(new Path(dirname(filePath.value)));
@@ -212,12 +264,46 @@ class StaticSiteBuilder {
 		});
 	}
 
+	private _getStaticPortalAiConfig(aiPublicToken?: string): AppConfig["portalAi"] {
+		const { portalAi } = getConfig();
+		const enabled = portalAi.enabled && Boolean(aiPublicToken);
+
+		return {
+			enabled,
+			apiUrl: enabled ? portalAi.apiUrl : "",
+			instanceName: enabled ? portalAi.instanceName : "",
+			token: enabled ? aiPublicToken : "",
+		};
+	}
+
 	private _stringifyDataSafely(config: Parameters<JSON["stringify"]>[0]) {
 		return JSON.stringify(config).replaceAll("<", "\\u003C");
 	}
 
 	private _escapeDollars(str: string) {
 		return str.replaceAll("$$", "$$$$$$$$");
+	}
+
+	static buildArticleHtml(
+		templateHtml: string,
+		parts: {
+			base: string;
+			title: string;
+			description?: string;
+			data: string;
+			body: string;
+			styles: string;
+			contentLanguage?: string;
+		},
+	): string {
+		return templateHtml
+			.replace(htmlTags.lang, resolveHtmlLang(parts.contentLanguage))
+			.replace(htmlTags.base, `<base href="${parts.base}">`)
+			.replace(htmlTags.title, parts.title)
+			.replace(htmlTags.description, () => renderDescriptionMetaTag(parts.description))
+			.replace(htmlTags.data, parts.data)
+			.replace(htmlTags.body, parts.body)
+			.replace(htmlTags.styles, parts.styles);
 	}
 
 	private _getRedirectHTML(catalogName: string) {

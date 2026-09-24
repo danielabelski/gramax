@@ -10,7 +10,7 @@ export const BaseListItem = ({ children, accentClassName, className, ...props }:
 	return (
 		<MenuItem
 			className={cn(
-				"relative flex w-full flex-col gap-1.5 rounded-none px-3 py-2.5 bg-transparent",
+				"group/review relative flex w-full min-w-0 items-start gap-2 rounded-lg bg-transparent px-2 py-2 hover:bg-secondary-border",
 				accentClassName,
 				className,
 			)}

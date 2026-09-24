@@ -330,6 +330,9 @@ fn gc_stash_objects(_sandbox: TempDir, #[with(&_sandbox)] mut repo: Repo<TestCre
 	let file_name = "file";
 
 	fs::write(_sandbox.path().join(file_name), "initial")?;
+	// Staged on purpose: the stash is built from the index, so an unstaged file would produce no stash
+	// and no objects for the collector to find.
+	repo.add(file_name)?;
 	let stash_oid = repo.stash(None)?.unwrap();
 
 	fs::write(_sandbox.path().join(file_name), "modified")?;

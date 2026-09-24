@@ -3,7 +3,7 @@ import { useSortable as useSortableHook } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Row } from "@ui-kit/DataTable";
 import { TableRow } from "@ui-kit/Table";
-import { type CSSProperties, createContext, useContext } from "react";
+import { type CSSProperties, createContext, type ReactNode, useContext } from "react";
 
 type SortableReturn = ReturnType<typeof useSortable>;
 
@@ -26,16 +26,18 @@ export function DraggableTableRow<T>({
 	rowKey,
 }: {
 	row: Row<T>;
-	children: React.ReactNode;
+	children: ReactNode;
 	state?: string | false;
 	rowKey: keyof T;
 }) {
-	const { attributes, listeners, transform, setNodeRef, setActivatorNodeRef, isDragging } = useSortableHook({
-		id: row.original[rowKey] as string,
-	});
+	const { attributes, listeners, transform, transition, setNodeRef, setActivatorNodeRef, isDragging } =
+		useSortableHook({
+			id: row.original[rowKey] as string,
+		});
 
 	const style: CSSProperties = {
 		transform: CSS.Transform.toString(transform),
+		transition,
 		opacity: isDragging ? 0.8 : 1,
 		zIndex: isDragging ? 1 : 0,
 		position: "relative",

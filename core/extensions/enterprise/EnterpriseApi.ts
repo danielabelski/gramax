@@ -3,12 +3,14 @@ import type {
 	QuizAnswerCreate,
 	QuizTestCreate,
 } from "@ext/enterprise/components/admin/settings/quiz/types/QuizComponentTypes";
+import { GesError, gesErrorCodeByStatus } from "@ext/enterprise/errors/GesError";
 import { EnterpriseErrorCode } from "@ext/enterprise/errors/getEnterpriseErrors";
 import type UserSettings from "@ext/enterprise/types/UserSettings";
 import type { EnterpriseWorkspaceConfig } from "@ext/enterprise/types/UserSettings";
 import DefaultError from "@ext/errorHandlers/logic/DefaultError";
 import t from "@ext/localization/locale/translate";
 import type UserInfo from "@ext/security/logic/User/UserInfo";
+import type { WorkspaceLayoutItem } from "@ext/workspace/WorkspaceConfig";
 import type { CheckChunk, CheckSuggestion } from "@ics/gx-vector-search";
 import type { AccessTokenItem } from "../enterpriseCommon/components/accessTokens/types/AccessTokensComponentTypes";
 import { EnterpriseAuthResult } from "./types/EnterpriseAuthResult";
@@ -16,6 +18,17 @@ import { EnterpriseAuthResult } from "./types/EnterpriseAuthResult";
 export type ResponseError = {
 	code: number;
 	message: string;
+};
+
+type EnterpriseUserData = {
+	info?: UserInfo;
+	expiresAt?: number;
+	workspacePermissions?: string[];
+	catalogsPermissions?: {
+		resourceId: string;
+		permissions: string[];
+		props: { branches?: string[]; mainBranch: string; mainBranchProtected: boolean };
+	}[];
 };
 
 class EnterpriseApi {
@@ -38,48 +51,65 @@ class EnterpriseApi {
 		}
 	}
 
+	async healthcheckAiAgent(token: string): Promise<boolean> {
+		if (!this._gesUrl || !token) return false;
+
+		try {
+			const baseUrl = this._gesUrl.replace(/\/+$/, "");
+			const res = await fetch(`${baseUrl}/ai-agent/healthcheck`, {
+				method: "GET",
+				headers: { Authorization: `Bearer ${token}` },
+				credentials: "include",
+			});
+			if (!res.ok) return false;
+
+			const data = (await res.json()) as { type?: string };
+			return data?.type === "ok";
+		} catch {
+			return false;
+		}
+	}
+
 	async getUser(token: string) {
 		if (!this._gesUrl) return;
 
+		let res: Response;
 		try {
 			const headers = {
 				Authorization: `Bearer ${token ? token : "null"}`,
 			};
-			const res = await fetch(`${this._gesUrl}/enterprise/sso/get-user`, {
+			res = await fetch(`${this._gesUrl}/enterprise/sso/get-user`, {
 				headers,
 				credentials: "include",
 			});
-			if (!res.ok || res.status !== 200) {
-				console.warn(`Error retrieving user information. Status: ${res.status} Status text: ${res.statusText}`);
-				return;
-			}
-
-			const data = (await res.json()) as {
-				info?: UserInfo;
-				workspacePermissions?: string[];
-				catalogsPermissions?: {
-					resourceId: string;
-					permissions: string[];
-					props: { branches?: string[]; mainBranch: string; mainBranchProtected: boolean };
-				}[];
-			};
-
-			const catalogsPermissions = data.catalogsPermissions;
-			const newCatalogsPermissions: { [catalogName: string]: string[] } = {};
-			const newCatalogsProps: {
-				[catalogName: string]: { branches?: string[]; mainBranch: string; mainBranchProtected: boolean };
-			} = {};
-			catalogsPermissions.forEach(({ resourceId, permissions, props }) => {
-				const split = resourceId.split("/");
-				const catalogName = split.pop();
-				if (!catalogName) return;
-				newCatalogsPermissions[catalogName] = permissions;
-				newCatalogsProps[catalogName] = props;
-			});
-			return { ...data, catalogsPermissions: newCatalogsPermissions, catalogsProps: newCatalogsProps };
 		} catch (e) {
-			console.error(e);
+			throw new GesError("offline", { cause: e });
 		}
+
+		if (!res.ok || res.status !== 200) {
+			throw new GesError(gesErrorCodeByStatus(res.status));
+		}
+
+		let data: EnterpriseUserData;
+		try {
+			data = (await res.json()) as EnterpriseUserData;
+		} catch (e) {
+			throw new GesError("malformed", { cause: e });
+		}
+
+		const catalogsPermissions = data.catalogsPermissions;
+		const newCatalogsPermissions: { [catalogName: string]: string[] } = {};
+		const newCatalogsProps: {
+			[catalogName: string]: { branches?: string[]; mainBranch: string; mainBranchProtected: boolean };
+		} = {};
+		catalogsPermissions.forEach(({ resourceId, permissions, props }) => {
+			const split = resourceId.split("/");
+			const catalogName = split.pop();
+			if (!catalogName) return;
+			newCatalogsPermissions[catalogName] = permissions;
+			newCatalogsProps[catalogName] = props;
+		});
+		return { ...data, catalogsPermissions: newCatalogsPermissions, catalogsProps: newCatalogsProps };
 	}
 
 	async checkIsAdmin(token: string): Promise<EnterpriseAuthResult> {
@@ -93,6 +123,17 @@ class EnterpriseApi {
 		} catch {
 			return EnterpriseAuthResult.Error;
 		}
+	}
+
+	async saveWorkspaceLayout(token: string, items: WorkspaceLayoutItem[]): Promise<void> {
+		const res = await fetch(`${this._gesUrl}/enterprise/config/workspace/layout/set`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+			body: JSON.stringify(items),
+			credentials: "include",
+		});
+
+		if (!res.ok) throw new Error(`Failed to save workspace layout: ${res.status}`);
 	}
 
 	async getUsers(search: string, token: string): Promise<{ name: string; email: string }[]> {
@@ -347,10 +388,10 @@ class EnterpriseApi {
 		return await res.json();
 	}
 
-	async healthcheckAccessTokens(): Promise<boolean> {
+	async healthcheckAccessTokens(token: string): Promise<boolean> {
 		try {
 			const res = await fetch(`${this._gesUrl}/enterprise/config/access-tokens/health`, {
-				credentials: "include",
+				headers: { Authorization: `Bearer ${token}` },
 			});
 			return res.status === 204;
 		} catch {

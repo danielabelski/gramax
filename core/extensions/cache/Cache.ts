@@ -17,7 +17,19 @@ class Cache {
 	}
 
 	async delete(key: string): Promise<void> {
-		return this._fp.delete(this._getKeyPath(key));
+		try {
+			await this._fp.delete(this._getKeyPath(key));
+		} catch (e: unknown) {
+			const error = e as { name?: string; code?: string };
+			if (
+				error?.name === "ENOENT" ||
+				error?.code === "ENOENT" ||
+				error?.name === "NotFound" ||
+				error?.code === "NotFound"
+			)
+				return;
+			throw e;
+		}
 	}
 
 	async exists(key: string): Promise<boolean> {

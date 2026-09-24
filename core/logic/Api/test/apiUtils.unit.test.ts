@@ -52,6 +52,31 @@ describe("apiUtils", () => {
 		});
 	});
 
+	describe("sendAborted", () => {
+		test("sets 499 and closes the response", () => {
+			let ended = false;
+			const res = { statusCode: 200, end: () => (ended = true) } as unknown as ApiResponse;
+
+			apiUtils.sendAborted(res);
+
+			expect(res.statusCode).toBe(499);
+			expect(ended).toBe(true);
+		});
+
+		test("leaves a response whose headers are already sent untouched (stream)", () => {
+			const res = {
+				statusCode: 200,
+				headersSent: true,
+				end: () => {
+					throw new Error("end must not be called after headers are sent");
+				},
+			} as unknown as ApiResponse;
+
+			expect(() => apiUtils.sendAborted(res)).not.toThrow();
+			expect(res.statusCode).toBe(200);
+		});
+	});
+
 	// Bugsnag 698339579cb22f058b8efe15 — "TypeError: [NEXT] res.send is not a function".
 	// Crawler-hit routes reached via rewrite (/robots.txt, /sitemap.xml) get a response
 	// object without the NextApiResponse `.send` helper; every sender must degrade to `.end`.

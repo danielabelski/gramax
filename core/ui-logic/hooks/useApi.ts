@@ -1,4 +1,5 @@
 import resolveModule from "@app/resolveModule/frontend";
+import { CLIENT_CLOSED_STATUS_CODE } from "@core/Api/consts";
 import { createEventEmitter, type Event, type EventArgs } from "@core/Event/EventEmitter";
 import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import type FetchResponse from "@core-ui/ApiServices/Types/FetchResponse";
@@ -294,6 +295,11 @@ export const useApi = <T, O = T>({ url: rawUrl, opts, parse, ...props }: UseApiP
 
 			try {
 				const res = await fetchEndpoint(url, opts);
+
+				if (res.status === CLIENT_CLOSED_STATUS_CODE) {
+					setStatus(RequestStatus.Init);
+					return;
+				}
 
 				if (res.ok) {
 					const temp = await parseResponse<T>(res, parse, opts?.failOnParse);

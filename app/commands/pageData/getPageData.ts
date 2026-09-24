@@ -12,7 +12,14 @@ const getPageData: Command<PageDataParams, PageProps> = Command.create({
 	flags: ["otel-omit-result"],
 
 	async do(props: PageDataParams) {
-		return await resolvePageData(this._commands, this._app.wm, props);
+		try {
+			const page = await resolvePageData(this._commands, this._app.wm, props);
+			this._app.readContentHealthState?.observe(page, props.options);
+			return page;
+		} catch (error) {
+			if (!props.options?.diff && !props.options?.scope) this._app.readContentHealthState?.recordFailure();
+			throw error;
+		}
 	},
 
 	params(ctx, q) {

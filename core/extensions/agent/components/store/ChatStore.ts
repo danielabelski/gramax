@@ -1,4 +1,5 @@
 import type { AgentDraftAttachment, ChatMessage, SessionTabItem } from "@ext/agent/components/types/chat";
+import type { AgentQuote } from "@ext/agent/core/events";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
@@ -14,6 +15,7 @@ interface ChatStoreState {
 
 	draft: string;
 	attachments: AgentDraftAttachment[];
+	quote: AgentQuote | null;
 	sessionLoading: boolean;
 	hydrating: boolean;
 	isSending: boolean;
@@ -24,7 +26,6 @@ interface ChatStoreState {
 	onSelectSession: (id: string) => void;
 	onCloseTab: (id: string) => void;
 	onNewSession: () => void;
-	onSaveSettings: ((key: string) => void) | null;
 	onDraftChange: (value: string) => void;
 	onAttachmentsChange: (files: AgentDraftAttachment[]) => void;
 	onSubmit: () => void;
@@ -47,6 +48,7 @@ const useChatStore = create<ChatStoreState>()((set) => ({
 
 	draft: "",
 	attachments: [],
+	quote: null,
 	sessionLoading: false,
 	hydrating: false,
 	isSending: false,
@@ -57,7 +59,6 @@ const useChatStore = create<ChatStoreState>()((set) => ({
 	onSelectSession: () => {},
 	onCloseTab: () => {},
 	onNewSession: () => {},
-	onSaveSettings: null,
 	onDraftChange: () => {},
 	onAttachmentsChange: () => {},
 	onSubmit: () => {},
@@ -86,6 +87,8 @@ export const useChatStreamText = (active: boolean) => useChatStore((s) => (activ
 
 export const useChatDraft = () => useChatStore(useShallow((s) => ({ draft: s.draft, onDraftChange: s.onDraftChange })));
 
+export const useChatQuote = () => useChatStore((s) => s.quote);
+
 export const useChatInput = () =>
 	useChatStore(
 		useShallow((s) => ({
@@ -113,10 +116,10 @@ export const useChatHeaderActions = () =>
 			onSelectSession: s.onSelectSession,
 			onCloseTab: s.onCloseTab,
 			onNewSession: s.onNewSession,
-			onSaveSettings: s.onSaveSettings,
 		})),
 	);
 
 export const setChatState = (patch: Partial<Omit<ChatStoreState, "set">>) => useChatStore.getState().set(patch);
+export const setQuote = (quote: AgentQuote | null) => setChatState({ quote });
 
 export default useChatStore;

@@ -8,8 +8,12 @@ import { useIsDiffView } from "@ext/git/core/Diff/logic/hooks/useIsDiffView";
 import t from "@ext/localization/locale/translate";
 import { useIsStorageConnected } from "@ext/storage/logic/utils/useStorage";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@ui-kit/Dropdown";
-import { ComponentVariantProvider } from "@ui-kit/Providers";
-import { ToolbarIcon, ToolbarToggleButton, ToolbarTriggerChevron } from "@ui-kit/Toolbar";
+import {
+	GlassToolbarGroup,
+	GlassToolbarIcon,
+	GlassToolbarToggleButton,
+	GlassToolbarTriggerChevron,
+} from "@ui-kit/GlassToolbar";
 
 export const ToolbarDiffToggle = () => {
 	const isReadOnly = PageDataContext.value.conf.isReadOnly;
@@ -23,26 +27,24 @@ export const ToolbarDiffToggle = () => {
 	if (!isStorageConnected) return null;
 
 	return (
-		<>
-			<ToolbarToggleButton
+		<GlassToolbarGroup>
+			<GlassToolbarToggleButton
 				active={diffEnabled}
 				data-testid="tb-diff-toggler"
 				disabled={(!isRevision && !isDiffView && isReadOnly) || isRevisionCompare}
 				onClick={toggleDiffMode}
 				tooltipText={t("editor.diff")}
 			>
-				<ToolbarIcon icon="diff" />
-			</ToolbarToggleButton>
-			<ComponentVariantProvider variant="inverse">
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<ToolbarTriggerChevron data-testid="tb-diff-sub" sub />
-					</DropdownMenuTrigger>
-					<DropdownMenuContent className="shadow-hard-base" side="top" sideOffset={8}>
-						<ToolbarModesToggle />
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</ComponentVariantProvider>
-		</>
+				<GlassToolbarIcon icon="diff" />
+			</GlassToolbarToggleButton>
+			<DropdownMenu modal={false}>
+				<DropdownMenuTrigger asChild>
+					<GlassToolbarTriggerChevron data-testid="tb-diff-sub" sub />
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" side="top" sideOffset={8}>
+					<ToolbarModesToggle />
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</GlassToolbarGroup>
 	);
 };

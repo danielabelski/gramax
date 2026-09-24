@@ -43,6 +43,17 @@ export const logStep = async <T>(
 	}
 };
 
+export const logStepWithProgress = async <T>(
+	step: string,
+	action: (onProgress: (progress: number) => void) => Promise<T>,
+) => {
+	const onProgress = (progress: number) => {
+		ChalkLogger.write(`\r${step}... ${Math.round(progress * 100)}%`);
+	};
+
+	return await logStepWithErrorSuppression(step, () => action(onProgress));
+};
+
 export const logStepWithErrorSuppression = async <T>(
 	logMessage: string,
 	action: () => Promise<T> | T,

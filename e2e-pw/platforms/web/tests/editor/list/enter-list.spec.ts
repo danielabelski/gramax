@@ -4,7 +4,7 @@ import { editorTest } from "@web/fixtures/editor.fixture";
 editorTest.describe("List Enter", () => {
 	editorTest("create new item with Enter", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("lists");
-		await sharedPage.getByRole("menuitem", { name: "Bullet" }).click();
+		await sharedPage.locator('[data-list-type="bullet"]').click();
 		await editor.type("Orange");
 		await editor.press("Enter");
 		await editor.assertMarkdown(md`

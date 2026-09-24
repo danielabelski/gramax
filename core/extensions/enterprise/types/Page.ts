@@ -13,4 +13,5 @@ export enum Page {
 	MAIL = "mail",
 	GUESTS = "guests",
 	ACCESS_TOKENS = "accessTokens",
+	LICENSE = "license",
 }

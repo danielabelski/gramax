@@ -4,6 +4,10 @@
     - !reference [.rules, build, base]
   variables:
     PUSH_ENTERPRISE: 'true'
+  before_script:
+    - !reference [.template.docker.base, before_script]
+    - !reference [.template.nexus-login, before_script]
+    - printf 'registry=https://nexus.ics-it.ru/repository/npm-proxy/\n//nexus.ics-it.ru/repository/npm-proxy/:_auth=%s\n' "$NPM_AUTH" > /tmp/nexus.npmrc
   script:
     - |
       TAGS="$TAG"
@@ -30,6 +34,8 @@
 
       docker build --rm $BUILD_TAGS \
         --provenance=false \
+        --secret id=npmrc,src=/tmp/nexus.npmrc \
+        --secret id=github-token,env=GITHUB_TOKEN \
         -f $DOCKERFILE_PATH --progress=plain --metadata-file build-metadata.json \
         --build-arg BRANCH=$BRANCH \
         --build-arg USE_IMAGE_TAG=$USE_IMAGE_TAG \
@@ -45,7 +51,6 @@
         --build-arg COOKIE_SECRET=${COOKIE_SECRET} \
         --build-arg SHARE_ACCESS_TOKEN=${SHARE_ACCESS_TOKEN} \
         --build-arg UPLOAD_SOURCE_MAPS_TO_BUGSNAG=${UPLOAD_SOURCE_MAPS_TO_BUGSNAG} \
-        --build-arg CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX=${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX} \
         --build-arg NEXUS_DOCKERHUB=${NEXUS_DOCKERHUB} \
         --build-arg CLOUD_SERVICE_URL=${CLOUD_SERVICE_URL} \
         --build-arg CLOUD_UPLOAD_TOKEN=${CLOUD_UPLOAD_TOKEN} \
@@ -56,6 +61,7 @@
     - |
       for TAG in $TAGS; do
         retry 3 2 -- docker push "$CI_REGISTRY_IMAGE/$IMAGE_NAME:$TAG"
+        ./.ci/scripts/assert-servable-manifest.sh "$CI_REGISTRY_IMAGE/$IMAGE_NAME:$TAG"
       done
 
       CONTAINER_SIGN_TAGS="$TAGS" ./.ci/apps/sign.sh --container
@@ -96,6 +102,7 @@
     - !reference [.template.nexus-login, before_script]
   script:
     - docker build --rm
+      --provenance=false
       -t $CI_REGISTRY_IMAGE/$IMAGE_NAME:$TAG_SHORT
       $(if [ "$TAG_SHORT" = "$PROD_VERSION" ]; then echo "-t $CI_REGISTRY_IMAGE/$IMAGE_NAME:latest"; fi)
       $(if [ "$CI_COMMIT_REF_NAME" = "develop" ]; then echo "-t $CI_REGISTRY_IMAGE/$IMAGE_NAME:latest-dev"; fi)
@@ -118,21 +125,25 @@
 
       for TAG in $PUSH_TAGS; do
         retry 3 2 -- docker push "$CI_REGISTRY_IMAGE/$IMAGE_NAME:$TAG"
+        ./.ci/scripts/assert-servable-manifest.sh "$CI_REGISTRY_IMAGE/$IMAGE_NAME:$TAG"
       done
 
 .template.docker.build.opensource:
   extends: .template.docker.base
   rules:
     - !reference [.rules, build, if-prod]
+  before_script:
+    - !reference [.template.docker.base, before_script]
+    - !reference [.template.nexus-login, before_script]
   script:
     - retry 3 2 -- bash -c 'echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin'
     - .ci/sync/delete-secrets.sh $DELETE_SECRETS_ARGS
     - docker build --rm
       -f $DOCKERFILE_PATH
+      --secret id=github-token,env=GITHUB_TOKEN
       --build-arg BRANCH=$BRANCH
       --build-arg USE_IMAGE_TAG=$USE_IMAGE_TAG
       --build-arg PRODUCTION=$PRODUCTION
-      --build-arg CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX=${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}
       --build-arg NEXUS_DOCKERHUB=${NEXUS_DOCKERHUB}
       --tag $DOCKERHUB_IMAGE:$TAG
       --tag $DOCKERHUB_IMAGE:latest
@@ -180,8 +191,6 @@ build-image-multiplatform:
       optional: true
     - job: bootstrap-dind-bun
       optional: true
-  variables:
-    BUILD_PLATFORMS: 'linux/amd64,linux/arm64,linux/arm64/v8'
   parallel:
     matrix:
       - IMAGE_NAME: ['base-image', 'playwright', 'ai']
@@ -221,17 +230,17 @@ build-docportal:
     KUBERNETES_CPU_REQUEST: '1'
     KUBERNETES_CPU_LIMIT: '2'
 
-# build-docportal-new:
-#   extends: .template.docker.build
-#   variables:
-#     NO_TRIVY: '1'
-#     GIT_DEPTH: 2000
-#     UPLOAD_SOURCE_MAPS_TO_BUGSNAG: 'true'
-#     IMAGE_NAME: 'docportal-new'
-#     DOCKERFILE_PATH: './apps/docportal/Dockerfile'
-#     KUBERNETES_MEMORY_REQUEST: '1Gi'
-#     KUBERNETES_CPU_REQUEST: '1'
-#     KUBERNETES_CPU_LIMIT: '2'
+build-docportal-new:
+  extends: .template.docker.build
+  variables:
+    NO_TRIVY: '1'
+    GIT_DEPTH: 2000
+    UPLOAD_SOURCE_MAPS_TO_BUGSNAG: 'true'
+    IMAGE_NAME: 'docportal-new'
+    DOCKERFILE_PATH: './apps/docportal/Dockerfile'
+    KUBERNETES_MEMORY_REQUEST: '1Gi'
+    KUBERNETES_CPU_REQUEST: '1'
+    KUBERNETES_CPU_LIMIT: '2'
 
 build-blog:
   extends: .template.docker.build
@@ -262,7 +271,6 @@ build-services:
       - SERVICE_NAME:
           - auth
           - git-proxy
-          - enterprise-cloud
           - diagram-renderer
           - cloud
 
@@ -274,6 +282,15 @@ build-service-enterprise:
     - !reference [.rules, build, base]
   variables:
     SERVICE_NAME: enterprise
+
+build-service-enterprise-cloud:
+  extends: .template.docker.build.service
+  tags:
+    - kubernetes01-gramax-5ghz
+  rules:
+    - !reference [.rules, build, base]
+  variables:
+    SERVICE_NAME: enterprise-cloud
 
 publish-cli:
   tags:
@@ -291,6 +308,24 @@ publish-cli:
     - bun run --cwd ./apps/cli build
     - cd ./apps/cli/dist
     - npm version $(npm show gramax-cli version) --no-git-tag-version
+    - npm version patch --no-git-tag-version
+    - npm publish
+
+publish-sdk:
+  tags:
+    - kubernetes01-gramax
+  stage: build
+  image: gitlab.ics-it.ru:4567/ics/doc-reader/base-image:$USE_IMAGE_TAG
+  rules: !reference [.rules, build, if-prod]
+  when: manual
+  before_script:
+    - bun plugins/sdk/scripts/create-npmrc.mjs ~/.npmrc
+  script:
+    - npm whoami --registry=https://npm.ics-it.ru
+    - ./install-deps.sh --ci
+    - bun run --cwd plugins/sdk build
+    - cd plugins/sdk
+    - npm version $(npm view @gramax/sdk version --registry=https://npm.ics-it.ru) --no-git-tag-version
     - npm version patch --no-git-tag-version
     - npm publish
 

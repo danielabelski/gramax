@@ -3,7 +3,6 @@ import type {
 	SearchArticleResult,
 	SearchCatalogResult,
 	SearchResult,
-	SearchResultBlockItem,
 	SearchResultItem,
 	SearchResultMarkItem,
 	SearchResultParagraphItem,
@@ -49,15 +48,17 @@ export interface SearchItemRowBase {
 
 export interface SearchItemBlockRowBase extends SearchItemRowBase {
 	children: SearchItemRow[];
-	breadcrumbs: BlockItem[];
 }
 
 export interface SearchItemHeaderBlockRow extends SearchItemBlockRowBase {
 	type: "block";
+	breadcrumbs: SearchResultMarkItem[][];
 }
 
 export interface SearchItemFileBlockRow extends SearchItemBlockRowBase {
 	type: "file-block";
+	title: SearchResultMarkItem[];
+	fileName?: SearchResultMarkItem[];
 }
 
 export type SearchItemBlockRow = SearchItemHeaderBlockRow | SearchItemFileBlockRow;
@@ -75,19 +76,6 @@ export interface SearchItemLinkRow extends SearchItemRowBase {
 }
 
 export type SearchItemRow = SearchItemLinkRow | SearchItemBlockRow | SearchItemDiagramRow;
-
-type BlockItemBase = Omit<SearchResultBlockItem, "type" | "embeddedLinkTitle" | "items">;
-
-export interface HeaderBlockItem extends BlockItemBase {
-	type: "header";
-}
-
-export interface FileBlockItem extends BlockItemBase {
-	type: "file";
-	fileName?: SearchResultMarkItem[];
-}
-
-export type BlockItem = HeaderBlockItem | FileBlockItem;
 
 export class SearchItemRowIdGenerator {
 	private _id = 0;
@@ -203,39 +191,33 @@ function getSearchRows(
 
 			if (item.type === "paragraph") {
 				handleParagraph(item, (text) => articleFragmentCounter.initFragmentInfo(text));
-			} else if (item.type === "block") {
+			} else if (item.type === "block" && item.embeddedLinkTitle == null) {
+				// Walking a collapsed block chain, the innermost titled block wins the fragment.
 				let fragmentInfo: SearchFragmentInfo | undefined = overrideFragmentInfo;
-				let overrideFragmentInfoForChildren: SearchFragmentInfo | undefined = overrideFragmentInfo;
-				let type: SearchItemBlockRow["type"] = "block";
+				const type: SearchItemBlockRow["type"] = "block";
 
-				const newFragmentInfo = (block: BlockItem) => {
-					const joinedTitle = block.title.map((x) => x.text).join("");
-					fragmentInfo = articleFragmentCounter.initFragmentInfo(joinedTitle);
+				const newFragmentInfo = (title: SearchResultMarkItem[]) => {
+					const joinedTitle = title.map((x) => x.text).join("");
+					return articleFragmentCounter.initFragmentInfo(joinedTitle);
 				};
 
-				const handleFileBlock = (block: BlockItem): void => {
-					if (type === "block" && !overrideFragmentInfo && block.title.length > 0) {
-						newFragmentInfo(block);
-					}
-
-					if (block.type === "file") {
-						type = "file-block";
-						if (!overrideFragmentInfo) {
-							overrideFragmentInfoForChildren = fragmentInfo;
-						}
+				const handleBlockTitle = (title: SearchResultMarkItem[]): void => {
+					if (!overrideFragmentInfo && title.length > 0) {
+						fragmentInfo = newFragmentInfo(title);
 					}
 				};
 
-				const rootBlockItem = getBlockItem(item);
-				const breadcrumbs: BlockItem[] = [rootBlockItem];
+				const breadcrumbs: SearchResultMarkItem[][] = [item.title];
 				let curRawItem = item;
-				let curBlockItem = rootBlockItem;
-				handleFileBlock(curBlockItem);
-				while (curRawItem.items.length === 1 && curRawItem.items[0].type === "block") {
+				handleBlockTitle(curRawItem.title);
+				while (
+					curRawItem.items.length === 1 &&
+					curRawItem.items[0].type === "block" &&
+					curRawItem.items[0].embeddedLinkTitle == null
+				) {
 					curRawItem = curRawItem.items[0];
-					curBlockItem = getBlockItem(curRawItem);
-					handleFileBlock(curBlockItem);
-					breadcrumbs.push(curBlockItem);
+					handleBlockTitle(curRawItem.title);
+					breadcrumbs.push(curRawItem.title);
 				}
 
 				const href = createLinkRefUrl(baseUrl, fragmentInfo);
@@ -256,8 +238,49 @@ function getSearchRows(
 					id,
 					url: href,
 					breadcrumbs,
-					children: handleItemsRecursively(curRawItem.items, overrideFragmentInfoForChildren),
+					children: handleItemsRecursively(curRawItem.items, overrideFragmentInfo),
 					openSideEffect,
+				});
+			} else if (item.type === "block" && item.embeddedLinkTitle != null) {
+				const newFragmentInfo = (title: SearchResultMarkItem[]) => {
+					const joinedTitle = title.map((x) => x.text).join("");
+					return articleFragmentCounter.initFragmentInfo(joinedTitle);
+				};
+
+				const fragmentInfo: SearchFragmentInfo | undefined =
+					overrideFragmentInfo ?? newFragmentInfo(item.title);
+				const id = idGenerator.generateId();
+				const href = createLinkRefUrl(baseUrl, fragmentInfo);
+				const children = handleItemsRecursively(item.items, fragmentInfo);
+				const openSideEffect: LinkOpenSideEffectOptions = {
+					params: {
+						pathname: baseUrl,
+						fragmentInfo,
+					},
+				};
+
+				if (!overrideFragmentInfo) {
+					rowIdLinkMap.set(id, { url: href, openSideEffect });
+				}
+
+				const titleText = item.title
+					.map((x) => x.text)
+					.join("")
+					.trim();
+				const fileNameText = item.embeddedLinkTitle
+					.map((x) => x.text)
+					.join("")
+					.trim();
+				const noFileName = !fileNameText || titleText === fileNameText;
+
+				res.push({
+					type: "file-block",
+					id,
+					url: href,
+					title: item.title,
+					fileName: noFileName ? undefined : item.embeddedLinkTitle,
+					children,
+					openSideEffect: openSideEffect,
 				});
 			} else if (item.type === "diagram") {
 				const itemFragmentInfos = item.items.map((x) =>
@@ -290,7 +313,7 @@ function getSearchRows(
 					id: idGenerator.generateId(),
 					url: href,
 					diagramType: item.diagramType,
-					title: item.title,
+					title: sanitizeMarks(item.title),
 					children,
 					openSideEffect: children.length > 0 ? children[0].openSideEffect : openSideEffect,
 				});
@@ -303,31 +326,4 @@ function getSearchRows(
 	return handleItemsRecursively(items);
 }
 
-function getBlockItem(item: SearchResultBlockItem): BlockItem {
-	if (item.embeddedLinkTitle) {
-		const titleText = item.title
-			.map((x) => x.text)
-			.join("")
-			.trim();
-		const embTitleText = item.embeddedLinkTitle
-			.map((x) => x.text)
-			.join("")
-			.trim();
-
-		const result: FileBlockItem = {
-			type: "file",
-			title: item.title,
-		};
-
-		if (embTitleText.length !== 0 && embTitleText !== titleText) {
-			result.fileName = item.embeddedLinkTitle;
-		}
-
-		return result;
-	}
-
-	return {
-		type: "header",
-		title: item.title,
-	};
-}
+const sanitizeMarks = (marks: SearchResultMarkItem[]): SearchResultMarkItem[] => marks.filter((x) => x.text.length > 0);

@@ -1,28 +1,15 @@
-import styled from "@emotion/styled";
-import { ToolbarIcon, ToolbarToggleButton, type ToolbarToggleButtonProps } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton, type GlassToolbarToggleButtonProps } from "@ui-kit/GlassToolbar";
+import type { IconCode } from "@ui-kit/Icon";
 
-interface AiToolbarButtonProps extends Omit<ToolbarToggleButtonProps, "children"> {
+interface AiToolbarButtonProps extends Omit<GlassToolbarToggleButtonProps, "children"> {
 	tooltipText: string;
-	icon: string;
+	icon: IconCode;
 }
-
-const StyledToolbarToggleButton = styled(ToolbarToggleButton)`
-	background-color: hsl(var(--inverse-accent));
-	color: hsl(var(--inverse-accent-text));
-
-	> svg {
-		color: hsl(var(--inverse-accent-text));
-	}
-
-	&:hover {
-		background-color: hsl(var(--inverse-accent-hover));
-	}
-`;
 
 export const AiToolbarButton = ({ tooltipText, icon, ...otherProps }: AiToolbarButtonProps) => {
 	return (
-		<StyledToolbarToggleButton className="text-secondary-bg" focusable tooltipText={tooltipText} {...otherProps}>
-			<ToolbarIcon icon={icon} />
-		</StyledToolbarToggleButton>
+		<GlassToolbarToggleButton focusable tooltipText={tooltipText} {...otherProps}>
+			<GlassToolbarIcon icon={icon} />
+		</GlassToolbarToggleButton>
 	);
 };

@@ -17,6 +17,16 @@ export type ResourceManagerEvents = Event<
 	{ path: Path; ctx?: Context; content: Buffer; out: { out: Buffer | true | null } }
 >;
 
+/**
+ * A reference that points outside the catalog: an absolute URL (`scheme:`) or `//host/…`.
+ *
+ * `set` is handed raw `src`/`path` attribute values, and an external one that reaches the list stops
+ * being recognisable: `getAbsolutePath` joins it onto the article path and `Path` normalises it into
+ * something shaped like a catalog file, which every consumer then treats as one. The scheme part is
+ * wider than `linkCreator.isExternalLink`'s `\w+:` because `vscode-file:` slipped past that check.
+ */
+const EXTERNAL_REFERENCE = /^(?:[\w+.-]+:|\/\/)/;
+
 class ResourceManager implements Hashable {
 	private _resources: Path[];
 	private _events = createEventEmitter<ResourceManagerEvents>();
@@ -156,6 +166,7 @@ class ResourceManager implements Hashable {
 	}
 
 	set(path: Path) {
+		if (EXTERNAL_REFERENCE.test(path?.value ?? "")) return;
 		if (this._resources.findIndex((p) => p.compare(path)) === -1) {
 			this._resources.push(path);
 		}

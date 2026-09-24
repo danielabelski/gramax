@@ -1,4 +1,5 @@
 import type Style from "@components/HomePage/Cards/model/Style";
+import type { AutoLfsProps } from "@core/GitLfs/logic/autoLfsAttachments";
 import type { ContentLanguage } from "@ext/localization/core/model/Language";
 import type { Syntax } from "@ext/markdown/core/edit/logic/Formatter/Formatters/typeFormats/model/Syntax";
 import type { Property } from "@ext/properties/models";
@@ -15,6 +16,7 @@ export interface CatalogEditProps {
 	properties?: Property[];
 	// private?: string[];
 	syntax?: Syntax;
+	lfs?: AutoLfsProps;
 	logo?: string;
 	logo_dark?: string;
 }

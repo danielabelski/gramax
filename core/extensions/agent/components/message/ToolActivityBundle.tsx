@@ -1,42 +1,50 @@
 import type { IconCode } from "@components/Atoms/Icon/LucideIcon";
 import { cn } from "@core-ui/utils/cn";
+import type UiLanguage from "@ext/localization/core/model/Language";
 import t from "@ext/localization/locale/translate";
+import { useSetting } from "@ext/settings/logic/hooks";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@ui-kit/Collapsible";
 import { Divider } from "@ui-kit/Divider";
 import { Icon } from "@ui-kit/Icon";
 import { TextOverflowTooltip } from "@ui-kit/Tooltip";
 import { memo, useEffect, useMemo, useState } from "react";
+import { useAutoScrollGuard } from "../context/scrollGuardContext";
 import type { ChatMessage, ToolCallMessage, ToolResultMessage } from "../types/chat";
 import { isPlainObject } from "../utils/agentTimeline";
 import { ToolPayloadSection, ToolResultSection } from "./ToolPayloadSection";
 
-const TOOL_LABELS: Record<string, string> = {
-	list_catalogs: t("agent.tools.list_catalogs"),
-	get_navigation: t("agent.tools.get_navigation"),
-	search_catalogs: t("agent.tools.search_catalogs"),
-	search_files: t("agent.tools.search_files"),
-	read_catalog_item: t("agent.tools.read_catalog_item"),
-	get_files_navigation: t("agent.tools.get_files_navigation"),
-	read_file: t("agent.tools.read_file"),
-	get_catalog_item_headings: t("agent.tools.get_catalog_item_headings"),
-	create_catalog_item: t("agent.tools.create_catalog_item"),
-	write_catalog_item: t("agent.tools.write_catalog_item"),
-	replace_catalog_item: t("agent.tools.replace_catalog_item"),
-	delete_catalog_item: t("agent.tools.delete_catalog_item"),
-	move_catalog_item: t("agent.tools.move_catalog_item"),
-	git_inspect: t("agent.tools.git_inspect"),
-	git_discard: t("agent.tools.git_discard"),
-	read_agent_skill: t("agent.tools.read_agent_skill"),
-	read_agent_attachment: t("agent.tools.read_agent_attachment"),
-	search_web: t("agent.tools.search_web"),
-	http_request: t("agent.tools.http_request"),
-	browser_navigate: t("agent.tools.browser_navigate"),
-	browser_read_page: t("agent.tools.browser_read_page"),
-	browser_read_element: t("agent.tools.browser_read_element"),
-	browser_click: t("agent.tools.browser_click"),
-	browser_type: t("agent.tools.browser_type"),
-	browser_scroll: t("agent.tools.browser_scroll"),
-};
+const buildToolLabels = (language: UiLanguage): Record<string, string> => ({
+	list_catalogs: t("agent.tools.list_catalogs", language),
+	get_navigation: t("agent.tools.get_navigation", language),
+	search_catalogs: t("agent.tools.search_catalogs", language),
+	search_files: t("agent.tools.search_files", language),
+	read_catalog_item: t("agent.tools.read_catalog_item", language),
+	get_files_navigation: t("agent.tools.get_files_navigation", language),
+	read_file: t("agent.tools.read_file", language),
+	get_catalog_item_headings: t("agent.tools.get_catalog_item_headings", language),
+	create_catalog_item: t("agent.tools.create_catalog_item", language),
+	write_catalog_item: t("agent.tools.write_catalog_item", language),
+	replace_catalog_item: t("agent.tools.replace_catalog_item", language),
+	delete_catalog_item: t("agent.tools.delete_catalog_item", language),
+	move_catalog_item: t("agent.tools.move_catalog_item", language),
+	git_inspect: t("agent.tools.git_inspect", language),
+	git_discard: t("agent.tools.git_discard", language),
+	git_branch: t("agent.tools.git_branch", language),
+	git_restore: t("agent.tools.git_restore", language),
+	read_document: t("agent.tools.read_document", language),
+	save_chat_attachment: t("agent.tools.save_chat_attachment", language),
+	transcribe_audio: t("agent.tools.transcribe_audio", language),
+	search_web: t("agent.tools.search_web", language),
+	http_request: t("agent.tools.http_request", language),
+	mail_request: t("agent.tools.mail_request", language),
+	browser_navigate: t("agent.tools.browser_navigate", language),
+	browser_read_page: t("agent.tools.browser_read_page", language),
+	browser_read_element: t("agent.tools.browser_read_element", language),
+	browser_click: t("agent.tools.browser_click", language),
+	browser_type: t("agent.tools.browser_type", language),
+	browser_scroll: t("agent.tools.browser_scroll", language),
+	compact_context: t("agent.tools.compact_context", language),
+});
 
 const TOOL_ICONS: Record<string, IconCode> = {
 	list_catalogs: "list",
@@ -54,20 +62,25 @@ const TOOL_ICONS: Record<string, IconCode> = {
 	move_catalog_item: "folder-input",
 	git_inspect: "git-compare",
 	git_discard: "undo2",
-	read_agent_skill: "puzzle",
-	read_agent_attachment: "paperclip",
+	git_branch: "git-branch",
+	git_restore: "history",
+	read_document: "paperclip",
+	save_chat_attachment: "paperclip",
+	transcribe_audio: "audio-lines",
 	search_web: "globe",
 	http_request: "globe",
+	mail_request: "mail",
 	browser_navigate: "globe",
 	browser_read_page: "scan-text",
 	browser_read_element: "search",
 	browser_click: "mouse-pointer-click",
 	browser_type: "keyboard",
 	browser_scroll: "arrow-down",
+	compact_context: "package",
 };
 
-const getToolLabel = (toolName: string, args?: unknown, itemTitle?: string): string => {
-	const base = TOOL_LABELS[toolName] ?? toolName.replace(/_/g, " ");
+const getToolLabel = (labels: Record<string, string>, toolName: string, args?: unknown, itemTitle?: string): string => {
+	const base = labels[toolName] ?? toolName.replace(/_/g, " ");
 	if (itemTitle) return `${base} «${itemTitle}»`;
 	if (!isPlainObject(args)) return base;
 	if (
@@ -118,8 +131,9 @@ const buildPairs = (messages: ChatMessage[]): ToolPair[] => {
 
 const SHOW_CHECK_DURATION = 3000;
 
-const ToolPairCard = ({ pair }: { pair: ToolPair }) => {
+const ToolPairCard = ({ pair, labels }: { pair: ToolPair; labels: Record<string, string> }) => {
 	const [open, setOpen] = useState(false);
+	useAutoScrollGuard(open);
 	const { call, result } = pair;
 	const isPending = call.kind === "tool_call" && !result;
 	const isError = result?.toolResultIsError === true;
@@ -138,7 +152,7 @@ const ToolPairCard = ({ pair }: { pair: ToolPair }) => {
 	const toolArguments = call.kind === "tool_call" ? call.toolArguments : undefined;
 	const toolItemTitle = call.kind === "tool_call" ? call.toolItemTitle : undefined;
 	const toolName = call.toolName;
-	const label = getToolLabel(toolName, toolArguments, toolItemTitle);
+	const label = getToolLabel(labels, toolName, toolArguments, toolItemTitle);
 	const toolIcon = getToolIcon(toolName);
 
 	return (
@@ -201,11 +215,12 @@ const ToolPairCard = ({ pair }: { pair: ToolPair }) => {
 	);
 };
 
-const ToolSegment = ({ pairs }: { pairs: ToolPair[] }) => {
+const ToolSegment = ({ pairs, labels }: { pairs: ToolPair[]; labels: Record<string, string> }) => {
 	const [open, setOpen] = useState(false);
+	useAutoScrollGuard(open);
 
 	if (pairs.length === 1) {
-		return <ToolPairCard pair={pairs[0]} />;
+		return <ToolPairCard labels={labels} pair={pairs[0]} />;
 	}
 
 	return (
@@ -220,7 +235,7 @@ const ToolSegment = ({ pairs }: { pairs: ToolPair[] }) => {
 			</CollapsibleTrigger>
 			<CollapsibleContent className="pt-1 space-y-2">
 				{pairs.map((pair) => (
-					<ToolPairCard key={pair.call.id} pair={pair} />
+					<ToolPairCard key={pair.call.id} labels={labels} pair={pair} />
 				))}
 			</CollapsibleContent>
 		</Collapsible>
@@ -233,10 +248,12 @@ type Props = {
 
 export const ToolActivityBundle = memo(({ messages }: Props) => {
 	const pairs = useMemo(() => buildPairs(messages), [messages]);
+	const [language] = useSetting("general.language");
+	const labels = useMemo(() => buildToolLabels(language), [language]);
 
 	return (
 		<div className="w-full min-w-0 space-y-2">
-			<ToolSegment pairs={pairs} />
+			<ToolSegment labels={labels} pairs={pairs} />
 		</div>
 	);
 });

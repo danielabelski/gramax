@@ -8,6 +8,8 @@ use serde::Serialize;
 
 use crate::prelude::Branch;
 
+use super::diff::changed_paths;
+use super::diff::name_what_blocks;
 use crate::creds::ActualCreds;
 use crate::error::OrUtf8Err;
 use crate::error::Result;
@@ -238,11 +240,20 @@ impl<C: ActualCreds> Merge for Repo<'_, C> {
 impl<C: ActualCreds> Repo<'_, C> {
 	fn merge_as_fast_forward(&self, fetch_commit: AnnotatedCommit) -> Result<MergeResult> {
 		info!(target: TAG, "fast-forwarding to given fetch commit; oid: {}", fetch_commit.id());
+
 		let mut head = self.0.head()?;
+		let before = head.peel_to_tree()?;
+		let after = self.0.find_commit(fetch_commit.id())?.tree()?;
+
+		// The working copy is brought over first, while `HEAD` still describes what is on disk: that is
+		// what a safe checkout compares against. Moving `HEAD` first would make every file that has yet
+		// to be written look like the user had deleted it, and a safe checkout would refuse to touch it.
+		self.checkout_changed_paths(&before, &after)?;
+
 		let msg = format!("fast-forward: Setting HEAD to id: {}", fetch_commit.id());
 		head.set_target(fetch_commit.id(), &msg)?;
 		self.0.set_head(head.name().or_utf8_err()?)?;
-		self.0.checkout_head(Some(CheckoutBuilder::default().force()))?;
+
 		Ok(MergeResult::Ok)
 	}
 
@@ -302,8 +313,42 @@ impl<C: ActualCreds> Repo<'_, C> {
 
 		let parents = if squash { vec![&commit] } else { vec![&commit, &remote_commit] };
 
+		// The merge happened in memory, so the working copy still holds the state from before it. It is
+		// brought to the result here, at the paths the merge changed and nowhere else — the caller used
+		// to do this with a forced checkout of the entire catalog.
+		//
+		// Before the commit, not after: a safe checkout compares the working copy against `HEAD`, and
+		// `HEAD` has to still describe what is on disk for that comparison to mean anything. It also
+		// makes the failure clean — a checkout that refuses leaves no merge commit behind.
+		self.checkout_changed_paths(&commit.tree()?, &tree)?;
+
 		self.0.commit(Some("HEAD"), &signature, &signature, &msg, &tree, &parents)?;
 
 		Ok(MergeResult::Ok)
+	}
+
+	/// Writes out the paths where two trees differ, leaving the rest of the working copy untouched.
+	///
+	/// A checkout without paths compares every file in the catalog against the target tree, which on a
+	/// browser filesystem is the same full pass the stash was rid of — around half a second per
+	/// synchronisation on a catalog of 3448 files. The paths come from a tree-to-tree diff, so finding
+	/// them reads objects instead of files.
+	///
+	/// The checkout is *not* forced. The working copy at these paths was put aside by the stash taken
+	/// before the pull, so a safe checkout has nothing to refuse — and if it does refuse, that means
+	/// something was there that the stash did not carry. Forcing would overwrite it without a word;
+	/// failing says so, and the caller's recovery path puts the repository back.
+	fn checkout_changed_paths(&self, before: &Tree, after: &Tree) -> Result<()> {
+		let paths = changed_paths(&self.0, before, after)?;
+
+		let mut opts = CheckoutBuilder::new();
+		opts.safe().update_index(true);
+		for path in &paths {
+			opts.path(path);
+		}
+
+		info!(target: TAG, "checking out {} changed paths", paths.len());
+
+		name_what_blocks(&self.0, self.0.checkout_tree(after.as_object(), Some(&mut opts)), &paths)
 	}
 }

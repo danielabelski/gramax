@@ -20,7 +20,10 @@ interface PageDataContext {
 	isArticle: boolean;
 	pdfTemplates: string[];
 	wordTemplates: string[];
-	userInfo: UserInfo;
+	user: {
+		info: UserInfo;
+		sessionExpired?: boolean;
+	};
 	language: {
 		content: ContentLanguage;
 	};

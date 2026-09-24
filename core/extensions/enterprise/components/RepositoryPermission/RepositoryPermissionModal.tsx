@@ -142,7 +142,7 @@ const RepositoryPermissionForm = (props: RepositoryPermissionFormProps) => {
 	return (
 		<>
 			<DialogBody className="p-6 pt-0 overflow-y-auto">
-				<RepoForm state={card.repoFormState} />
+				<RepoForm showEnterpriseElements={true} state={card.repoFormState} />
 			</DialogBody>
 
 			<FormFooter

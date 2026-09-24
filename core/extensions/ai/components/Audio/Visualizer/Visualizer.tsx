@@ -1,6 +1,5 @@
 import { isActive, isPaused } from "@core-ui/hooks/useAudioRecorder";
 import useWatch from "@core-ui/hooks/useWatch";
-import styled from "@emotion/styled";
 import AudioRecorderService from "@ext/ai/components/Audio/AudioRecorderService";
 import Timer from "@ext/ai/components/Audio/Timer";
 import AudioHistory from "@ext/ai/components/Audio/Visualizer/AudioHistory";
@@ -8,7 +7,7 @@ import CanvasVisualizator from "@ext/ai/components/Audio/Visualizer/CanvasVisual
 import { AiToolbarButton } from "@ext/ai/components/Helpers/AiToolbarButton";
 import type { AudioHistoryItem } from "@ext/ai/models/types";
 import t from "@ext/localization/locale/translate";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface VisualizerProps {
@@ -21,19 +20,6 @@ export interface VisualizerProps {
 	onReset?: () => void;
 	onSend?: (buffer: ArrayBuffer, transcribe?: boolean) => void;
 }
-
-const Container = styled.div`
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.5em;
-	width: 100%;
-`;
-
-const EqualizerContainer = styled.div`
-	height: 1em;
-	width: 100%;
-`;
 
 const formatTime = (ms: number): string => {
 	const seconds = Math.floor(ms / 1000);
@@ -55,6 +41,17 @@ const Visualizer = (props: VisualizerProps) => {
 	} = props;
 
 	const { micState, recorderState, recorderActions, micActions } = AudioRecorderService.value;
+	const {
+		startRecording: startMicrophoneRecording,
+		stopRecording: stopMicrophoneRecording,
+		toggleMicrophone,
+	} = micActions;
+	const {
+		clearRecording,
+		startRecording: startRecorderRecording,
+		stopRecording: stopRecorderRecording,
+		toggleRecording,
+	} = recorderActions;
 
 	const audioContextRef = useRef<AudioContext>(null);
 	const analyserRef = useRef<AnalyserNode>(null);
@@ -72,7 +69,7 @@ const Visualizer = (props: VisualizerProps) => {
 		accumulatedTimeMsRef.current = accumulatedTimeMs;
 	}, [accumulatedTimeMs]);
 
-	const getCurrentAudioLevel = (): number => {
+	const getCurrentAudioLevel = useCallback((): number => {
 		if (!analyserRef.current) return 8;
 
 		const bufferLength = analyserRef.current.frequencyBinCount;
@@ -87,24 +84,11 @@ const Visualizer = (props: VisualizerProps) => {
 
 		const normalized = (weighted / 255) * 24 + 8;
 		return Math.max(8, Math.min(32, normalized));
-	};
+	}, []);
 
-	const handlePlay = async () => {
-		if (isPaused(recorderState)) {
-			micActions.toggleMicrophone();
-			recorderActions.toggleRecording();
-			startRecordingVisualization();
-		} else {
-			setAccumulatedTimeMs(0);
-			setSessionStartTime(null);
-			const stream = await micActions.startRecording();
-			if (stream) recorderActions.startRecording(stream);
-		}
-	};
-
-	const handlePause = () => {
-		micActions.toggleMicrophone();
-		recorderActions.toggleRecording();
+	const handlePause = useCallback(() => {
+		toggleMicrophone();
+		toggleRecording();
 
 		if (sessionStartTime) {
 			const currentSessionTime = Date.now() - sessionStartTime;
@@ -123,17 +107,17 @@ const Visualizer = (props: VisualizerProps) => {
 		}
 
 		if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-			audioContextRef.current.close();
+			void audioContextRef.current.close();
 			audioContextRef.current = null;
 		}
 
 		analyserRef.current = null;
-	};
+	}, [accumulatedTimeMs, sessionStartTime, toggleMicrophone, toggleRecording]);
 
 	const handleReset = useCallback(() => {
 		if (isActive(recorderState)) {
-			recorderActions.stopRecording();
-			micActions.stopRecording();
+			void stopRecorderRecording();
+			stopMicrophoneRecording();
 		}
 
 		onReset?.();
@@ -141,17 +125,22 @@ const Visualizer = (props: VisualizerProps) => {
 		setLimitReached(false);
 		setAccumulatedTimeMs(0);
 		setSessionStartTime(null);
-	}, [recorderActions, micActions, onReset, recorderState?.state]);
+	}, [onReset, recorderState, stopMicrophoneRecording, stopRecorderRecording]);
 
 	useEffect(() => {
 		if (!isActive(recorderState)) handleReset();
-	}, [recorderState]);
+	}, [recorderState, handleReset]);
 
 	const startRecordingVisualization = useCallback(() => {
 		if (!micState.stream) return;
 
 		try {
-			audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+			const AudioContextConstructor =
+				window.AudioContext ??
+				(window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+			if (!AudioContextConstructor) return;
+
+			audioContextRef.current = new AudioContextConstructor();
 			const audioContext = audioContextRef.current;
 
 			analyserRef.current = audioContext.createAnalyser();
@@ -181,7 +170,27 @@ const Visualizer = (props: VisualizerProps) => {
 		} catch (error) {
 			console.error("Error starting recording visualization:", error);
 		}
-	}, [micState.stream, handleReset]);
+	}, [getCurrentAudioLevel, micState.stream]);
+
+	const handlePlay = useCallback(async () => {
+		if (isPaused(recorderState)) {
+			toggleMicrophone();
+			toggleRecording();
+			startRecordingVisualization();
+		} else {
+			setAccumulatedTimeMs(0);
+			setSessionStartTime(null);
+			const stream = await startMicrophoneRecording();
+			if (stream) startRecorderRecording(stream);
+		}
+	}, [
+		recorderState,
+		startMicrophoneRecording,
+		startRecorderRecording,
+		startRecordingVisualization,
+		toggleMicrophone,
+		toggleRecording,
+	]);
 
 	const stopRecordingVisualization = useCallback(() => {
 		if (historyIntervalRef.current) {
@@ -195,7 +204,7 @@ const Visualizer = (props: VisualizerProps) => {
 		}
 
 		if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-			audioContextRef.current.close();
+			void audioContextRef.current.close();
 			audioContextRef.current = null;
 		}
 
@@ -207,12 +216,12 @@ const Visualizer = (props: VisualizerProps) => {
 		else if (!isActive(recorderState) && !isPaused(recorderState)) stopRecordingVisualization();
 
 		return () => stopRecordingVisualization();
-	}, [micState.stream, recorderState, startRecordingVisualization]);
+	}, [micState.stream, recorderState, startRecordingVisualization, stopRecordingVisualization]);
 
 	useEffect(() => {
 		const documentVisibilityChange = () => {
 			if (document.visibilityState === "hidden") handlePause();
-			else if (document.visibilityState === "visible") handlePlay();
+			else if (document.visibilityState === "visible") void handlePlay();
 		};
 
 		document.addEventListener("visibilitychange", documentVisibilityChange);
@@ -220,7 +229,7 @@ const Visualizer = (props: VisualizerProps) => {
 		return () => {
 			document.removeEventListener("visibilitychange", documentVisibilityChange);
 		};
-	}, [recorderState]);
+	}, [handlePause, handlePlay]);
 
 	const renderVisualization = () => {
 		let currentTime = accumulatedTimeMs;
@@ -256,11 +265,11 @@ const Visualizer = (props: VisualizerProps) => {
 
 	const onSendClick = async () => {
 		if (isActive(recorderState)) {
-			const result = await recorderActions.stopRecording();
+			const result = await stopRecorderRecording();
 			if (result) onSend?.(result.buffer);
 
-			recorderActions.clearRecording();
-			micActions.stopRecording();
+			clearRecording();
+			stopMicrophoneRecording();
 		}
 	};
 
@@ -277,16 +286,16 @@ const Visualizer = (props: VisualizerProps) => {
 	);
 
 	return (
-		<Container>
+		<div className="flex w-full items-center justify-between gap-[0.5em]">
 			<AudioHistory disabled={sendDisabled} onClick={onFileClick} />
-			<ToolbarToggleButton
+			<GlassToolbarToggleButton
 				disabled={limitReached}
 				onClick={isActive(recorderState) && !isPaused(recorderState) ? handlePause : handlePlay}
 				tooltipText={getTogglerTooltipText()}
 			>
-				<ToolbarIcon icon={getTooglerIcon()} />
-			</ToolbarToggleButton>
-			<EqualizerContainer>{renderVisualization()}</EqualizerContainer>
+				<GlassToolbarIcon icon={getTooglerIcon()} />
+			</GlassToolbarToggleButton>
+			<div className="h-[1em] w-full">{renderVisualization()}</div>
 			<div className="flex items-center gap-2">
 				<Timer
 					accumulatedTimeMs={accumulatedTimeMs}
@@ -302,7 +311,7 @@ const Visualizer = (props: VisualizerProps) => {
 					tooltipText={sendTooltipText}
 				/>
 			</div>
-		</Container>
+		</div>
 	);
 };
 

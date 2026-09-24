@@ -121,7 +121,7 @@ export async function highlightFragmentUsage(fragmentId: string) {
 			});
 		}
 	});
-	usage.scrollIntoView({ block: "center", behavior: "auto" });
+	scrollToElement(usage);
 }
 
 export async function highlightFragmentInDocportalByUrl() {
@@ -327,8 +327,12 @@ async function waitForArticleToSettle(article: HTMLElement) {
 	});
 }
 
+function getScrollContainer() {
+	return document.querySelector<HTMLElement>('[data-testid="article-scroll-container"]');
+}
+
 function scrollToRange(range: Range) {
-	const scrollContainer = document.querySelector<HTMLElement>('[data-testid="article-scroll-container"]');
+	const scrollContainer = getScrollContainer();
 	if (!scrollContainer) {
 		range.startContainer.parentElement?.scrollIntoView({ block: "center" });
 		return;
@@ -337,6 +341,25 @@ function scrollToRange(range: Range) {
 	const containerRect = scrollContainer.getBoundingClientRect();
 	scrollContainer.scrollTop +=
 		rangeRect.top - containerRect.top - scrollContainer.clientHeight / 2 + rangeRect.height / 2;
+}
+
+function scrollToElement(element: HTMLElement) {
+	const scrollContainer = getScrollContainer();
+	if (!scrollContainer) {
+		element.scrollIntoView({ block: "center", behavior: "auto" });
+		return;
+	}
+
+	const elementRect = element.getBoundingClientRect();
+	const containerRect = scrollContainer.getBoundingClientRect();
+	const nextScrollTop =
+		scrollContainer.scrollTop +
+		elementRect.top -
+		containerRect.top -
+		scrollContainer.clientHeight / 2 +
+		elementRect.height / 2;
+
+	if (scrollContainer.scrollTop !== nextScrollTop) scrollContainer.scrollTop = nextScrollTop;
 }
 
 function highlightSearchFragment(
@@ -367,7 +390,7 @@ function highlightSearchFragment(
 
 			highlightElements([foundEl, ...additionalElementsToHighlight], setAnimation);
 
-			foundEl.scrollIntoView({ block: "center", behavior: "auto" });
+			scrollToElement(foundEl);
 		}
 	}
 }
@@ -387,6 +410,7 @@ function findElementToHighlight(
 	overrideHighlightElement: OverrideHighlightElement,
 	elementPreHandle?: ElementPreHandle,
 ) {
+	const elementText = buildElementTextIndex(articleContentWrapper);
 	const findElementWithFragmentRecursively = (
 		contentEls: HTMLCollectionOf<HTMLElement>,
 		startCount: number,
@@ -412,7 +436,7 @@ function findElementToHighlight(
 					.map((text) => text.textContent ?? "")
 					.join("\n");
 			} else {
-				textContent = contentEl.innerText;
+				textContent = elementText.get(contentEl) ?? "";
 			}
 
 			const substringCount = findSubstringCountForSearchFragment(textContent, highlightFragment);
@@ -442,6 +466,65 @@ function findElementToHighlight(
 
 	const contentEls = articleContentWrapper?.children as HTMLCollectionOf<HTMLElement> | undefined;
 	return contentEls ? findElementWithFragmentRecursively(contentEls, 0) : undefined;
+}
+
+const blockTextElements = new Set([
+	"ADDRESS",
+	"ARTICLE",
+	"ASIDE",
+	"BLOCKQUOTE",
+	"DIV",
+	"DL",
+	"FIELDSET",
+	"FIGCAPTION",
+	"FIGURE",
+	"FOOTER",
+	"FORM",
+	"H1",
+	"H2",
+	"H3",
+	"H4",
+	"H5",
+	"H6",
+	"HEADER",
+	"HR",
+	"LI",
+	"MAIN",
+	"NAV",
+	"OL",
+	"P",
+	"PRE",
+	"SECTION",
+	"TABLE",
+	"UL",
+]);
+const skippedTextElements = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "SVG"]);
+
+export function buildElementTextIndex(root: Element) {
+	const elementText = new WeakMap<Element, string>();
+	const visit = (element: Element): string => {
+		if (skippedTextElements.has(element.tagName.toUpperCase())) return "";
+
+		let text = "";
+		for (const child of element.childNodes) {
+			if (child.nodeType === Node.TEXT_NODE) text += child.nodeValue ?? "";
+			else if (child.nodeType === Node.ELEMENT_NODE) {
+				const childElement = child as Element;
+				const childTagName = childElement.tagName.toUpperCase();
+				if (childTagName === "BR") {
+					text += "\n";
+					continue;
+				}
+				const childText = visit(childElement);
+				text += blockTextElements.has(childTagName) ? `\n${childText}\n` : childText;
+			}
+		}
+		elementText.set(element, text);
+		return text;
+	};
+
+	visit(root);
+	return elementText;
 }
 
 function findSubstringCountForSearchFragment(str: string, substr: string) {

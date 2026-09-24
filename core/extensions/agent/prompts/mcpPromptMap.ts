@@ -1,7 +1,9 @@
 const parameterDescriptions = {
 	catalogName: "Имя каталога из списка list_catalogs.",
 	itemPath:
-		"Путь к документу относительно каталога, без имени каталога в начале. Слеши как в URL, суффикс .md; для категории путь оканчивается на _index.md.",
+		"Адрес узла внутри каталога (без catalogName). Статья — guides/setup, раздел — guides/ (хвостовой слэш). Корень — пустая строка. Без .md и _index.md. Для agent skill — @skills/<имя>.",
+	attachmentItemPath:
+		"Источник: @attachments/<name.ext> из блока прикрепленных файлов, catalogName/itemPath@resources/<name.ext> из статьи, или http(s) URL.",
 } as const;
 
 export const MCP_PROMPT_MAP = {
@@ -44,22 +46,20 @@ export const MCP_PROMPT_MAP = {
 			"Прокрутить текущую страницу в браузере агента вниз и вернуть обновлённый полный снимок страницы после стабилизации.",
 		input: {},
 	},
-	readAgentAttachment: {
+	readDocument: {
 		description:
-			"Прочитать прикрепленный к текущей сессии файл по имени. Ответ: content — текст файла. Без headingId — весь файл; с headingId (chunk~1, section-chunk~1, …) — чанк.",
-		tooLarge:
-			"Прикреплённый файл слишком большой. Возьми data.headings из этого ответа и повтори с более узким headingId.",
+			"Прочитать документ по attachmentItemPath: @attachments/<name.ext>, catalogName/itemPath@resources/<name.ext> или http(s) URL. Ответ: content — текст. Без headingId — весь файл; с headingId (chunk~1, section-chunk~1, …) — чанк. Не все типы файлов можно прочитать как текст.",
+		tooLarge: "Документ слишком большой. Возьми data.headings из этого ответа и повтори с более узким headingId.",
 		input: {
-			attachmentName: "Точное attachmentName из блока «Прикрепленные файлы». Не используй путь или другое имя.",
+			attachmentItemPath: parameterDescriptions.attachmentItemPath,
 			headingId:
 				"Необязательно: используй только если чтение всего файла вернуло ошибку. id чанка для чтения (chunk~1, section-chunk~1, …).",
 		},
 	},
-	readAgentSkill: {
-		description:
-			"Прочитать полный текст agent skill по его имени. Используй, когда краткое описание skill релевантно задаче пользователя и нужны детальные инструкции.",
+	transcribeAudio: {
+		description: "Транскрибация аудио/видео через Nexara API по attachmentItemPath. Нужен секрет NEXARA_API_KEY.",
 		input: {
-			skillName: "Точное имя skill из блока «Доступные agent skills» в системном контексте.",
+			attachmentItemPath: `${parameterDescriptions.attachmentItemPath} Только аудио/видео.`,
 		},
 	},
 	listCatalogs: {
@@ -67,7 +67,7 @@ export const MCP_PROMPT_MAP = {
 	},
 	readCatalogItem: {
 		description:
-			"Прочитать узел каталога Gramax (статья .md или категория _index.md). Без headingId — полный markdown. С headingId из get_catalog_item_headings — глава или её чанк (id вида section-chunk~1).",
+			"Прочитать узел каталога Gramax (статью или раздел). Без headingId — полный markdown. С headingId из get_catalog_item_headings — глава или её чанк (id вида section-chunk~1).",
 		tooLarge: "Фрагмент слишком большой. Повтори с более узким headingId.",
 		input: {
 			catalogName: parameterDescriptions.catalogName,
@@ -80,7 +80,7 @@ export const MCP_PROMPT_MAP = {
 			"Иерархия заголовков и чанков больших секций в статье/разделе. Ответ: дерево headings (id, level, title, children). Большие главы без детей разбиваются на id-chunk~1, id-chunk~2; у больших глав с детьми — читай дочерние id.",
 		input: {
 			catalogName: parameterDescriptions.catalogName,
-			itemPath: "Путь к статье (.md) или разделу (_index.md) относительно каталога, без имени каталога в начале.",
+			itemPath: parameterDescriptions.itemPath,
 		},
 	},
 	searchCatalogs: {
@@ -93,41 +93,36 @@ export const MCP_PROMPT_MAP = {
 	},
 	getNavigation: {
 		description:
-			"Полное дерево навигации каталога. Ответ: root + tree с рекурсивными children; у каждого узла type, itemPath, title (itemPath — для аргументов инструментов, title — заголовок для контекста). Опциональный itemPath строит дерево от указанного узла.",
+			"Полное дерево навигации каталога. Ответ: root + tree с рекурсивными children; у каждого узла type, itemPath, title (itemPath — для аргументов инструментов, title — заголовок для контекста). Без itemPath — дерево от корня.",
 		input: {
 			catalogName: parameterDescriptions.catalogName,
-			itemPath:
-				"Необязательный стартовый узел: относительный путь к категории (_index.md). Если не указан — строится от корня каталога.",
+			itemPath: `Необязательно. ${parameterDescriptions.itemPath}`,
 		},
 	},
 	deleteCatalogItem: {
 		description:
-			"Удалить статью или категорию (необратимо). Категория удаляется иерархически: вместе с вложенными подкатегориями и статьями. Если нужно удалить всё содержимое раздела, удаляй сам раздел одним вызовом. Успех: JSON с itemPath (нормализованный путь).",
+			"Удалить статью или категорию (необратимо). Категория удаляется иерархически: вместе с вложенными подкатегориями и статьями. Если нужно удалить всё содержимое раздела, удаляй сам раздел одним вызовом. Успех: JSON с itemPath.",
 		input: {
 			catalogName: parameterDescriptions.catalogName,
-			itemPath:
-				"Относительно каталога, без имени каталога в начале. Слеши как в URL, суффикс .md; для удаления раздела/подраздела передавай путь категории, оканчивающийся на _index.md.",
+			itemPath: parameterDescriptions.itemPath,
 		},
 	},
 	moveCatalogItem: {
 		description:
-			"Перенести статью или категорию в пределах каталога. Для категории перенос рекурсивный: вместе со всеми вложенными подкатегориями и статьями. Передавай конечный toItemPath целиком. Если toItemPath занят, инструмент возвращает ошибку и не переносит.",
+			"Перенести статью или категорию в пределах каталога. Для категории — рекурсивно со всем содержимым. Передавай конечный toItemPath целиком. Если занят — ошибка, без переноса. Статья→раздел: toItemPath со слэшем; обратное не поддерживается.",
 		input: {
 			catalogName: parameterDescriptions.catalogName,
-			fromItemPath: "Текущий путь элемента относительно каталога. Статья — .md, категория — _index.md.",
-			toItemPath:
-				"Новый полный путь элемента относительно каталога. Для статьи должен оканчиваться на .md, для категории — на _index.md.",
+			fromItemPath: parameterDescriptions.itemPath,
+			toItemPath: parameterDescriptions.itemPath,
 		},
 	},
 	createCatalogItem: {
 		description:
-			"Создать пустую статью или подкатегорию. Успех: type (article|category), itemPath, content — начальный markdown в формате read_catalog_item; дополни и сохрани через write_catalog_item.",
+			"Создать пустую статью или подкатегорию. Тип — из itemPath (слэш = раздел). Последний сегмент itemPath — имя файла; title — заголовок узла. Новый узел встаёт последним среди соседей, order задавать не нужно. Успех: type, itemPath, content — content уже содержит frontmatter, дополни документ через write_catalog_item.",
 		input: {
 			catalogName: parameterDescriptions.catalogName,
-			type: "article — новая статья (.md); category — новая вложенная категория (папка).",
-			title: "Заголовок (title). Без слешей и без .md (Gramax добавит .md; иначе возможен …md.md). Нестандартные имена вроде «x.md.md» — целиком.",
-			parentItemPath:
-				"Родитель нового элемента: корень — пусто; иначе путь к _index.md категории (как itemPath в get_navigation).",
+			itemPath: parameterDescriptions.itemPath,
+			title: "Заголовок нового узла.",
 		},
 	},
 	writeCatalogItem: {
@@ -143,7 +138,7 @@ export const MCP_PROMPT_MAP = {
 	},
 	replaceCatalogItem: {
 		description:
-			"Точечная текстовая замена в статье или _index.md по шаблону oldText -> newText. Используй для небольших правок по точному совпадению (строка, фрагмент). Для переписывания целой главы — write_catalog_item с headingId; для всего документа — write_catalog_item без headingId. Обязательный флаг replaceAll: false — ровно одна замена (если найдено больше 1 вхождения, инструмент вернет ошибку), true — массовая замена всех вхождений. При ошибке парсинга текст статьи не обновляется. Успех: JSON с itemPath, replacedCount, replaceAll.",
+			"Точечная текстовая замена в статье или разделе по шаблону oldText -> newText. Используй для небольших правок по точному совпадению (строка, фрагмент). Для переписывания целой главы — write_catalog_item с headingId; для всего документа — write_catalog_item без headingId. Обязательный флаг replaceAll: false — ровно одна замена (если найдено больше 1 вхождения, инструмент вернет ошибку), true — массовая замена всех вхождений. При ошибке парсинга текст статьи не обновляется. Успех: JSON с itemPath, replacedCount, replaceAll.",
 		input: {
 			catalogName: parameterDescriptions.catalogName,
 			itemPath: parameterDescriptions.itemPath,
@@ -151,6 +146,16 @@ export const MCP_PROMPT_MAP = {
 			newContent: `Текст замены.`,
 			replaceAll:
 				"Обязательный флаг массовости: true — заменить все вхождения, false — заменить только одно. При false и количестве вхождений > 1 инструмент вернет ошибку.",
+		},
+	},
+	saveChatAttachment: {
+		description:
+			"Скопировать вложение чата рядом со статьёй/разделом. Markdown в статью не вставляет. Успех: href и markdown — вставь сниппет через write_catalog_item или replace_catalog_item.",
+		input: {
+			attachmentItemPath: "Источник: @attachments/<name.ext> из блока прикрепленных файлов.",
+			catalogName: parameterDescriptions.catalogName,
+			targetItemPath:
+				"Куда положить файл: статья — guides/setup, раздел — guides/, корень каталога — пустая строка.",
 		},
 	},
 	getFilesNavigation: {
@@ -182,12 +187,15 @@ export const MCP_PROMPT_MAP = {
 	},
 	gitInspect: {
 		description:
-			"Просмотр git-состояния без изменений репозитория: общий список изменений (staged+unstaged) и file_diff. В status для каждого файла возвращаются added/deleted строки и общие totals.",
+			"Просмотр git без изменений репозитория. status — текущие изменения; log — история коммитов; diff — сравнение версий или дифф файла. Сначала status/log, затем diff с oid из log.",
 		input: {
-			catalogName: "Имя каталога, где нужно посмотреть git-состояние.",
-			action: "status | file_diff. Для file_diff обязательно передай filePath.",
+			catalogName: "Имя каталога.",
+			action: "status | log | diff.",
 			filePath:
-				"Необязательно: путь файла для action=file_diff (можно относительный или полный путь внутри рабочего каталога).",
+				"Необязательно: путь файла. Для log — история файла; для diff — hunks этого файла (без filePath — список файлов).",
+			limit: "Необязательно для log: сколько коммитов вернуть (по умолчанию 20).",
+			from: "Необязательно для diff: oid коммита из git_inspect log. Без from и to — workdir vs HEAD.",
+			to: "Необязательно для diff: oid из log или workdir. По умолчанию workdir. Если to — oid, from обязателен.",
 		},
 	},
 	gitDiscard: {
@@ -199,14 +207,43 @@ export const MCP_PROMPT_MAP = {
 				"Необязательно: список путей файлов. Если не передан — действие применяется ко всем staged+unstaged изменениям в каталоге.",
 		},
 	},
+	gitBranch: {
+		description:
+			"Ветки git. branches — список (name, oid, remote, current); checkout — переключить (destructive). Сначала branches; oid из ответа — для git_inspect/git_restore.",
+		input: {
+			catalogName: "Имя каталога.",
+			action: "branches | checkout.",
+			branch: "Для checkout: имя ветки из branches.",
+		},
+	},
+	gitRestore: {
+		description:
+			"Записать в workdir файлы из коммита from (oid из log/branches; HEAD не двигается). С filePaths — частично, без — все отличающиеся. Destructive. Незакоммиченное к HEAD — git_discard.",
+		input: {
+			catalogName: "Имя каталога.",
+			from: "Oid коммита из git_inspect log или git_branch branches.",
+			filePaths: "Необязательно: пути файлов. Без поля — полный откат к from.",
+		},
+	},
 	httpRequest: {
 		description:
-			"HTTP-запрос к внешнему API (аналог curl). ИСПОЛЬЗУЙ С ОСТОРОЖНОСТЬЮ. Ответ: status, statusText, ok (true для 2xx), body — текст ответа.",
+			"HTTP-запрос к внешнему API (аналог curl). ИСПОЛЬЗУЙ С ОСТОРОЖНОСТЬЮ. Текстовый ответ: status, statusText, ok, body. Бинарный ответ сохраняется как вложение сессии: status, ok, attachmentItemPath (@attachments/<name.ext>), mime, size.",
 		input: {
 			url: "Полный URL, начинается с http:// или https://.",
 			method: "Необязательно: метод запроса.",
 			headers: 'Необязательно: объект HTTP-заголовков, например {"Authorization": "Bearer token"}.',
-			body: "Необязательно: тело запроса строкой. Для JSON передай сериализованную строку и Content-Type: application/json в headers.",
+			body: "Необязательно: тело запроса строкой.",
+			auth: "Необязательно: HTTP Basic, как curl -u. Объект { username, password }; заголовок Authorization кодируется сам. Для Bearer используй headers.",
+		},
+	},
+	mailRequest: {
+		description:
+			"Запрос к IMAP/SMTP (аналог curl --url imaps:// / smtps://). ИСПОЛЬЗУЙ С ОСТОРОЖНОСТЬЮ. Схема url задаёт протокол. Ответ: status, statusText, ok, body — сырой текст сервера, truncated.",
+		input: {
+			url: "Полный URL: imaps://host[:port]/mailbox или smtps://host[:port]. Порт можно опустить.",
+			command: "Необязательно. IMAP-команда без тега, например UID SEARCH UNSEEN. Для SMTP не передавай.",
+			body: "Необязательно. SMTP: RFC822-письмо.",
+			auth: "Необязательно: { username, password }. LOGIN/AUTH кодируется сам. Для секретов — плейсхолдеры.",
 		},
 	},
 	searchWeb: {
@@ -216,5 +253,10 @@ export const MCP_PROMPT_MAP = {
 			query: "Поисковый запрос в свободной форме.",
 			limit: "Необязательно: количество результатов. Если не передан, используется лимит по умолчанию.",
 		},
+	},
+	compactContext: {
+		description:
+			"Сжать контекст диалога: история заменяется кратким summary плюс последние сообщения пользователя. Вызывай, когда пользователь явно просит суммаризировать/сжать/компактировать контекст или историю диалога. Сжатие произойдёт перед следующим шагом модели.",
+		input: {},
 	},
 } as const;

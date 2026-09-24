@@ -40,7 +40,9 @@ async function paginateIntoPages(
 	}
 	throwIfAborted(signal);
 
-	const getCountPrintPages = () => pages.querySelectorAll(`.${PAGE_CLASS}`).length;
+	// Direct children only: an OpenAPI block brings its own <main class="page"> along, and counting it
+	// reported more pages than the export produced -- in the progress bar and in the CLI's final line.
+	const getCountPrintPages = () => pages.querySelectorAll(`:scope > .${PAGE_CLASS}`).length;
 
 	const yieldTick = createChunkScheduler(24, signal);
 	await nextFrame();

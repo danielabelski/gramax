@@ -21,7 +21,7 @@ export default ApplyApiMiddleware(
 			});
 		}
 
-		await this.app.am.logout(ctx.cookie, req, res);
+		await this.app.amp.current().logout(ctx.cookie, req, res);
 	},
 	[new MainMiddleware()],
 );

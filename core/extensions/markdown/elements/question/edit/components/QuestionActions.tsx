@@ -42,7 +42,7 @@ const QuestionActions = ({ node, getPos, editor }: QuestionActionsProps) => {
 				tooltipText={t("editor.question.required")}
 			/>
 			<DropdownMenu>
-				<DropdownMenuTrigger>
+				<DropdownMenuTrigger asChild>
 					<ActionButton icon="type" tooltipText={t("editor.question.types.name")} />
 				</DropdownMenuTrigger>
 				<DropdownMenuContent>

@@ -8,6 +8,8 @@ const setSourceData: Command<{ ctx: Context } & SourceData, string> = Command.cr
 
 	kind: ResponseKind.plain,
 
+	flags: ["otel-omit-args"],
+
 	async do({ ctx, ...data }) {
 		const { wm } = this._app;
 		await wm.currentOrDefault(); // to be sure that the workspace is initialized

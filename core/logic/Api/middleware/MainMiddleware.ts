@@ -1,4 +1,5 @@
 import getAppVersion from "@core/utils/getAppVersion";
+import { isAbortError } from "@core/utils/isAbortError";
 import DefaultError from "@ext/errorHandlers/logic/DefaultError";
 import NetworkApiError from "@ext/errorHandlers/network/NetworkApiError";
 import t from "@ext/localization/locale/translate";
@@ -21,6 +22,8 @@ export class MainMiddleware extends Middleware {
 		try {
 			await this._next.Process(req, res);
 		} catch (e) {
+			if (isAbortError(e) && req.clientAbortSignal?.aborted) return apiUtils.sendAborted(res);
+
 			let defaultError: DefaultError;
 			if (this._ignoreErrorInstances.some((instance) => e instanceof instance)) {
 				defaultError = e;

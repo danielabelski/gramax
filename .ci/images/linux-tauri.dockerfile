@@ -38,8 +38,10 @@ RUN export HTTPS_PROXY=$RUNNER_HTTPS_PROXY && \
 	sh /tmp/rustup-init.sh -y && \
 	rm -rf /tmp/rustup-init.sh
 
+ARG BUN_VERSION=bun-v1.3.14
+
 RUN export HTTPS_PROXY=$RUNNER_HTTPS_PROXY && \
-	curl -fsSL https://bun.com/install | bash && \
+	curl -fsSL https://bun.com/install | bash -s "$BUN_VERSION" && \
 	curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s v23
 
 

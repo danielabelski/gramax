@@ -7,7 +7,7 @@ import type { AgentLlmClient } from "../llm/agentLlmClient";
 import { AGENT_PROMPT_MAP } from "../prompts/agentPromptMap";
 import { AgentErrorType, AgentWarningType, isAgentError } from "./agentError";
 import type { AgentAttachment } from "./attachmentStore";
-import type { AgentEvent } from "./events";
+import type { AgentEvent, AgentQuote } from "./events";
 import { runAgentTurn } from "./loop";
 
 export type AgentUsage = {
@@ -30,6 +30,7 @@ export class AgentSession {
 	activeRunController: AbortController | null = null;
 	processing = false;
 	lastError: string | null = null;
+	catalogMutated = false;
 	events: AgentEvent[] = [];
 	browser: AgentBrowserSessionMeta = {
 		active: false,
@@ -100,6 +101,7 @@ export class AgentSession {
 		openCatalogName?: string,
 		openItemPath?: string,
 		useSkill?: string,
+		quote?: AgentQuote,
 	): Promise<void> {
 		const content = userText.trim();
 		const isFirstUserMessage = !this.events.some((event) => event.type === "user_message");
@@ -116,18 +118,24 @@ export class AgentSession {
 			content,
 			browserAllowed: app.agentManager.browserAllowed,
 			attachments,
+			quote: quote,
 			useSkill,
 			openCatalogName,
 			openItemPath,
 		};
 		this.events.push(userEvent);
+		this.processing = true;
 		await app.agentManager.sessions.update(this.id);
 		if (isFirstUserMessage) {
 			void this._generateAutoTitle(content, llmClient, app);
 		}
 
-		this.runChain = this.runChain.then(() => this._runOneTurn(turnId, llmClient, app, ctx, commands));
-		await this.runChain;
+		this.runChain = this.runChain
+			.then(() => this._runOneTurn(turnId, llmClient, app, ctx, commands))
+			.catch((err) => {
+				this.processing = false;
+				this.lastError = err instanceof Error ? err.message : String(err);
+			});
 	}
 
 	private async _generateAutoTitle(userMessage: string, llmClient: AgentLlmClient, app: Application): Promise<void> {
@@ -187,6 +195,9 @@ export class AgentSession {
 						if (e.type === "error") {
 							this.lastError = e.message;
 						}
+						if (e.type === "tool_result" && e.catalogMutated) {
+							this.catalogMutated = true;
+						}
 					},
 				},
 				onLlmUsage: (usage) => {
@@ -224,12 +235,18 @@ export class AgentSession {
 				turnId,
 				ts: Date.now(),
 				status,
-				refreshPage: true,
 			});
 			if (this.activeRunController === runAbort) {
 				this.activeRunController = null;
 			}
 			this.processing = false;
+
+			const meta = await app.agentManager.browserHost.getSessionMeta(this.id);
+			if (meta.active) {
+				await app.agentManager.browserHost.teardown(this.id);
+				this.browser = { active: false, visible: false };
+			}
+
 			await app.agentManager.sessions.update(this.id);
 		}
 	}

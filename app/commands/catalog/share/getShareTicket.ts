@@ -11,6 +11,9 @@ const getShareTicket: Command<{ ctx: Context; catalogName: string; path: Path; d
 	Command.create({
 		path: "catalog/share/getShareTicket",
 
+		// the returned URL carries the signed share ticket — never write it to a span
+		flags: ["otel-omit-result"],
+
 		kind: ResponseKind.plain,
 
 		middlewares: [new AuthorizeMiddleware(), new ReloadConfirmMiddleware()],

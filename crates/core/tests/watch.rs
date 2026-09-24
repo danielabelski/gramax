@@ -31,6 +31,33 @@ fn wait_for<F: Fn() -> bool>(check: F, timeout: Duration) -> bool {
 	false
 }
 
+/// Blocks until the watcher demonstrably delivers events for `dir`, then drops what the probe
+/// produced.
+///
+/// A fixed sleep here is what made this suite flaky: on a loaded machine the FSEvents stream is not
+/// armed yet when the test writes its file, so the event is never generated and no amount of waiting
+/// afterwards recovers it. It also made the negative tests pass vacuously — "no event arrived" is
+/// trivially true for a watcher that was not listening.
+fn wait_until_armed(dir: &std::path::Path, events: &Store) {
+	let probe = dir.join("watch-probe.md");
+	let armed = wait_for(
+		|| {
+			let _ = std::fs::write(&probe, "probe");
+			wait_for(
+				|| events.lock().unwrap().iter().any(|e| e.rel_path == "watch-probe.md"),
+				Duration::from_millis(100),
+			)
+		},
+		Duration::from_secs(10),
+	);
+	assert!(armed, "watcher never delivered an event for the probe file");
+
+	let _ = std::fs::remove_file(&probe);
+	// Let the removal's own event land before clearing, so it cannot leak into the test's window.
+	std::thread::sleep(Duration::from_millis(150));
+	events.lock().unwrap().clear();
+}
+
 fn opts_fast() -> WatchOpts {
 	WatchOpts { excludes: vec![".git".into()], debounce_ms: 50 }
 }
@@ -49,8 +76,7 @@ fn watch_emits_renamed_on_rename() {
 
 	let (events, push) = collector();
 	let handle = watch_workspace(scope_for(tmp.path()), opts_fast(), push).unwrap();
-	std::thread::sleep(Duration::from_millis(300));
-	events.lock().unwrap().clear();
+	wait_until_armed(tmp.path(), &events);
 
 	std::fs::rename(&from, &to).unwrap();
 	std::thread::sleep(Duration::from_millis(800));
@@ -80,7 +106,7 @@ fn watch_emits_modified_on_overwrite() {
 
 	let (events, push) = collector();
 	let handle = watch_workspace(scope_for(tmp.path()), opts_fast(), push).unwrap();
-	std::thread::sleep(Duration::from_millis(100));
+	wait_until_armed(tmp.path(), &events);
 
 	std::fs::write(&file, "v2").unwrap();
 
@@ -108,8 +134,7 @@ fn watch_emits_removed_on_delete() {
 
 	let (events, push) = collector();
 	let handle = watch_workspace(scope_for(tmp.path()), opts_fast(), push).unwrap();
-	std::thread::sleep(Duration::from_millis(400));
-	events.lock().unwrap().clear();
+	wait_until_armed(tmp.path(), &events);
 
 	std::fs::remove_file(&file).unwrap();
 
@@ -130,7 +155,7 @@ fn watch_debounce_coalesces_burst() {
 	let file = tmp.path().join("burst.md");
 	let (events, push) = collector();
 	let handle = watch_workspace(scope_for(tmp.path()), opts_fast(), push).unwrap();
-	std::thread::sleep(Duration::from_millis(100));
+	wait_until_armed(tmp.path(), &events);
 
 	for i in 0..10 {
 		std::fs::write(&file, format!("{i}")).unwrap();
@@ -154,7 +179,7 @@ fn watch_excludes_filters_dot_git() {
 
 	let (events, push) = collector();
 	let handle = watch_workspace(scope_for(tmp.path()), opts_fast(), push).unwrap();
-	std::thread::sleep(Duration::from_millis(100));
+	wait_until_armed(tmp.path(), &events);
 
 	std::fs::write(tmp.path().join(".git/HEAD"), "ref:").unwrap();
 	std::thread::sleep(Duration::from_millis(500));
@@ -174,7 +199,7 @@ fn watch_does_not_follow_symlinks() {
 
 	let (events, push) = collector();
 	let handle = watch_workspace(scope_for(tmp.path()), opts_fast(), push).unwrap();
-	std::thread::sleep(Duration::from_millis(100));
+	wait_until_armed(tmp.path(), &events);
 
 	std::fs::write(outside.path().join("inside.md"), "y").unwrap();
 	std::thread::sleep(Duration::from_millis(500));
@@ -188,13 +213,26 @@ fn watch_emits_create_and_delete_in_order() {
 	let tmp = TempDir::new().unwrap();
 	let (events, push) = collector();
 	let handle = watch_workspace(scope_for(tmp.path()), opts_fast(), push).unwrap();
-	std::thread::sleep(Duration::from_millis(100));
+	wait_until_armed(tmp.path(), &events);
 
 	let f = tmp.path().join("seq.md");
 	std::fs::write(&f, "x").unwrap();
-	std::thread::sleep(Duration::from_millis(400));
+	assert!(
+		wait_for(
+			|| events.lock().unwrap().iter().any(|e| e.rel_path == "seq.md"),
+			Duration::from_millis(3000)
+		),
+		"no create event before the delete"
+	);
+
 	std::fs::remove_file(&f).unwrap();
-	std::thread::sleep(Duration::from_millis(500));
+	assert!(
+		wait_for(
+			|| events.lock().unwrap().iter().any(|e| matches!(e.kind, FsEventKind::Removed) && e.rel_path == "seq.md"),
+			Duration::from_millis(3000)
+		),
+		"no remove event"
+	);
 
 	let seen: Vec<_> = events.lock().unwrap().iter().filter(|e| e.rel_path == "seq.md").map(|e| e.kind.clone()).collect();
 	let cpos = seen.iter().position(|k| matches!(k, FsEventKind::Created | FsEventKind::Modified));
@@ -209,7 +247,7 @@ fn watch_emits_created_on_new_file() {
 	let tmp = TempDir::new().unwrap();
 	let (events, push) = collector();
 	let handle = watch_workspace(scope_for(tmp.path()), opts_fast(), push).unwrap();
-	std::thread::sleep(Duration::from_millis(100));
+	wait_until_armed(tmp.path(), &events);
 
 	std::fs::write(tmp.path().join("hello.md"), "# hi").unwrap();
 
@@ -226,6 +264,46 @@ fn watch_emits_created_on_new_file() {
 		events.lock().unwrap()
 	);
 
+	handle.stop();
+}
+
+/// The reported bug: a category created while the file system is busy never reaches the app.
+///
+/// A burst overruns the backend's queue, it drops what it could not deliver and says so
+/// (macOS `kFSEventStreamEventFlagUserDropped`, Linux `IN_Q_OVERFLOW`). The category created right
+/// after the burst is exactly what lands in that hole, so the watcher must either deliver its
+/// events or report the rescan — silently delivering neither leaves the new category invisible.
+#[test]
+fn structural_change_survives_a_noisy_burst() {
+	let tmp = TempDir::new().unwrap();
+	std::fs::create_dir_all(tmp.path().join("notes")).unwrap();
+	std::fs::create_dir_all(tmp.path().join("noise")).unwrap();
+
+	let (events, push) = collector();
+	let handle = watch_workspace(scope_for(tmp.path()), opts_fast(), push).unwrap();
+	wait_until_armed(tmp.path(), &events);
+
+	const NOISE: usize = 5000;
+	for i in 0..NOISE {
+		std::fs::write(tmp.path().join(format!("noise/f{i}.tmp")), "x").unwrap();
+	}
+	for i in 0..NOISE {
+		std::fs::remove_file(tmp.path().join(format!("noise/f{i}.tmp"))).unwrap();
+	}
+
+	std::fs::create_dir_all(tmp.path().join("notes/new-category")).unwrap();
+	std::fs::write(tmp.path().join("notes/new-category/_index.md"), "# new").unwrap();
+
+	let reported = wait_for(
+		|| {
+			let evs = events.lock().unwrap();
+			evs.iter().any(|e| e.rel_path.starts_with("notes/new-category"))
+				|| evs.iter().any(|e| matches!(e.kind, FsEventKind::Rescan))
+		},
+		Duration::from_secs(20),
+	);
+
+	assert!(reported, "the new category was neither delivered nor announced as a rescan");
 	handle.stop();
 }
 

@@ -1,11 +1,18 @@
 import Path from "@core/FileProvider/Path/Path";
+import { ItemType } from "@core/FileStructue/Item/ItemType";
 import { AgentErrorType } from "../core/agentError";
 import type { AgentEvent } from "../core/events";
 import { getSystemPrompt, getUserMessage } from "../prompts";
 import { AGENT_PROMPT_MAP } from "../prompts/agentPromptMap";
+import { SKILL_PROMPT_MAP } from "../prompts/skills/skillPromptMap";
 import { AgentLlmEventMapper } from "./agentLlmEventMapper";
 
 const defaultApp = {
+	agentManager: {
+		secrets: {
+			refs: () => ({}),
+		},
+	},
 	wm: {
 		current: () => ({
 			getCatalog: async () => null,
@@ -48,7 +55,7 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 		];
 
 		expect(await mapEvents(events)).toEqual([
-			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx, defaultCommands) },
+			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx) },
 			{ role: "user", content: "find docs" },
 			{
 				role: "assistant",
@@ -76,7 +83,7 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 		expect(await mapEvents(events)).toEqual([
 			{
 				role: "system",
-				content: await getSystemPrompt(defaultApp, defaultCtx, defaultCommands, undefined, undefined, true),
+				content: await getSystemPrompt(defaultApp, defaultCtx, undefined, undefined, true),
 			},
 			{ role: "user", content: "find docs" },
 		]);
@@ -101,12 +108,12 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 				status: "failed",
 			},
 			{ type: "user_message", turnId: "turn-2", ts: 5, content: "continue" },
-			{ type: "assistant_message", turnId: "turn-2", ts: 6, content: "ok" },
+			{ type: "assistant_message", turnId: "turn-2", ts: 6, content: "ok", contentPreview: "ok" },
 			{ type: "turn_finished", turnId: "turn-2", ts: 7, status: "completed" },
 		];
 
 		expect(await mapEvents(events)).toEqual([
-			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx, defaultCommands) },
+			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx) },
 			{ role: "user", content: "create a section" },
 			{ role: "user", content: "continue" },
 			{ role: "assistant", content: "ok" },
@@ -124,7 +131,7 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 		];
 
 		expect(await mapEvents(events)).toEqual([
-			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx, defaultCommands) },
+			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx) },
 			{ role: "user", content: "Создай раздел Drafts" },
 			{ role: "assistant", content: "План:\n1) найду каталог" },
 			{ role: "user", content: "Нет, раздел Archive" },
@@ -135,7 +142,7 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 		const events: AgentEvent[] = [
 			{ type: "user_message", turnId: "turn-1", ts: 1, content: "find docs" },
 			{ type: "assistant_delta", turnId: "turn-1", ts: 2, content: "План: ищу" },
-			{ type: "assistant_message", turnId: "turn-1", ts: 3, content: "План: ищу" },
+			{ type: "assistant_message", turnId: "turn-1", ts: 3, content: "План: ищу", contentPreview: "План: ищу" },
 			{
 				type: "tool_call_requested",
 				turnId: "turn-1",
@@ -155,12 +162,18 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 				fullLength: 11,
 				isError: false,
 			},
-			{ type: "assistant_message", turnId: "turn-1", ts: 5, content: "Нашёл документы" },
+			{
+				type: "assistant_message",
+				turnId: "turn-1",
+				ts: 5,
+				content: "Нашёл документы",
+				contentPreview: "Нашёл документы",
+			},
 			{ type: "turn_finished", turnId: "turn-1", ts: 6, status: "completed" },
 		];
 
 		expect(await mapEvents(events)).toEqual([
-			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx, defaultCommands) },
+			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx) },
 			{ role: "user", content: "find docs" },
 			{
 				role: "assistant",
@@ -206,7 +219,7 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 		];
 
 		expect(await mapEvents(events)).toEqual([
-			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx, defaultCommands) },
+			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx) },
 			{
 				role: "assistant",
 				content: null,
@@ -241,7 +254,7 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 		];
 
 		expect(await mapEvents(events)).toEqual([
-			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx, defaultCommands) },
+			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx) },
 		]);
 	});
 
@@ -252,6 +265,7 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 				turnId: "turn-1",
 				ts: 1,
 				content: "",
+				contentPreview: "",
 				reasoningContent: "tool-thoughts",
 			},
 			{
@@ -293,7 +307,7 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 		];
 
 		expect(await mapEvents(events)).toEqual([
-			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx, defaultCommands) },
+			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx) },
 			{
 				role: "assistant",
 				content: null,
@@ -323,6 +337,7 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 				turnId: "turn-1",
 				ts: 1,
 				content: "searching",
+				contentPreview: "searching",
 				reasoningContent: "tool-thoughts",
 			},
 			{
@@ -348,12 +363,13 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 				turnId: "turn-1",
 				ts: 4,
 				content: "answer",
+				contentPreview: "answer",
 				reasoningContent: "final-thoughts",
 			},
 		];
 
 		expect(await mapEvents(events)).toEqual([
-			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx, defaultCommands) },
+			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx) },
 			{
 				role: "assistant",
 				content: "searching",
@@ -371,14 +387,70 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 		]);
 	});
 
+	test("context_compacted resets prior history to system + tail + summary", async () => {
+		const tailUser: Extract<AgentEvent, { type: "user_message" }> = {
+			type: "user_message",
+			turnId: "turn-1",
+			ts: 1,
+			content: "keep me",
+		};
+		const events: AgentEvent[] = [
+			{ type: "user_message", turnId: "turn-1", ts: 1, content: "old request" },
+			{
+				type: "tool_call_requested",
+				turnId: "turn-1",
+				ts: 2,
+				toolCallId: "call-1",
+				name: "search_catalogs",
+				arguments: { query: "docs" },
+			},
+			{
+				type: "tool_result",
+				turnId: "turn-1",
+				ts: 3,
+				toolCallId: "call-1",
+				name: "search_catalogs",
+				content: '{"hits":[]}',
+				contentPreview: '{"hits":[]}',
+				fullLength: 11,
+				isError: false,
+			},
+			{
+				type: "context_compacted",
+				turnId: "turn-1",
+				ts: 4,
+				summary: "handoff summary",
+				tailUserMessages: [tailUser],
+			},
+		];
+
+		expect(await mapEvents(events)).toEqual([
+			{ role: "system", content: await getSystemPrompt(defaultApp, defaultCtx) },
+			{ role: "user", content: "keep me" },
+			{ role: "user", content: "handoff summary" },
+		]);
+	});
+
 	test("enriches user message with open context, attachments, and skill", async () => {
-		const skill = { name: "test-skill", description: "Описание навыка", content: "Тело навыка для агента" };
+		const skill = {
+			itemPath: "@skills/test-skill",
+			catalogName: "docs",
+			name: "test-skill",
+			description: "Описание навыка",
+			content: "Тело навыка для агента",
+		};
 		const app = {
+			agentManager: {
+				secrets: {
+					refs: () => ({}),
+				},
+			},
 			wm: {
 				current: () => ({
 					getCatalog: async () => ({
 						name: "docs",
 						findItemByItemPath: () => ({
+							type: ItemType.article,
 							ref: { path: new Path("docs/section/a.md") },
 							logicPath: "docs/section/a",
 							getTitle: () => "Title",
@@ -388,8 +460,11 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 						customProviders: {
 							agentResourcesProvider: {
 								getSkills: async () => [skill],
-								getSkillByName: async (_app, _ctx, _commands, name: string) =>
-									name === skill.name ? skill : null,
+								getSkillByItemPath: async (_app, _ctx, _commands, itemPath: string) =>
+									itemPath === skill.itemPath ? skill : null,
+								getSkillByName: async (_app, _ctx, _commands, skillName: string) =>
+									skillName === skill.name ? skill : null,
+								getSkillArticleByItemPath: async () => null,
 								getSystemPrompt: async () => null,
 							},
 						},
@@ -409,7 +484,7 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 			attachments: [
 				{
 					originalFilename: "notes.txt",
-					itemPath: "sessions/sess-1/attachments/notes.txt",
+					storagePath: "sessions/sess-1/attachments/notes.txt",
 					size: 18,
 					mime: "text/plain",
 				},
@@ -420,18 +495,18 @@ describe("mapAgentEventsToChatCompletionMessages", () => {
 			{ type: "turn_finished", turnId: "turn-1", ts: 2, status: "completed" },
 		];
 
-		const enriched = await getUserMessage(app, defaultCtx, defaultCommands, userEvent);
+		const enriched = await getUserMessage(app, defaultCtx, userEvent, [skill]);
 
-		expect(await mapper.eventsToMessages(app, defaultCtx, defaultCommands, events)).toEqual([
-			{ role: "system", content: await getSystemPrompt(app, defaultCtx, defaultCommands) },
+		expect(await mapper.eventsToMessages(app, defaultCtx, defaultCommands, events, "docs")).toEqual([
+			{ role: "system", content: await getSystemPrompt(app, defaultCtx, "docs", [skill]) },
 			{ role: "user", content: enriched },
 		]);
 		expect(enriched).toContain(AGENT_PROMPT_MAP.openItemPreamble);
 		expect(enriched).toContain(userEvent.openCatalogName);
-		expect(enriched).toContain(userEvent.openItemPath);
+		expect(enriched).toContain("section/a");
 		expect(enriched).toContain(AGENT_PROMPT_MAP.attachmentsPreamble);
-		expect(enriched).toContain("notes.txt");
-		expect(enriched).toContain(AGENT_PROMPT_MAP.forcedSkillPreamble);
+		expect(enriched).toContain("@attachments/notes.txt");
+		expect(enriched).toContain(SKILL_PROMPT_MAP.forcedSkillPreamble);
 		expect(enriched).toContain(skill.content);
 		expect(enriched).toContain(userEvent.content);
 	});
@@ -485,6 +560,7 @@ describe("mapChatCompletionMessagesToAgentEvents", () => {
 				turnId: "turn-1",
 				ts: expect.any(Number),
 				content: "hello",
+				contentPreview: "hello",
 				reasoningContent: "thoughts",
 			},
 		]);
@@ -517,6 +593,7 @@ describe("mapChatCompletionMessagesToAgentEvents", () => {
 				turnId: "turn-1",
 				ts: expect.any(Number),
 				content: "searching",
+				contentPreview: "searching",
 				reasoningContent: "tool-thoughts",
 			},
 			{
@@ -601,6 +678,7 @@ describe("mapChatCompletionMessagesToAgentEvents", () => {
 				turnId: "turn-1",
 				ts: expect.any(Number),
 				content: "",
+				contentPreview: "",
 				reasoningContent: "tool-thoughts",
 			},
 			{
@@ -696,7 +774,7 @@ describe("mapChatCompletionMessagesToAgentEvents round-trip", () => {
 	test("round-trips assistant_message with tool calls and final answer", async () => {
 		const events: AgentEvent[] = [
 			{ type: "user_message", turnId: "turn-1", ts: 1, content: "find docs" },
-			{ type: "assistant_message", turnId: "turn-1", ts: 3, content: "План: ищу" },
+			{ type: "assistant_message", turnId: "turn-1", ts: 3, content: "План: ищу", contentPreview: "План: ищу" },
 			{
 				type: "tool_call_requested",
 				turnId: "turn-1",
@@ -716,7 +794,13 @@ describe("mapChatCompletionMessagesToAgentEvents round-trip", () => {
 				fullLength: 11,
 				isError: false,
 			},
-			{ type: "assistant_message", turnId: "turn-1", ts: 5, content: "Нашёл документы" },
+			{
+				type: "assistant_message",
+				turnId: "turn-1",
+				ts: 5,
+				content: "Нашёл документы",
+				contentPreview: "Нашёл документы",
+			},
 		];
 
 		const messages = await mapEvents(events);

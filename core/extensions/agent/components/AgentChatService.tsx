@@ -1,6 +1,5 @@
 import type { ReactElement } from "react";
 import { useAgentChatPanel } from "./hooks/useAgentChatPanel";
-import ChatPanelOverlay from "./panel/ChatPanelOverlay";
 
 const AgentChatPanelController = (): null => {
 	useAgentChatPanel();
@@ -8,12 +7,7 @@ const AgentChatPanelController = (): null => {
 };
 
 const AgentChatService = {
-	Init: (): ReactElement => (
-		<>
-			<AgentChatPanelController />
-			<ChatPanelOverlay />
-		</>
-	),
+	Init: (): ReactElement => <AgentChatPanelController />,
 };
 
 export default AgentChatService;

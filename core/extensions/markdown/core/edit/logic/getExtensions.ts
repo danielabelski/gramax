@@ -6,6 +6,7 @@ import BlockContentField from "@ext/markdown/elements/blockContentField/edit/mod
 import BlockProperty from "@ext/markdown/elements/blockProperty/edit/models/blockProperty";
 import Br from "@ext/markdown/elements/br/edit/br";
 import HardBreak from "@ext/markdown/elements/br/edit/hardBreak";
+import SoftBreak from "@ext/markdown/elements/br/edit/softBreak";
 import Code from "@ext/markdown/elements/code/edit/model/code";
 import ExtendedCodeBlockLowlight from "@ext/markdown/elements/codeBlockLowlight/edit/model/codeBlockLowlight";
 import Color from "@ext/markdown/elements/color/edit/model/color";
@@ -140,6 +141,7 @@ export const getSimpleExtensions = (): Extensions => [
 	LineBreakers,
 	DisableMarksForInlineComponents,
 	HardBreak,
+	SoftBreak,
 	Em,
 	UndoRedo,
 	Typography,

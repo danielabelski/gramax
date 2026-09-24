@@ -45,16 +45,36 @@ interface TableRowActionsProps {
 	tableRef: RefObject<HTMLTableElement>;
 	tableSheet?: TableNodeSheet;
 	withMenu?: boolean;
+	onMenuOpenChange?: (open: boolean) => void;
 }
 
 const TableRowActions = (props: TableRowActionsProps) => {
-	const { dataQa, editor, index, node, onClick, pos, tableRef, tableSheet, withMenu = true } = props;
+	const {
+		dataQa,
+		editor,
+		index,
+		node,
+		onClick,
+		pos,
+		tableRef,
+		tableSheet,
+		withMenu = true,
+		onMenuOpenChange,
+	} = props;
 
 	return (
 		<div className="plus-actions-container relative w-3" data-row-number={index}>
 			<PlusActions dataQa={dataQa} index={index} onClick={onClick} tableRef={tableRef} vertical />
 			{withMenu && (
-				<PlusMenu editor={editor} index={index} node={node} pos={pos} tableSheet={tableSheet} vertical />
+				<PlusMenu
+					editor={editor}
+					index={index}
+					node={node}
+					onOpenChange={onMenuOpenChange}
+					pos={pos}
+					tableSheet={tableSheet}
+					vertical
+				/>
 			)}
 		</div>
 	);
@@ -63,6 +83,11 @@ const TableRowActions = (props: TableRowActionsProps) => {
 const TablePlusActions = (props: TablePlusActionsProps) => {
 	const { node, pos, className, tableSizes, tableRef, isHovered, editor, tableSheet, sorted, hideControls } = props;
 	const [isVisible, setIsVisible] = useState(true);
+	const [openMenuCount, setOpenMenuCount] = useState(0);
+
+	const onMenuOpenChange = useCallback((open: boolean) => {
+		setOpenMenuCount((count) => Math.max(0, count + (open ? 1 : -1)));
+	}, []);
 
 	const hidden = !isVisible || !isHovered;
 	const cols = tableSizes?.cols || [];
@@ -129,13 +154,14 @@ const TablePlusActions = (props: TablePlusActionsProps) => {
 			className={classNames(className, { hidden }, [
 				"table-actions",
 				"absolute top-0",
-				`[&:has(*[aria-expanded="true"])]:flex`,
-				`[&:has(*[aria-expanded="true"])]:!visible`,
-				`[&:has(*[aria-expanded="true"])]:!overflow-visible`,
-				`[&:has(*[aria-expanded="true"])]:!pointer-events-auto`,
+				"data-[menu-open=true]:flex",
+				"data-[menu-open=true]:!visible",
+				"data-[menu-open=true]:!overflow-visible",
+				"data-[menu-open=true]:!pointer-events-auto",
 				"[&.hidden]:invisible [&.hidden]:overflow-hidden [&.hidden]:pointer-events-none",
 			])}
 			contentEditable={false}
+			data-menu-open={openMenuCount > 0 ? "true" : undefined}
 			style={style}
 		>
 			<div className="table-controller relative">
@@ -158,6 +184,7 @@ const TablePlusActions = (props: TablePlusActionsProps) => {
 								editor={editor}
 								index={index}
 								node={node}
+								onOpenChange={onMenuOpenChange}
 								pos={pos}
 								tableSheet={tableSheet}
 							/>
@@ -189,6 +216,7 @@ const TablePlusActions = (props: TablePlusActionsProps) => {
 								key={index}
 								node={node}
 								onClick={plusRow}
+								onMenuOpenChange={onMenuOpenChange}
 								pos={pos}
 								tableRef={tableRef}
 								tableSheet={tableSheet}

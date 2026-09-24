@@ -65,6 +65,7 @@ const Sync = ({ style, disable }: { style?: CSSProperties; disable?: boolean }) 
 		};
 	}, []);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: apiUrlCreator is a reactive context value hidden behind a service getter
 	const handleSyncClick = useCallback(async () => {
 		if (source?.isInvalid) {
 			if (isEnterprise) {
@@ -76,7 +77,7 @@ const Sync = ({ style, disable }: { style?: CSSProperties; disable?: boolean }) 
 		}
 
 		await SyncService.sync(apiUrlCreator);
-	}, [source?.isInvalid, openRestoreSourceModal, openStorageNotConnectedModal, isEnterprise]);
+	}, [apiUrlCreator, source?.isInvalid, openRestoreSourceModal, openStorageNotConnectedModal, isEnterprise]);
 
 	return (
 		<SyncLayout

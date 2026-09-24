@@ -45,7 +45,7 @@ viewTest.describe("Catalog views", () => {
 			await popoverLocator.getByText(textButton).click();
 		}
 
-		const leftNavigationLayout = sharedPage.getByRole("list");
+		const leftNavigationLayout = catalogPage.articleTree;
 		await expect(leftNavigationLayout.getByText("First children category one")).not.toBeVisible();
 		await expect(leftNavigationLayout.getByText("Firt children category two")).not.toBeVisible();
 	});
@@ -68,7 +68,7 @@ viewTest.describe("Catalog views", () => {
 			await popoverLocator.getByText(textButton).click();
 		}
 
-		const leftNavigationLayout = sharedPage.getByRole("list");
+		const leftNavigationLayout = catalogPage.articleTree;
 		await expect(leftNavigationLayout.getByText("First children category one")).not.toBeVisible();
 		await expect(leftNavigationLayout.getByText("Firt children category two")).not.toBeVisible();
 
@@ -98,30 +98,41 @@ viewTest.describe("Catalog views", () => {
 		await expect(input).toBeVisible();
 		await input.fill("Test view 2");
 
-		await sharedPage.getByRole("button", { name: "Save" }).click();
-		await expect(viewItem).toHaveText("Test view 2");
+		// Scoped to the popover, like the sibling test: an unscoped "Save" can land on a button that
+		// belongs to something else on the page.
+		await sharedPage.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+
+		// By name, not by position — the list reorders once the view is renamed, so the row that was
+		// first is not necessarily the one that was edited.
+		await expect(sharedPage.getByTestId("catalog-view-item").filter({ hasText: "Test view 2" })).toBeVisible();
 	});
 
-	viewTest.fixme(
-		"delete temporary view correctly",
-		async ({ basePage, catalogPage, sharedPage, openViewsPopover }) => {
-			await catalogPage.waitForLoad();
+	viewTest("delete temporary view correctly", async ({ basePage, catalogPage, sharedPage, openViewsPopover }) => {
+		await catalogPage.waitForLoad();
 
-			await openViewsPopover();
-			const viewItem = sharedPage.getByTestId("catalog-view-item").nth(0);
-			const dropdown = new Dropdown(sharedPage, viewItem.getByTestId("catalog-view-item-menu-trigger"));
-			await dropdown.open();
+		await openViewsPopover();
+		const viewItem = sharedPage.getByTestId("catalog-view-item").nth(0);
+		// Remember which one is being deleted: counting leftover placeholders depends on how many
+		// views the preceding tests happened to leave behind.
+		const deletedName = ((await viewItem.textContent()) ?? "").trim();
+		expect(deletedName).not.toBe("");
 
-			await dropdown.assertHasItem({ title: "Delete" });
-			await dropdown.findItemByTitle("Delete").then((item) => item.click());
+		const dropdown = new Dropdown(sharedPage, viewItem.getByTestId("catalog-view-item-menu-trigger"));
+		await dropdown.open();
 
-			await expect(basePage.modal).toBeVisible();
+		await dropdown.assertHasItem({ title: "Delete" });
+		await dropdown.findItemByTitle("Delete").then((item) => item.click());
 
-			await basePage.modal.getByRole("button", { name: "Continue" }).click();
+		await expect(basePage.modal).toBeVisible();
 
-			await openViewsPopover();
+		await basePage.modal.getByRole("button", { name: "Continue" }).click();
 
-			await expect(sharedPage.getByTestId("catalog-view-empty")).toHaveCount(3);
-		},
-	);
+		await openViewsPopover();
+
+		await expect(
+			sharedPage.getByTestId("catalog-view-item").filter({
+				has: sharedPage.getByText(deletedName, { exact: true }),
+			}),
+		).toHaveCount(0);
+	});
 });

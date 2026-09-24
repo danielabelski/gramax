@@ -1,6 +1,7 @@
 import t from "@ext/localization/locale/translate";
 import { getSimpleExtensions } from "@ext/markdown/core/edit/logic/getExtensions";
 import Comment from "@ext/markdown/elements/comment/edit/model/comment";
+import SectionHeader from "@ext/settings/components/SectionHeader";
 import SettingField from "@ext/settings/components/SettingField";
 import type { AppSettingsFormData } from "@ext/settings/logic/formSchema";
 import { DiffExtension } from "@gaurussel/tiptap-diff-utility";
@@ -9,7 +10,6 @@ import { EditorContent, EditorContext, type JSONContent, useEditor } from "@tipt
 import { Divider } from "@ui-kit/Divider";
 import { FormStack } from "@ui-kit/Form";
 import { Label } from "@ui-kit/Label";
-import { ScrollShadowContainer } from "@ui-kit/ScrollShadowContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui-kit/Select";
 import { Slider, SliderRange, SliderThumb, SliderTrack } from "@ui-kit/Slider";
 import { useEffect, useMemo } from "react";
@@ -119,7 +119,7 @@ const EditorPreview = ({ form }: { form: UseFormReturn<AppSettingsFormData> }) =
 	}, [baseline, minSimilarity, debounce, minMatchLength, sensitivity, editor]);
 
 	return (
-		<div className="space-y-0.5 shrink-0 px-4 py-5 lg:p-6 pt-0 lg:pt-0">
+		<div className="space-y-0.5 shrink-0 px-5 py-5 pt-0">
 			<Label>{t("app-settings.content-compare.preview.title")}</Label>
 			<div className="article w-full min-h-14 rounded-lg border border-secondary-border bg-secondary-bg px-3 py-2.5 shadow-soft-sm outline-none lg:py-2 font-sans text-sm">
 				<div className="article-body">
@@ -135,7 +135,11 @@ const EditorPreview = ({ form }: { form: UseFormReturn<AppSettingsFormData> }) =
 export const ContentCompareSection = ({ form }: { form: UseFormReturn<AppSettingsFormData> }) => {
 	return (
 		<div className="flex flex-col h-full min-h-0 gap-4">
-			<ScrollShadowContainer className="px-4 py-5 lg:p-6 flex-1 min-h-0">
+			<div className="flex flex-1 min-h-0 flex-col gap-5 overflow-y-auto p-5">
+				<SectionHeader
+					description={t("app-settings.sections.content-compare.description")}
+					title={t("app-settings.sections.content-compare.title")}
+				/>
 				<FormStack className="min-h-0">
 					<SettingField
 						control={({ field }) => (
@@ -157,8 +161,6 @@ export const ContentCompareSection = ({ form }: { form: UseFormReturn<AppSetting
 							</Select>
 						)}
 						description={t("app-settings.content-compare.sensitivity.description")}
-						labelClassName="w-max"
-						layout="vertical"
 						name="contentCompare.sensitivity"
 						title={t("app-settings.content-compare.sensitivity.title")}
 					/>
@@ -185,14 +187,12 @@ export const ContentCompareSection = ({ form }: { form: UseFormReturn<AppSetting
 							)}
 							description={t(descKey)}
 							key={name}
-							labelClassName="w-max"
-							layout="vertical"
 							name={`contentCompare.${name}` as const}
 							title={t(titleKey)}
 						/>
 					))}
 				</FormStack>
-			</ScrollShadowContainer>
+			</div>
 			<Divider />
 			<EditorPreview form={form} />
 		</div>

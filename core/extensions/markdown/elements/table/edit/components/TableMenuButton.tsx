@@ -3,13 +3,13 @@ import t from "@ext/localization/locale/translate";
 import { readyToPlace } from "@ext/markdown/elementsUtils/cursorFunctions";
 import { BlockPlusAndSubNodes, ListGroupAndItem } from "@ext/markdown/logic/insertableNodeGroups";
 import type { Editor } from "@tiptap/core";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 
 const TableMenuButton = ({ editor }: { editor: Editor }) => {
 	const { disabled, isActive } = ButtonStateService.useCurrentAction({ action: "table" });
 
 	return (
-		<ToolbarToggleButton
+		<GlassToolbarToggleButton
 			active={isActive}
 			data-testid="tb-table"
 			disabled={isActive ? true : disabled}
@@ -25,8 +25,8 @@ const TableMenuButton = ({ editor }: { editor: Editor }) => {
 			}}
 			tooltipText={t("editor.table.name")}
 		>
-			<ToolbarIcon icon="table" />
-		</ToolbarToggleButton>
+			<GlassToolbarIcon icon="table" />
+		</GlassToolbarToggleButton>
 	);
 };
 

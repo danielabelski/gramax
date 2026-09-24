@@ -13,7 +13,7 @@ import { type EditorState, Plugin, PluginKey, type Transaction } from "@tiptap/p
 import { AddMarkStep, AttrStep, RemoveMarkStep, type Transform } from "@tiptap/pm/transform";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
-const processCommentPositions = (doc: Node): Map<string, Range[]> => {
+export const processCommentPositions = (doc: Node): Map<string, Range[]> => {
 	const commentPositions: Map<string, Range[]> = new Map();
 
 	doc.descendants((node, pos) => {

@@ -1,11 +1,11 @@
 import useMediaQuery from "@core-ui/hooks/useMediaQuery";
 import { cn } from "@core-ui/utils/cn";
 import { cssMedia } from "@core-ui/utils/cssUtils";
+// biome-ignore lint/style/noRestrictedImports: expected
 import styled from "@emotion/styled";
 import { LinkMenu, type LinkMenuMode } from "@ext/markdown/elements/link/edit/components/LinkMenu/LinkMenu";
 import { useLinkMenuState } from "@ext/markdown/elements/link/edit/hooks/useLinkMenuState";
 import type { Editor } from "@tiptap/core";
-import { ComponentVariantProvider } from "@ui-kit/Providers";
 import { useCallback, useEffect, useState } from "react";
 
 interface LinkMenuMobilePopoverProps {
@@ -80,22 +80,20 @@ export const LinkMenuMobilePopover = (props: LinkMenuMobilePopoverProps) => {
 	if (!isOpen || !isMobile) return null;
 
 	return (
-		<ComponentVariantProvider variant="inverse">
-			<div
-				style={{
-					position: "fixed",
-					bottom: options.bottom || 56,
-					left: 0,
-					right: 0,
-					zIndex: 50,
-					pointerEvents: "none",
-					marginBottom: "0.25rem",
-				}}
-			>
-				<Container className={cn("bg-transparent border-none lg:shadow-hard-base")}>
-					<LinkMenu mark={mark} mode={mode} onDelete={onDelete} onUpdate={onUpdate} setMode={setMode} />
-				</Container>
-			</div>
-		</ComponentVariantProvider>
+		<div
+			style={{
+				position: "fixed",
+				bottom: options.bottom || 56,
+				left: 0,
+				right: 0,
+				zIndex: 50,
+				pointerEvents: "none",
+				marginBottom: "0.25rem",
+			}}
+		>
+			<Container className={cn("bg-transparent border-none")}>
+				<LinkMenu mark={mark} mode={mode} onDelete={onDelete} onUpdate={onUpdate} setMode={setMode} />
+			</Container>
+		</div>
 	);
 };

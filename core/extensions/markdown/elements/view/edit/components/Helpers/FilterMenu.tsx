@@ -84,6 +84,7 @@ const FilterMenu = memo((props: FilterMenuProps) => {
 				<PropertiesScrollContainer>
 					{noAssignedProperties.map((property) => (
 						<Item
+							id={property.id}
 							key={property.id}
 							mode="single"
 							name={property.name}

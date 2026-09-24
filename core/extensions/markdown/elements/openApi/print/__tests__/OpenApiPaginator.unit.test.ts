@@ -55,6 +55,7 @@ describe("OpenApiPaginator", () => {
 				marginBottom: 0,
 			})),
 			updateAccumulatedHeightDim: jest.fn(() => Paginator.paginationInfo.accumulatedHeight),
+			remeasure: jest.fn().mockResolvedValue(undefined),
 		} as unknown as jest.Mocked<NodeDimensions>;
 
 		Paginator.controlInfo = {
@@ -141,14 +142,16 @@ describe("OpenApiPaginator: budget of the page the block opens on", () => {
 		if (node.tagName === "API-OPERATION") return OPERATION_HEIGHT;
 		if (node.classList.contains("doc-header") || node.classList.contains("operations-toolbar")) return INTRO_HEIGHT;
 		// Anything that holds the cards has to overflow a page on its own, or the paginator places it whole
-		// and the conditional OpenAPI handler -- the code under test -- is never reached. That covers the
-		// block, its shell, and the section: a section that fits keeps its operations together and nothing
-		// is ever dealt out one at a time.
+		// and the conditional OpenAPI handler -- the code under test -- is never reached. That is every box
+		// between the block and the cards: a container that fits keeps its contents together and nothing is
+		// ever dealt out one at a time.
+		const holdsTheCards = ["grid", "section-body", "section-inner", "operation-stack"];
 		if (
 			node.dataset.testid === "open-api" ||
 			node.tagName === "OPENAPI-DOC" ||
 			node.tagName === "API-SECTION" ||
-			node.tagName === "API-MODELS"
+			node.tagName === "API-MODELS" ||
+			holdsTheCards.some((name) => node.classList.contains(name))
 		)
 			return PAGE_HEIGHT * 4;
 		return 0;
@@ -175,6 +178,7 @@ describe("OpenApiPaginator: budget of the page the block opens on", () => {
 				height: Paginator.paginationInfo.accumulatedHeight.height + dimension.height,
 				marginBottom: 0,
 			})),
+			remeasure: jest.fn().mockResolvedValue(undefined),
 		} as unknown as jest.Mocked<NodeDimensions>;
 
 		Paginator.controlInfo = {

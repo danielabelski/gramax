@@ -1,4 +1,3 @@
-import Path from "@core/FileProvider/Path/Path";
 import type { Catalog } from "@core/FileStructue/Catalog/Catalog";
 import type ContextualCatalog from "@core/FileStructue/Catalog/ContextualCatalog";
 import type { Category } from "@core/FileStructue/Category/Category";
@@ -7,13 +6,13 @@ import { ItemType } from "@core/FileStructue/Item/ItemType";
 import { fail, ok, type ToolExecutionContext, type ToolExecutionResult } from "../tool";
 import { CatalogItemLookup } from "../utils/catalogPaths";
 
-type NavigationNode = ReturnType<CatalogItemLookup["asJSON"]> & { type: string; children?: NavigationNode[] };
+type NavigationNode = ReturnType<CatalogItemLookup["asAgentJSON"]> & { type: string; children?: NavigationNode[] };
 
 async function serializeTree(catalog: Catalog | ContextualCatalog, item: Item): Promise<NavigationNode> {
-	const lookup = await CatalogItemLookup.fromCatalogItem(catalog, item);
+	const lookup = CatalogItemLookup.fromCatalogItem(catalog, item);
 	const base = {
 		type: item.type,
-		...lookup.asJSON(),
+		...lookup.asAgentJSON(),
 	};
 	if (item.type !== ItemType.category) return base;
 	const children = await Promise.all(((item as Category).items ?? []).map((it) => serializeTree(catalog, it)));
@@ -37,7 +36,7 @@ export async function runGetNavigation({ app, ctx, input }: ToolExecutionContext
 		if (!startPathRaw) {
 			startNode = catalog.getRootCategory();
 		} else {
-			const item = catalog.findItemByItemPath(new Path(Path.join(catalogName, startPathRaw)));
+			const item = CatalogItemLookup.findItem(catalog, startPathRaw);
 			if (!item) return fail(`Start item not found`);
 			startNode = item;
 		}
@@ -48,7 +47,6 @@ export async function runGetNavigation({ app, ctx, input }: ToolExecutionContext
 				catalogName: tree.catalogName,
 				itemPath: tree.itemPath,
 				title: tree.title,
-				link: tree.link,
 			},
 			tree,
 		});

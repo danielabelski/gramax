@@ -14,32 +14,32 @@ export class ParagraphPaginator {
 	private _nodeDimension: NodeDimensionsData;
 
 	constructor(
-		private node: HTMLParagraphElement,
-		private parentPaginator: Paginator,
+		private _node: HTMLParagraphElement,
+		private _parentPaginator: Paginator,
 	) {
-		this._nodeDimension = Paginator.paginationInfo.nodeDimension.get(this.node);
+		this._nodeDimension = Paginator.paginationInfo.nodeDimension.get(this._node);
 	}
 
 	async paginateNode() {
 		throwIfAborted(Paginator.controlInfo.signal);
 
 		const nodeDimension = Paginator.paginationInfo.nodeDimension;
-		const dims = nodeDimension.get(this.node);
+		const dims = nodeDimension.get(this._node);
 
 		if (!dims) {
-			this.parentPaginator.tryFitElement(this.node, true);
+			this._parentPaginator.tryFitElement(this._node, true);
 			return;
 		}
 
-		const fullText = this.node.textContent ?? "";
+		const fullText = this._node.textContent ?? "";
 		if (!fullText.trim().length) {
-			this.parentPaginator.tryFitElement(this.node, true);
+			this._parentPaginator.tryFitElement(this._node, true);
 			return;
 		}
 
-		const totalCharCount = this._getTotalCharCount(this.node);
+		const totalCharCount = this._getTotalCharCount(this._node);
 
-		const baseParagraph = this.node.cloneNode(false) as HTMLParagraphElement;
+		const baseParagraph = this._node.cloneNode(false) as HTMLParagraphElement;
 
 		let startCharIndex = 0;
 		let currentPart = 0;
@@ -47,17 +47,17 @@ export class ParagraphPaginator {
 		while (startCharIndex < totalCharCount) {
 			throwIfAborted(Paginator.controlInfo.signal);
 
-			if (currentPart) this.parentPaginator.createPage();
+			if (currentPart) this._parentPaginator.createPage();
 
 			const { endCharIndex, height: segmentHeight } = this._findEndCharIndexForPage(
-				this.node,
+				this._node,
 				startCharIndex,
 				totalCharCount,
 			);
 
 			if (!currentPart && !this._checkCanUpdate(segmentHeight) && this._isSomeParentHaveChildNodes()) {
-				this.parentPaginator.createPage();
-				const tryFit = this.parentPaginator.tryFitElement(this.node);
+				this._parentPaginator.createPage();
+				const tryFit = this._parentPaginator.tryFitElement(this._node);
 				if (tryFit) return;
 			}
 			currentPart++;
@@ -65,14 +65,16 @@ export class ParagraphPaginator {
 			const segment = baseParagraph.cloneNode(false) as HTMLParagraphElement;
 			this._setParagraphContent(segment, startCharIndex, endCharIndex);
 
-			const pageContainer = this.parentPaginator.currentContainer;
+			const pageContainer = this._parentPaginator.currentContainer;
 			pageContainer.appendChild(segment);
 
-			const acc = Paginator.paginationInfo.accumulatedHeight;
-			const usableHeight = this.parentPaginator.getUsableHeight();
-			acc.height = Math.min(acc.height + segmentHeight, usableHeight);
-			acc.marginBottom = dims.marginBottom;
-			Paginator.paginationInfo.accumulatedHeight = acc;
+			// Booked the way every other node is: the running total carries each margin once, as part of what
+			// precedes it, and the next node takes the collapsed margin off it. A fragment that named its margin
+			// without adding it lost it to the next node, and the page believed it had that much more room.
+			Paginator.paginationInfo.accumulatedHeight = nodeDimension.updateAccumulatedHeightDim(
+				{ ...dims, height: segmentHeight },
+				Paginator.paginationInfo.accumulatedHeight,
+			);
 
 			startCharIndex = endCharIndex;
 
@@ -82,21 +84,41 @@ export class ParagraphPaginator {
 			}
 		}
 
-		this.node.remove();
+		this._node.remove();
 	}
 
 	private _isSomeParentHaveChildNodes() {
 		return (
-			this.parentPaginator.haveChildNodes() ||
-			(this.parentPaginator instanceof NodePaginator && someParentHaveChildNodes(this.parentPaginator))
+			this._parentPaginator.haveChildNodes() ||
+			(this._parentPaginator instanceof NodePaginator && someParentHaveChildNodes(this._parentPaginator))
 		);
+	}
+
+	/**
+	 * The height of the box a measured fragment will be drawn in.
+	 *
+	 * A `Range` measures the text; the page draws line boxes. Where the line height is above the glyphs' own —
+	 * every paragraph in the product, and in the OpenAPI viewer 25px of line for 17px of text — one is not the
+	 * other, and a page whose last lines were booked by their glyphs kept room the sheet does not have: what
+	 * came after was drawn past its edge, 21px of it in the export this was found on.
+	 *
+	 * The count of lines is what survives the difference: the measured rectangle of n plain-text lines is n-1
+	 * whole lines plus one box of glyphs. Inline content can be taller than its line, so the result must never
+	 * be smaller than the rectangle Range actually measured.
+	 */
+	private _lineBoxes(textHeight: number): number {
+		const lineHeight = this._nodeDimension?.lineHeight;
+		if (!lineHeight || !textHeight) return textHeight;
+
+		const lineBoxes = Math.max(1, Math.round(textHeight / lineHeight)) * lineHeight;
+		return Math.max(textHeight, lineBoxes);
 	}
 
 	private _checkCanUpdate(height: number) {
 		const nodeDimension = Paginator.paginationInfo.nodeDimension;
 		const dims = this._nodeDimension;
 		const newDims = { ...dims, height };
-		const canUpdate = nodeDimension.canUpdateAccumulatedHeightDim(newDims, this.parentPaginator.getUsableHeight());
+		const canUpdate = nodeDimension.canUpdateAccumulatedHeightDim(newDims, this._parentPaginator.getUsableHeight());
 		return canUpdate;
 	}
 
@@ -117,7 +139,7 @@ export class ParagraphPaginator {
 	 * Uses Range.cloneContents() for accurate DOM cloning.
 	 */
 	private _setParagraphContent(targetElement: HTMLElement, charIndexStart: number, charIndexEnd: number): void {
-		const sourceElement = this.node.cloneNode(true) as HTMLElement;
+		const sourceElement = this._node.cloneNode(true) as HTMLElement;
 		const range = document.createRange();
 		this._setRangeToCharIndex(range, sourceElement, charIndexStart, charIndexEnd);
 		const clonedContent = range.cloneContents();
@@ -133,7 +155,7 @@ export class ParagraphPaginator {
 		charIndexStart: number,
 		totalCharCount: number,
 	): { endCharIndex: number; height: number } {
-		const usableHeight = this.parentPaginator.getUsableHeight();
+		const usableHeight = this._parentPaginator.getUsableHeight();
 		const accumulated = Paginator.paginationInfo.accumulatedHeight;
 
 		const dim = this._nodeDimension;
@@ -152,7 +174,7 @@ export class ParagraphPaginator {
 			this._setRangeToCharIndex(range, element, charIndexStart, mid);
 
 			const rect = range.getBoundingClientRect();
-			const h = rect.height || 0;
+			const h = this._lineBoxes(rect.height || 0);
 
 			if (!h) {
 				low = mid + 1;
@@ -174,8 +196,7 @@ export class ParagraphPaginator {
 			const fallbackEnd = totalCharCount;
 			this._setRangeToCharIndex(range, element, charIndexStart, fallbackEnd);
 			const rect = range.getBoundingClientRect();
-			const h = rect.height || 0;
-			return { endCharIndex: fallbackEnd, height: h };
+			return { endCharIndex: fallbackEnd, height: this._lineBoxes(rect.height || 0) };
 		}
 
 		return { endCharIndex: bestIndex, height: bestHeight };

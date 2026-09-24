@@ -1,4 +1,4 @@
-ARG CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX=docker.io
+ARG NEXUS_DOCKERHUB=docker.io
 ARG USE_IMAGE_TAG="latest-dev"
 
 FROM --platform=$BUILDPLATFORM gitlab.ics-it.ru:4567/ics/doc-reader/base-image:${USE_IMAGE_TAG:-latest-dev} AS deps
@@ -22,7 +22,7 @@ RUN n install 23 && \
     ./install-deps.sh --ci --node && \
     npm --prefix apps/docportal run build
 
-FROM --platform=$TARGETPLATFORM ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/oven/bun:canary AS run
+FROM --platform=$TARGETPLATFORM ${NEXUS_DOCKERHUB}/oven/bun:canary AS run
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends bash fontconfig ca-certificates && \

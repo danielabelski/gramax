@@ -7,8 +7,8 @@ export enum NoteType {
 	quote = "quote",
 	lab = "lab",
 	tip = "tip",
-	note = "note",
 	info = "info",
+	note = "note",
 	danger = "danger",
 	hotfixes = "hotfixes",
 }
@@ -19,8 +19,8 @@ export const noteIcons: { [note in NoteType]: string } = {
 	tip: "lightbulb",
 	hotfixes: "wrench",
 	info: "info",
-	note: "circle-alert",
-	danger: "triangle-alert",
+	note: "triangle-alert",
+	danger: "octagon-alert",
 };
 
 interface NoteProps {

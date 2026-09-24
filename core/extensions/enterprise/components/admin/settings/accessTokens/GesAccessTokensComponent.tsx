@@ -15,8 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 const GesAccessTokensComponent = () => {
 	const gesUrl = PageDataContextService.value.conf.enterprise?.gesUrl;
 	const sourceDatas = SourceDataService.value;
-	// biome-ignore lint/correctness/useExhaustiveDependencies: it's ok
-	const token = useMemo(() => getEnterpriseSourceData(sourceDatas, gesUrl)?.token, [gesUrl, sourceDatas]);
+	const token = useMemo(() => getEnterpriseSourceData(sourceDatas, gesUrl)?.token, [gesUrl]);
 	const enterpriseApi = useMemo(() => new EnterpriseApi(gesUrl), [gesUrl]);
 
 	const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
@@ -24,10 +23,10 @@ const GesAccessTokensComponent = () => {
 
 	useEffect(() => {
 		void enterpriseApi
-			.healthcheckAccessTokens()
+			.healthcheckAccessTokens(token)
 			.then(setIsHealthy)
 			.finally(() => setHealthChecking(false));
-	}, [enterpriseApi]);
+	}, [enterpriseApi, token]);
 
 	const getTokens = useMemo(() => () => enterpriseApi.getAccessTokens(token), [enterpriseApi, token]);
 

@@ -49,9 +49,42 @@ pub fn open_in_explorer(_otel: OtelContext, path: &Path) -> Result<()> {
 }
 
 #[cfg(target_os = "macos")]
-#[command]
-pub fn show_print<R: Runtime>(_otel: OtelContext, window: WebviewWindow<R>) -> Result<()> {
-	window.print()
+#[command(async)]
+pub async fn show_print<R: Runtime>(_otel: OtelContext, window: WebviewWindow<R>) -> Result<()> {
+	use super::macos_print::PrintOutcome;
+	use objc2_foundation::NSCopying;
+	use std::time::Duration;
+
+	// Safety net: if AppKit ever skips didRunSelector, the leaked `Box<Done>` (platform/desktop/macos_print.rs)
+	// leaves `receiver` unresolved and the command would otherwise hang forever. The clock starts at invocation, so it
+	// also covers the time the print sheet and the save panel sit open with user input — an hour comfortably
+	// outlasts any real print session without cutting one short.
+	const PRINT_TIMEOUT: Duration = Duration::from_secs(60 * 60);
+
+	let (sender, receiver) = tokio::sync::oneshot::channel();
+
+	window.with_webview(move |webview| unsafe {
+		let ns_window: &objc2_app_kit::NSWindow = &*webview.ns_window().cast();
+		let webview: &objc2_web_kit::WKWebView = &*webview.inner().cast();
+		// A copy, not the process-wide shared NSPrintInfo: AppKit can stamp a cancellation onto the object an
+		// operation printed from, and the next export would then read that stamp back as its own outcome.
+		let print_info = objc2_app_kit::NSPrintInfo::sharedPrintInfo().copy();
+		// Match Wry's PrintOptions::default(). The shared NSPrintInfo keeps the printer's previous margins;
+		// without resetting them, WebKit clips the page footer (including the page number).
+		print_info.setTopMargin(0.0);
+		print_info.setRightMargin(0.0);
+		print_info.setBottomMargin(0.0);
+		print_info.setLeftMargin(0.0);
+		let print_operation = webview.printOperationWithPrintInfo(&print_info);
+		super::macos_print::run_print_operation(&print_operation, ns_window, move |outcome| {
+			let _ = sender.send(outcome);
+		});
+	})?;
+
+	match tokio::time::timeout(PRINT_TIMEOUT, receiver).await {
+		Ok(Ok(PrintOutcome::Printed | PrintOutcome::Cancelled)) => Ok(()),
+		_ => Err(anyhow::anyhow!("print operation failed").into()),
+	}
 }
 
 #[command]

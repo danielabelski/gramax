@@ -1,7 +1,15 @@
 import type { CategoryLink, ItemLink } from "@ext/navigation/NavigationLinks";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { DropMode } from "../utils/dropMode";
 import type { ChildrenMap, FlatIndex, ParentMap } from "./navigationTreeStore";
-import { buildFlatIndex, navigationTreeStore, reconcileExpansion } from "./navigationTreeStore";
+import {
+	buildFlatIndex,
+	NavigationTreeStoreProvider,
+	navigationTreeStore,
+	reconcileExpansion,
+	useNavigationTreeStore,
+} from "./navigationTreeStore";
 
 type LinkOverrides = Partial<Omit<CategoryLink, "ref" | "items">>;
 
@@ -24,6 +32,7 @@ beforeEach(() => {
 			selectedId: "",
 			hoveredParentId: null,
 			hoveredAnchorId: null,
+			hoveredNavigationId: null,
 			draggingId: null,
 			dragTarget: null,
 			isDragLocked: false,
@@ -271,6 +280,61 @@ describe("reconcileExpansion", () => {
 });
 
 describe("setNavItems", () => {
+	test("renders initial links from a scoped store during SSR", () => {
+		const Navigation = () => {
+			const { rootIds, scope } = useNavigationTreeStore((tree) => ({
+				rootIds: tree.rootIds,
+				scope: tree.scope,
+			}));
+			return createElement("nav", { "data-scope": scope }, rootIds.join(","));
+		};
+
+		const html = renderToStaticMarkup(
+			createElement(
+				NavigationTreeStoreProvider,
+				{
+					initialLinks: [link("catalog/root", [link("catalog/root/article")])],
+					scope: "catalog:ru",
+				},
+				createElement(Navigation),
+			),
+		);
+
+		expect(html).toBe('<nav data-scope="catalog:ru">catalog/root</nav>');
+	});
+
+	test("temporarily reveals current article ancestors without persisting them", () => {
+		const onToggle = jest.fn();
+		state().setOnToggle(onToggle);
+		state().setNavItems([
+			link(
+				"branch",
+				[
+					link("branch/nested", [link("branch/nested/current", undefined, { isCurrentLink: true })], {
+						isExpanded: true,
+					}),
+				],
+				{ isExpanded: true },
+			),
+			link("other"),
+		]);
+
+		expect(state().expanded.has("branch")).toBe(true);
+		expect(state().expanded.has("branch/nested")).toBe(true);
+		expect(onToggle).not.toHaveBeenCalled();
+
+		state().setNavItems([
+			link("branch", [link("branch/nested", [link("branch/nested/current")], { isExpanded: false })], {
+				isExpanded: false,
+			}),
+			link("other", undefined, { isCurrentLink: true }),
+		]);
+
+		expect(state().expanded.has("branch")).toBe(false);
+		expect(state().expanded.has("branch/nested")).toBe(false);
+		expect(onToggle).not.toHaveBeenCalled();
+	});
+
 	test("atomically replaces language-scoped items and clears transient drag state", () => {
 		state().setNavItems([link("catalog/ru")], "catalog:ru");
 		state().toggleExpanded("catalog/ru", true);
@@ -421,6 +485,22 @@ describe("select", () => {
 		expect(state().expanded.has("a/b")).toBe(true);
 		expect(onToggle).toHaveBeenCalledWith("a/b", true);
 	});
+
+	test("closes the previous automatically revealed branch when selection changes before route items update", () => {
+		state().setNavItems([
+			link("branch", [link("branch/child", [link("branch/child/current", undefined, { isCurrentLink: true })])]),
+			link("other"),
+		]);
+
+		state().select("other");
+		state().setNavItems([
+			link("branch", [link("branch/child", [link("branch/child/current")])]),
+			link("other", undefined, { isCurrentLink: true }),
+		]);
+
+		expect(state().expanded.has("branch")).toBe(false);
+		expect(state().expanded.has("branch/child")).toBe(false);
+	});
 });
 
 describe("setHover", () => {
@@ -447,6 +527,30 @@ describe("setHover", () => {
 
 		expect(state().hoveredParentId).toBeNull();
 		expect(state().hoveredAnchorId).toBeNull();
+	});
+});
+
+describe("setHoveredNavigationId", () => {
+	test("shares the hovered navigation target between sidebar controls", () => {
+		state().setHoveredNavigationId("a/b");
+
+		expect(state().hoveredNavigationId).toBe("a/b");
+	});
+
+	test("keeps the state object when the hovered navigation target is unchanged", () => {
+		state().setHoveredNavigationId("a/b");
+		const before = state();
+
+		state().setHoveredNavigationId("a/b");
+
+		expect(state()).toBe(before);
+	});
+
+	test("clears the hovered navigation target", () => {
+		state().setHoveredNavigationId("a/b");
+		state().setHoveredNavigationId(null);
+
+		expect(state().hoveredNavigationId).toBeNull();
 	});
 });
 

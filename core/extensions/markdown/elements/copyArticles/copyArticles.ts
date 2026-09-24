@@ -87,20 +87,38 @@ const CopyArticles = Extension.create<CopyArticlesOptions>({
 			new Plugin({
 				props: {
 					handleDOMEvents: {
-						copy: (view: EditorView, event: ClipboardEvent) =>
+						copy: (view: EditorView, event: ClipboardEvent) => {
+							const { articleProps, resourceService: contextResourceService } = getEditorContext(
+								this.editor,
+							);
+							const resourceService = contextResourceService ?? this.options.resourceService;
+							if (!articleProps || !resourceService) return false;
+
 							handleCopy(
 								view,
 								event,
-								getEditorContext(this.editor).articleProps,
-								this.options.resourceService,
-							),
-						cut: (view: EditorView, event: ClipboardEvent) =>
+								articleProps,
+								resourceService,
+								this.editor.storage.comment?.comments,
+							);
+							return true;
+						},
+						cut: (view: EditorView, event: ClipboardEvent) => {
+							const { articleProps, resourceService: contextResourceService } = getEditorContext(
+								this.editor,
+							);
+							const resourceService = contextResourceService ?? this.options.resourceService;
+							if (!articleProps || !resourceService) return false;
+
 							handleCut(
 								view,
 								event,
-								getEditorContext(this.editor).articleProps,
-								this.options.resourceService,
-							),
+								articleProps,
+								resourceService,
+								this.editor.storage.comment?.comments,
+							);
+							return true;
+						},
 					},
 					transformPastedHTML,
 					transformPastedText,
@@ -113,7 +131,9 @@ const CopyArticles = Extension.create<CopyArticlesOptions>({
 					const titleTr = headingPaste(transactions, oldState, newState);
 					if (titleTr) return titleTr;
 
-					resourcePaste(transactions, this.options.resourceService);
+					const resourceService =
+						getEditorContext(this.editor).resourceService ?? this.options.resourceService;
+					if (resourceService) resourcePaste(transactions, resourceService);
 					return null;
 				},
 			}),

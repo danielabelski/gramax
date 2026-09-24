@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { agentTest, agentTestOptions } from "./agent.fixture";
+import { agentTest, agentTestOptions, openAgentChat } from "./agent.fixture";
 
 agentTest.use(agentTestOptions);
 
@@ -16,7 +16,7 @@ const plannedCalls: PlannedCall[] = [
 	{ name: "get_navigation", args: { catalogName: CATALOG } },
 	{
 		name: "create_catalog_item",
-		args: { catalogName: CATALOG, type: "article", title: "e2e-temp" },
+		args: { catalogName: CATALOG, itemPath: "e2e-temp", title: "E2E Temp" },
 	},
 	{ name: "read_catalog_item", args: { catalogName: CATALOG, itemPath: "test-article.md" } },
 	{ name: "get_catalog_item_headings", args: { catalogName: CATALOG, itemPath: "test-article.md" } },
@@ -36,7 +36,7 @@ const plannedCalls: PlannedCall[] = [
 	{ name: "delete_catalog_item", args: { catalogName: CATALOG, itemPath: MOVE_TARGET } },
 ];
 
-const EXCLUDED_TOOLS = ["read_agent_skill", "read_agent_attachment", "git_inspect", "git_discard"] as const;
+const EXCLUDED_TOOLS = ["read_document", "save_chat_attachment", "git_inspect", "git_discard"] as const;
 
 agentTest.beforeEach(async ({ agentPage }) => {
 	await installAgentLlmRouteMock(agentPage, plannedCalls);
@@ -50,8 +50,8 @@ agentTest("runs tool scenario and applies catalog side effects", async ({ agentP
 	await catalogPage.waitForLoad();
 	await expect(agentPage.getByTestId("article-scroll-container")).toBeVisible();
 
-	await agentPage.locator('[data-qa="top-menu"]').getByRole("button").click();
-	const chat = agentPage.getByRole("dialog");
+	await openAgentChat(agentPage);
+	const chat = agentPage.locator('[data-floating-panel-id="agent-chat"]');
 	await expect(chat).toBeVisible();
 	const input = chat.getByRole("textbox");
 	await input.fill("run e2e tool scenario");

@@ -42,13 +42,27 @@ interface UseBulkAccessDraftArgs<TEnt, TCont> {
 	initial: Map<EntId, BulkAccessRow<TEnt, TCont>>;
 	allContainers: TCont[];
 	roleRules: RoleRules;
+	getRoleRules?: (row: BulkAccessRow<TEnt, TCont>) => RoleRules;
+	resolveContainerRole?: (container: TCont, role: RoleId) => RoleId;
+	resolveRowRole?: (containers: Map<ContId, AccessRow<TCont>>) => RoleValue;
 	getEntId: (x: TEnt) => EntId;
 	getContId: (x: TCont) => ContId;
 	getNames?: (xs: AccessRow<TCont>[]) => string[];
 }
 
 export function useBulkAccessDraft<TEnt, TCont>(args: UseBulkAccessDraftArgs<TEnt, TCont>) {
-	const { repoId, initial, allContainers, roleRules, getEntId, getContId, getNames } = args;
+	const {
+		repoId,
+		initial,
+		allContainers,
+		roleRules,
+		getRoleRules,
+		resolveContainerRole,
+		resolveRowRole,
+		getEntId,
+		getContId,
+		getNames,
+	} = args;
 	const { searchBranches } = useSettings();
 
 	const [bulkRowsMap, setBulkRowsMap] = useState(initial);
@@ -61,18 +75,23 @@ export function useBulkAccessDraft<TEnt, TCont>(args: UseBulkAccessDraftArgs<TEn
 			setBulkRowsMap((prev) => {
 				const prevBulk = prev.get(id);
 				if (!prevBulk || prevBulk.role === role) return prev;
-				const nextEnt = new Map([...prevBulk.containers.entries()].map(([k, v]) => [k, { ...v, role }]));
+				const nextEnt = new Map(
+					[...prevBulk.containers.entries()].map(([k, v]) => [
+						k,
+						{ ...v, role: resolveContainerRole?.(v.cont, role) ?? role },
+					]),
+				);
 				const next = new Map(prev);
 				next.set(id, {
 					...prevBulk,
-					role,
+					role: resolveRowRole?.(nextEnt) ?? role,
 					containers: nextEnt,
 				});
 				return next;
 			});
 			bumpRowVersion(id);
 		},
-		[bumpRowVersion],
+		[bumpRowVersion, resolveContainerRole, resolveRowRole],
 	);
 
 	const setBranches = useCallback(
@@ -110,10 +129,15 @@ export function useBulkAccessDraft<TEnt, TCont>(args: UseBulkAccessDraftArgs<TEn
 				const next = new Map(prev);
 				for (const entry of entries) {
 					const { role, branches } = entry;
-					const nextEnt = new Map(allContainers.map((x) => [getContId(x), { cont: x, role, branches }]));
+					const nextEnt = new Map(
+						allContainers.map((x) => [
+							getContId(x),
+							{ cont: x, role: resolveContainerRole?.(x, role) ?? role, branches },
+						]),
+					);
 					next.set(getEntId(entry.ent), {
 						ent: entry.ent,
-						role,
+						role: resolveRowRole?.(nextEnt) ?? role,
 						branches,
 						containers: nextEnt,
 					});
@@ -121,7 +145,7 @@ export function useBulkAccessDraft<TEnt, TCont>(args: UseBulkAccessDraftArgs<TEn
 				return next;
 			});
 		},
-		[allContainers, getContId, getEntId],
+		[allContainers, getContId, getEntId, resolveContainerRole, resolveRowRole],
 	);
 
 	const applyToAll = useCallback(
@@ -135,22 +159,26 @@ export function useBulkAccessDraft<TEnt, TCont>(args: UseBulkAccessDraftArgs<TEn
 					for (const ent of allContainers) {
 						const entId = getContId(ent);
 						if (nextEnt.has(entId)) continue;
-						nextEnt.set(entId, { cont: ent, role, branches });
+						nextEnt.set(entId, { cont: ent, role: resolveContainerRole?.(ent, role) ?? role, branches });
 					}
 
-					next.set(getEntId(row.ent), { ...row, containers: nextEnt });
+					next.set(getEntId(row.ent), {
+						...row,
+						role: resolveRowRole?.(nextEnt) ?? row.role,
+						containers: nextEnt,
+					});
 				}
 
 				return next;
 			});
 		},
-		[allContainers, getContId, getEntId],
+		[allContainers, getContId, getEntId, resolveContainerRole, resolveRowRole],
 	);
 
 	const columns = useMemo(
 		() => [
 			roleColumn<BulkAccessRow<TEnt, TCont>>({
-				getRules: () => roleRules,
+				getRules: (row) => getRoleRules?.(row) ?? roleRules,
 				getValue: (row) => row.role,
 				onChange: (row, role) => setRole(getEntId(row.ent), role),
 			}),
@@ -167,7 +195,18 @@ export function useBulkAccessDraft<TEnt, TCont>(args: UseBulkAccessDraftArgs<TEn
 				getNames: (row) => (getNames ? getNames([...row.containers.values()]) : [...row.containers.keys()]),
 			}),
 		],
-		[roleRules, branchErrors, allContainers, setRole, setBranches, searchBranches, getEntId, repoId, getNames],
+		[
+			roleRules,
+			getRoleRules,
+			branchErrors,
+			allContainers,
+			setRole,
+			setBranches,
+			searchBranches,
+			getEntId,
+			repoId,
+			getNames,
+		],
 	);
 
 	const validate = useCallback(() => {

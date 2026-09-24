@@ -11,7 +11,7 @@ export type RevisionArticleFilter = {
 	pathname: string;
 };
 
-type Filters = Omit<GitRevisionsFilter, "paths"> & {
+type Filters = Omit<GitRevisionsFilter, "pathspecs"> & {
 	articles?: RevisionArticleFilter[];
 };
 
@@ -20,7 +20,7 @@ type RevisionsCompare = {
 	to: GitVersionData;
 };
 
-interface RevisionCatalogStore {
+interface RevisionCatalogState {
 	status: "comparing" | "default";
 	revision: GitVersionData;
 	diffTree: DiffTree;
@@ -30,7 +30,10 @@ interface RevisionCatalogStore {
 	filter: Filters;
 	revisionsCompare: RevisionsCompare;
 	scrollY: number;
+	catalogName: string;
+}
 
+interface RevisionCatalogStore extends RevisionCatalogState {
 	setFilter: (filter: Filters) => void;
 	setRevision: (revision: string) => void;
 	setDiffTree: (diffTree: DiffTree) => void;
@@ -40,9 +43,11 @@ interface RevisionCatalogStore {
 	setRevisionsCompare: (revisionsCompare: RevisionsCompare) => void;
 	setStatus: (status: "comparing" | "default") => void;
 	setScrollY: (scrollY: number) => void;
+	setCatalogName: (catalogName: string) => void;
+	reset: () => void;
 }
 
-export const revisionCatalogStore = createStore<RevisionCatalogStore>((set, get) => ({
+const initialState: RevisionCatalogState = {
 	status: "default",
 	revision: null,
 	diffTree: null,
@@ -52,6 +57,11 @@ export const revisionCatalogStore = createStore<RevisionCatalogStore>((set, get)
 	filter: null,
 	revisionsCompare: null,
 	scrollY: 0,
+	catalogName: null,
+};
+
+export const revisionCatalogStore = createStore<RevisionCatalogStore>((set, get) => ({
+	...initialState,
 
 	setFilter: (filter) => set({ filter }),
 	setRevision: (oid) => {
@@ -66,6 +76,8 @@ export const revisionCatalogStore = createStore<RevisionCatalogStore>((set, get)
 	setRevisionsCompare: (revisionsCompare) => set({ revisionsCompare }),
 	setStatus: (status) => set({ status }),
 	setScrollY: (scrollY) => set({ scrollY }),
+	setCatalogName: (catalogName) => set({ catalogName }),
+	reset: () => set({ ...initialState, catalogName: get().catalogName }),
 }));
 
 export const useRevisionCatalogStore = <T>(selector: (state: RevisionCatalogStore) => T): T => {

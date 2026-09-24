@@ -40,10 +40,11 @@ type UseEnterpriseSignInParams = {
 
 export const useEnterpriseSignIn = ({ gesUrl, isWeb, isTauri, apiUrlCreator, router }: UseEnterpriseSignInParams) => {
 	const { enterpriseWorkspace, switchWorkspace } = useEnterpriseWorkspaceSwitch(gesUrl);
+	const isLogged = PageDataContextService.value.isLogged;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: it's ok
 	return useCallback(async () => {
-		if (enterpriseWorkspace && isTauri) {
+		if (enterpriseWorkspace && isTauri && isLogged) {
 			try {
 				await switchWorkspace();
 				await refreshPage();
@@ -60,7 +61,7 @@ export const useEnterpriseSignIn = ({ gesUrl, isWeb, isTauri, apiUrlCreator, rou
 		}
 
 		await resolveModule("enterpriseLogin")(url, apiUrlCreator, router);
-	}, [enterpriseWorkspace, switchWorkspace, gesUrl, isWeb, apiUrlCreator, router]);
+	}, [enterpriseWorkspace, switchWorkspace, gesUrl, isWeb, apiUrlCreator, router, isLogged]);
 };
 
 const SignInEnterprise = ({ trigger }: { trigger: JSX.Element }) => {

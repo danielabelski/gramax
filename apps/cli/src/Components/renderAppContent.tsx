@@ -33,6 +33,7 @@ export const renderAppContent = (data: ArticlePageData, context: PageDataContext
 					}}
 					platform="cli"
 					setData={() => {}}
+					viewKey={data.articleProps.logicPath}
 				/>
 			</Router>
 		</CacheProvider>,

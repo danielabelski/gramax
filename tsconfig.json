@@ -31,6 +31,12 @@
 		"moduleResolution": "bundler",
 
 		"paths": {
+			"@gramax/sdk": ["plugins/sdk/src/index.ts"],
+			"@gramax/sdk/editor": ["plugins/sdk/src/editor/index.ts"],
+			"@gramax/sdk/events": ["plugins/sdk/src/events/index.ts"],
+			"@gramax/sdk/localization": ["plugins/sdk/src/localization/index.ts"],
+			"@gramax/sdk/ui": ["plugins/sdk/src/ui/index.ts"],
+			"@gramax/sdk/utilities": ["plugins/sdk/src/utilities/index.ts"],
 			"@app/resolveModule": ["app/resolveModule/index.ts"],
 			"ics-ui-kit/*": ["node_modules/ics-ui-kit/dist/*"],
 			"@components/*": ["core/components/*"],
@@ -58,15 +64,7 @@
 		"checkJs": false
 	},
 
-	"include": [
-		"./app/**/*",
-		"./core/**/*",
-		"./apps/**/*",
-		"./services/**/*",
-		"./e2e/**/*",
-		"./scripts/**/*",
-		"./**/*.config.ts"
-	],
+	"include": ["./app/**/*", "./core/**/*", "./apps/**/*", "./services/**/*", "./scripts/**/*", "./**/*.config.ts"],
 
 	"exclude": [
 		"target",

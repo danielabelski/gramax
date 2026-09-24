@@ -50,7 +50,7 @@ const TableUtils = {
 	cellIncludeLineBreaks(childContent: Node) {
 		let hasHardBreak = false;
 		childContent.forEach((node) => {
-			if (node.type.name === "hard_break" || node.type.name === "br") {
+			if (node.type.name === "hard_break" || node.type.name === "br" || node.type.name === "soft_break") {
 				hasHardBreak = true;
 				return false;
 			}

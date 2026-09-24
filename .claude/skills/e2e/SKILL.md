@@ -110,19 +110,60 @@ Projects: `web`, `web-enterprise`, `static` (port 6002), `docportal-prepare`, `d
 
 ## Locators
 
-Priority: `getByRole` > `getByText` > `getByPlaceholder` > `getByTestId` > `locator()`.
+**Only `getByRole` and `getByText`.** `getByPlaceholder` and `getByLabel` are fine where they read
+naturally — they resolve through accessible names too. `getByTestId` is a last resort. CSS and
+XPath selectors — `locator(".foo")`, `locator("[data-qa=…]")`, class names, tag chains, `:nth-child`
+— are **not allowed**, and neither is reaching for a `data-*` attribute as a hook.
 
-If element lacks role/text, **modify app code** to add semantics rather than `data-testid`.
+When an element has no usable role or accessible name, the answer is to **fix the component**, not
+to work around it in the test. Give the button a real `<button>`, an `aria-label`, a visible text —
+whatever the element is actually missing. A test that reaches into markup is a test that breaks on
+the next restyle, and it hides an accessibility gap in the product.
+
+Editing app code to make an element addressable is expected and welcome. It is not scope creep.
 
 ```typescript
-// GOOD
+// GOOD — the element says what it is
 page.getByRole("button", { name: "Save" }).click();
+page.getByRole("menuitemradio", { name: "master" }).click();
 page.getByText("Article Title").click();
-// ACCEPTABLE
+
+// LAST RESORT — only when the element genuinely cannot carry a role or a name
 page.getByTestId("add-catalog").click();
-// AVOID
+
+// NOT ALLOWED — fix the component instead
 page.locator(".btn-primary > span").click();
+page.locator(".right-extensions i").first().click();
+page.locator("[data-qa='qa-publish-tab']").click();
 ```
+
+If you find yourself writing a comment that explains which CSS class the app happens to render, stop:
+that is the moment to add the role or the label to the component.
+
+### Fixing the component: use the real element, not an ARIA patch
+
+Making an element addressable means giving it the **right tag**, not decorating the wrong one.
+
+```tsx
+// GOOD
+<button type="button" aria-label={t("git.branch.actions")} onClick={…}>
+
+// BAD — a div wearing a button costume
+<div role="button" tabIndex={0} aria-label={…} onClick={…}>
+```
+
+`role="button"` plus `tabIndex={0}` on a `<div>` or `<span>` reproduces by hand what `<button>` gives
+for free — keyboard activation, focus order, Enter/Space handling — and it always reproduces some of
+it wrong. Use `<button type="button">`; `type` is required, or the button submits any form it lands in.
+
+**Never silence an a11y lint.** `biome-ignore lint/a11y/*` is not an accepted way out: that rule
+firing *is* the review telling you the element is wrong. If a semantic element genuinely does not
+fit — an existing click target would nest, a styled wrapper would break — change the surrounding
+markup so it does, or say plainly in the MR why it cannot be done. Do not commit the suppression.
+
+Suppressions in general are a smell here. The only one currently accepted in `e2e-pw` is
+`lint/correctness/noEmptyPattern` on fixture signatures, because Playwright *requires* the
+`async ({}, use)` form to detect fixture dependencies and biome has no way to know that.
 
 ## Test Examples
 
@@ -227,7 +268,8 @@ Toolbar buttons: `bold`, `italic`, `strikethrough`, `heading-2/3/4`, `bullet-lis
 
 1. One behavior per test
 2. Use POMs, not raw locators
-3. `getByRole`/`getByText` first — modify app for semantics if needed
+3. `getByRole`/`getByText` only — no CSS, no XPath, no `data-*` hooks. Missing role or name means the
+   component gets fixed; `getByTestId` is the last resort, not the default
 4. `waitForLoad()` after navigation
 5. `serial` only when order matters
 6. `files` fixture for test data, not manual setup

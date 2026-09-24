@@ -26,15 +26,16 @@ export const getStaticModules = (): DynamicModules => {
 		FileInput: () => null,
 		DiffFileInput: () => null,
 		httpFetch: () => undefined,
+		mailFetch: () => undefined,
 		setBadge: () => undefined,
 		openInExplorer: () => undefined,
 		openWindowWithUrl: () => undefined,
 		gesCloudLogin: () => undefined,
+		gesCloudPaymentMethodBinding: () => Promise.resolve(),
 		openInWeb: (url: string) => (typeof window === "undefined" ? undefined : window.open(url)),
 		getPdfjs,
 		updateCheck: () => undefined,
 		updateInstallFromCache: () => undefined,
-		updateAccept: () => undefined,
 	};
 };
 

@@ -1,5 +1,6 @@
 import type { WorkspaceConfig } from "@ext/workspace/WorkspaceConfig";
 import { expect, type Locator, type Page } from "@playwright/test";
+import { articleActionsButton, navItem } from "@utils/catalogTree";
 import { catalogTest } from "@web/fixtures/catalog.fixture";
 
 const MOCK_GROUPS = {
@@ -30,7 +31,7 @@ export interface EnterpriseFixture {
 }
 
 export const notificationsTest = catalogTest.extend<EnterpriseFixture>({
-	enterprisePage: async ({ sharedPage }, use) => {
+	enterprisePage: async ({ sharedPage, catalogPage }, use) => {
 		const previousEnterpriseConfig = await sharedPage.evaluate(async () => {
 			const app = await window.app!;
 			const workspace = app.wm.current();
@@ -82,7 +83,8 @@ export const notificationsTest = catalogTest.extend<EnterpriseFixture>({
 		});
 
 		await sharedPage.reload({ waitUntil: "domcontentloaded" });
-		await sharedPage.locator('[data-qa="catalog-navigation-article-link-level-1"]').first().waitFor();
+		await catalogPage.waitForLoad();
+		await expect(navItem(sharedPage, "Test Article")).toBeVisible();
 
 		await use(sharedPage);
 
@@ -109,9 +111,9 @@ export const notificationsTest = catalogTest.extend<EnterpriseFixture>({
 	},
 
 	editMenu: async ({ enterprisePage }, use) => {
-		const articleItem = enterprisePage.locator('[data-qa="catalog-navigation-article-link-level-1"]').first();
+		const articleItem = navItem(enterprisePage, "Test Article");
 		await articleItem.hover();
-		await articleItem.getByTestId("article-actions").click();
+		await articleActionsButton(enterprisePage, "Test Article").click();
 		const dropdownContent = enterprisePage.getByTestId("dropdown-content");
 		await expect(dropdownContent).toBeVisible();
 
@@ -128,9 +130,9 @@ export const notificationsTest = catalogTest.extend<EnterpriseFixture>({
 
 	openNotificationDialog: async ({ enterprisePage }, use) => {
 		await use(async () => {
-			const articleItem = enterprisePage.locator('[data-qa="catalog-navigation-article-link-level-1"]').first();
+			const articleItem = navItem(enterprisePage, "Test Article");
 			await articleItem.hover();
-			await articleItem.getByTestId("article-actions").click();
+			await articleActionsButton(enterprisePage, "Test Article").click();
 			const dropdownContent = enterprisePage.getByTestId("dropdown-content");
 			await expect(dropdownContent).toBeVisible();
 			await dropdownContent.getByRole("menuitem", { name: "Edit notifications" }).click();

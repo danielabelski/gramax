@@ -44,8 +44,11 @@ export const fillMarkdownTemplate = (fields: TemplateField[], properties: Proper
 		updatedContent = properties.reduce((acc, propValue) => {
 			if (!propValue?.id || !propValue?.value?.length || !propValue?.value?.[0]?.length) return acc;
 
+			// Only the indentation of the opening tag, never the line breaks around it: `\s`
+			// swallows newlines, and every content line then gets a stray one in front of it —
+			// which splits a table or a list inside the block into separate paragraphs.
 			const blockRegex = new RegExp(
-				`(^\\s*)\\[block-property:${propValue.id}\\]([\\s\\S]*?)\\[\\/block-property\\]`,
+				`(^[^\\S\\r\\n]*)\\[block-property:${propValue.id}\\]([\\s\\S]*?)\\[\\/block-property\\]`,
 				"gm",
 			);
 

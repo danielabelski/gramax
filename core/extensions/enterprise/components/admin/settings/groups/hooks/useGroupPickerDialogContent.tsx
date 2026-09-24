@@ -1,4 +1,3 @@
-import { useSettings } from "@ext/enterprise/components/admin/contexts/SettingsContext";
 import { AddGroupSheet } from "@ext/enterprise/components/admin/settings/groups/dialog/AddGroupSheet";
 import { useGroupList } from "@ext/enterprise/components/admin/settings/groups/hooks/useGroupList";
 import { groupBadgesColumn } from "@ext/enterprise/components/admin/settings/members/config/groupBadgesColumn";
@@ -25,7 +24,6 @@ export interface UseGroupPickerDialogContentArgs {
 
 export const useGroupPickerDialogContent = (args: UseGroupPickerDialogContentArgs) => {
 	const { aggregate, preselected, setRowsMap, setSelection } = args;
-	const { ssoGroupsEnabled } = useSettings();
 
 	const [addNewOpen, setAddNewOpen] = useState(false);
 	const [createdGroups, setCreatedGroups] = useState<GroupMember[]>([]);
@@ -118,7 +116,6 @@ export const useGroupPickerDialogContent = (args: UseGroupPickerDialogContentArg
 			isLoading: groupList.data.isLoading,
 			getRowId: getGroupRowId,
 			filter: groupList.filter,
-			ssoEnabled: ssoGroupsEnabled,
 		},
 		headerControls,
 		headerLeftControls,

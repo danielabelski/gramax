@@ -1,0 +1,174 @@
+openapi: 3.1.0
+info:
+  title: Массовый импорт конфигураций
+  version: '1.0'
+  description: |
+    # Особенности API
+
+    Оркестратор позволяет создавать данные на Платформе на основании заранее подготовленных
+    конфигурационных файлов. Конфигурационные файлы имеют формат **`.csv`** (разделитель — `;`)
+    и используются для массовых операций:
+
+    - регистрация **устройства**;
+    - создание **L3-интерфейсов (Network)**;
+    - создание **правил МСЭ**.
+
+    ## Аутентификация
+
+    Аутентификация производится через стандартный механизм входа на Платформу — **p12-сертификат**
+    плюс **имя учётной записи**. Сертификат должен быть выпущен удостоверяющим центром Платформы
+    и содержать расширение, разрешающее клиентскую аутентификацию.
+
+    ## Авторизация
+
+    Авторизация осуществляется согласно ролевой модели доступа. Для интеграции существуют отдельные
+    доступы, позволяющие только **создавать** соответствующие сущности; чтение и удаление в рамках
+    этого API не поддерживаются.
+
+    ## Файлы
+
+    Поддерживаются следующие типы CSV-файлов (разделитель — `;`):
+
+    - `cpes_input.csv` — пакетная регистрация устройств;
+    - `networks_input.csv` — пакетное создание L3-интерфейсов;
+    - `rules_input.csv` — пакетное создание правил МСЭ.
+
+    ## Проверка выполнения
+
+    При вызове функций создания и регистрации в ответ возвращается идентификатор операции:
+
+    ```json
+    { "sagaId": 123456 }
+    ```
+
+    Полный ответ метода проверки — по строке на каждую запись файла:
+
+    ```json
+    {
+      "sagaId": 123456,
+      "row1": { "cpe": "bankomat-ce20n-HUB-1", "status": "queued" },
+      "row2": { "cpe": "bankomat-ce20n-HUB-2", "status": "queued" },
+      "row3": { "cpe": "bankomat-ce20n-HUB-3", "status": "queued" },
+      "row4": { "cpe": "bankomat-ce20n-HUB-4", "status": "queued" },
+      "row5": { "cpe": "bankomat-ce20n-HUB-5", "status": "queued" },
+      "row6": { "cpe": "bankomat-ce20n-HUB-6", "status": "queued" },
+      "row7": { "cpe": "bankomat-ce20n-HUB-7", "status": "queued" },
+      "row8": { "cpe": "bankomat-ce20n-HUB-8", "status": "queued" },
+      "row9": { "cpe": "bankomat-ce20n-HUB-9", "status": "queued" },
+      "row10": { "cpe": "bankomat-ce20n-HUB-10", "status": "queued" },
+      "row11": { "cpe": "bankomat-ce20n-HUB-11", "status": "queued" },
+      "row12": { "cpe": "bankomat-ce20n-HUB-12", "status": "queued" },
+      "row13": { "cpe": "bankomat-ce20n-HUB-13", "status": "queued" },
+      "row14": { "cpe": "bankomat-ce20n-HUB-14", "status": "queued" },
+      "row15": { "cpe": "bankomat-ce20n-HUB-15", "status": "queued" },
+      "row16": { "cpe": "bankomat-ce20n-HUB-16", "status": "queued" },
+      "row17": { "cpe": "bankomat-ce20n-HUB-17", "status": "queued" },
+      "row18": { "cpe": "bankomat-ce20n-HUB-18", "status": "queued" },
+      "row19": { "cpe": "bankomat-ce20n-HUB-19", "status": "queued" },
+      "row20": { "cpe": "bankomat-ce20n-HUB-20", "status": "queued" },
+      "row21": { "cpe": "bankomat-ce20n-HUB-21", "status": "queued" },
+      "row22": { "cpe": "bankomat-ce20n-HUB-22", "status": "queued" },
+      "row23": { "cpe": "bankomat-ce20n-HUB-23", "status": "queued" },
+      "row24": { "cpe": "bankomat-ce20n-HUB-24", "status": "queued" },
+      "row25": { "cpe": "bankomat-ce20n-HUB-25", "status": "queued" },
+      "row26": { "cpe": "bankomat-ce20n-HUB-26", "status": "queued" },
+      "row27": { "cpe": "bankomat-ce20n-HUB-27", "status": "queued" },
+      "row28": { "cpe": "bankomat-ce20n-HUB-28", "status": "queued" },
+      "row29": { "cpe": "bankomat-ce20n-HUB-29", "status": "queued" },
+      "row30": { "cpe": "bankomat-ce20n-HUB-30", "status": "queued" },
+      "row31": { "cpe": "bankomat-ce20n-HUB-31", "status": "queued" },
+      "row32": { "cpe": "bankomat-ce20n-HUB-32", "status": "queued" },
+      "total": 32
+    }
+    ```
+
+    Для проверки выполнения передайте `sagaId` в метод проверки. В ответ вернётся CSV-файл
+    с заполненными данными и ошибками, возникшими при выполнении операции. При получении списка
+    выполняемых и выполненных заданий в ответе будет количество успешно обработанных строк,
+    обработанных с ошибкой и оставшихся к обработке. Общее количество строк в файле равно
+    сумме всех трёх значений.
+
+    ## Примеры CSV
+
+    ### cpes_input.csv
+
+    |        cpe_name        |             wan            |   wan_public_ip  |     wan_gateway       | cpe_type |    cpe_template   |    description   |
+    |:----------------------:|:--------------------------:|:----------------:|:---------------------:|:--------:|:-----------------:|:----------------:|
+    | bankomat-ce20n-HUB-1   | 10.0.3.10/24, 10.0.4.10/24 | 1.1.1.1, 2.2.2.2 |10.0.3.10, 10.0.4.10   | HUB      | sdwan-ce20n-3t2mw | первое устройство|
+    | bankomat-ce20n-HUB-50  | 10.0.3.11/24, 10.0.4.11/24 | 1.1.1.2, 2.2.2.3 |10.0.3.11, 10.0.4.11   | HUB      | sdwan-ce20n-3t2mw |                  |
+    | bankomat-ce10b-SPOKE-1 | 10.0.8.7/24                | 10.0.8.7         |10.0.8.7               | SPOKE    | sdwan-ce10b-5tw   |                  |
+    | bankomat-ce20n-HUB-1   | 10.0.1.10/24, 10.0.1.11/24 | 1.1.1.1, 2.2.2.1 |10.0.1.10, 10.0.1.11   | HUB      | sdwan-ce20n-3t2mw | устройство 1   |
+    | bankomat-ce20n-HUB-2   | 10.0.2.10/24, 10.0.2.11/24 | 1.1.1.2, 2.2.2.2 |10.0.2.10, 10.0.2.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 2   |
+    | bankomat-ce20n-HUB-3   | 10.0.3.10/24, 10.0.3.11/24 | 1.1.1.3, 2.2.2.3 |10.0.3.10, 10.0.3.11   | HUB      | sdwan-ce20n-3t2mw | устройство 3   |
+    | bankomat-ce20n-HUB-4   | 10.0.4.10/24, 10.0.4.11/24 | 1.1.1.4, 2.2.2.4 |10.0.4.10, 10.0.4.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 4   |
+    | bankomat-ce20n-HUB-5   | 10.0.5.10/24, 10.0.5.11/24 | 1.1.1.5, 2.2.2.5 |10.0.5.10, 10.0.5.11   | HUB      | sdwan-ce20n-3t2mw | устройство 5   |
+    | bankomat-ce20n-HUB-6   | 10.0.6.10/24, 10.0.6.11/24 | 1.1.1.6, 2.2.2.6 |10.0.6.10, 10.0.6.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 6   |
+    | bankomat-ce20n-HUB-7   | 10.0.7.10/24, 10.0.7.11/24 | 1.1.1.7, 2.2.2.7 |10.0.7.10, 10.0.7.11   | HUB      | sdwan-ce20n-3t2mw | устройство 7   |
+    | bankomat-ce20n-HUB-8   | 10.0.8.10/24, 10.0.8.11/24 | 1.1.1.8, 2.2.2.8 |10.0.8.10, 10.0.8.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 8   |
+    | bankomat-ce20n-HUB-9   | 10.0.9.10/24, 10.0.9.11/24 | 1.1.1.9, 2.2.2.9 |10.0.9.10, 10.0.9.11   | HUB      | sdwan-ce20n-3t2mw | устройство 9   |
+    | bankomat-ce20n-HUB-10  | 10.0.10.10/24, 10.0.10.11/24 | 1.1.1.10, 2.2.2.10 |10.0.10.10, 10.0.10.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 10   |
+    | bankomat-ce20n-HUB-11  | 10.0.11.10/24, 10.0.11.11/24 | 1.1.1.11, 2.2.2.11 |10.0.11.10, 10.0.11.11   | HUB      | sdwan-ce20n-3t2mw | устройство 11   |
+    | bankomat-ce20n-HUB-12  | 10.0.12.10/24, 10.0.12.11/24 | 1.1.1.12, 2.2.2.12 |10.0.12.10, 10.0.12.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 12   |
+    | bankomat-ce20n-HUB-13  | 10.0.13.10/24, 10.0.13.11/24 | 1.1.1.13, 2.2.2.13 |10.0.13.10, 10.0.13.11   | HUB      | sdwan-ce20n-3t2mw | устройство 13   |
+    | bankomat-ce20n-HUB-14  | 10.0.14.10/24, 10.0.14.11/24 | 1.1.1.14, 2.2.2.14 |10.0.14.10, 10.0.14.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 14   |
+    | bankomat-ce20n-HUB-15  | 10.0.15.10/24, 10.0.15.11/24 | 1.1.1.15, 2.2.2.15 |10.0.15.10, 10.0.15.11   | HUB      | sdwan-ce20n-3t2mw | устройство 15   |
+    | bankomat-ce20n-HUB-16  | 10.0.16.10/24, 10.0.16.11/24 | 1.1.1.16, 2.2.2.16 |10.0.16.10, 10.0.16.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 16   |
+    | bankomat-ce20n-HUB-17  | 10.0.17.10/24, 10.0.17.11/24 | 1.1.1.17, 2.2.2.17 |10.0.17.10, 10.0.17.11   | HUB      | sdwan-ce20n-3t2mw | устройство 17   |
+    | bankomat-ce20n-HUB-18  | 10.0.18.10/24, 10.0.18.11/24 | 1.1.1.18, 2.2.2.18 |10.0.18.10, 10.0.18.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 18   |
+    | bankomat-ce20n-HUB-19  | 10.0.19.10/24, 10.0.19.11/24 | 1.1.1.19, 2.2.2.19 |10.0.19.10, 10.0.19.11   | HUB      | sdwan-ce20n-3t2mw | устройство 19   |
+    | bankomat-ce20n-HUB-20  | 10.0.20.10/24, 10.0.20.11/24 | 1.1.1.20, 2.2.2.20 |10.0.20.10, 10.0.20.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 20   |
+    | bankomat-ce20n-HUB-21  | 10.0.21.10/24, 10.0.21.11/24 | 1.1.1.21, 2.2.2.21 |10.0.21.10, 10.0.21.11   | HUB      | sdwan-ce20n-3t2mw | устройство 21   |
+    | bankomat-ce20n-HUB-22  | 10.0.22.10/24, 10.0.22.11/24 | 1.1.1.22, 2.2.2.22 |10.0.22.10, 10.0.22.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 22   |
+    | bankomat-ce20n-HUB-23  | 10.0.23.10/24, 10.0.23.11/24 | 1.1.1.23, 2.2.2.23 |10.0.23.10, 10.0.23.11   | HUB      | sdwan-ce20n-3t2mw | устройство 23   |
+    | bankomat-ce20n-HUB-24  | 10.0.24.10/24, 10.0.24.11/24 | 1.1.1.24, 2.2.2.24 |10.0.24.10, 10.0.24.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 24   |
+    | bankomat-ce20n-HUB-25  | 10.0.25.10/24, 10.0.25.11/24 | 1.1.1.25, 2.2.2.25 |10.0.25.10, 10.0.25.11   | HUB      | sdwan-ce20n-3t2mw | устройство 25   |
+    | bankomat-ce20n-HUB-26  | 10.0.26.10/24, 10.0.26.11/24 | 1.1.1.26, 2.2.2.26 |10.0.26.10, 10.0.26.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 26   |
+    | bankomat-ce20n-HUB-27  | 10.0.27.10/24, 10.0.27.11/24 | 1.1.1.27, 2.2.2.27 |10.0.27.10, 10.0.27.11   | HUB      | sdwan-ce20n-3t2mw | устройство 27   |
+    | bankomat-ce20n-HUB-28  | 10.0.28.10/24, 10.0.28.11/24 | 1.1.1.28, 2.2.2.28 |10.0.28.10, 10.0.28.11   | SPOKE      | sdwan-ce20n-3t2mw | устройство 28   |
+
+    ### networks_input.csv
+
+    |       cpe_name       | zone | vlan |     prefix    | name | dhcp_server_mode |   dhcp_relay_servers   |     sip    |     eip    |        dns       |
+    |:--------------------:|:----:|:----:|:-------------:|:----:|:----------------:|:----------------------:|:----------:|:----------:|:----------------:|
+    | bankomat-ce20n-HUB-1 | LAN  | 1    | 10.10.1.55/30 | lan  | Relay            | 10.10.2.55, 10.10.3.55 |            |            |                  |
+    | bankomat-ce20n-HUB-2 | LAN  | 1    | 10.10.2.55/30 | lan  | Enabled          |                        | 10.10.2.55 | 10.10.2.56 | 1.1.1.1, 2.2.2.2 |
+servers:
+  - url: https://example.org/api
+    description: Продуктив
+  - url: https://stage.example.org/api
+    description: Тестовый контур
+paths:
+  /cpes:
+    post:
+      summary: Массовая регистрация устройств
+      operationId: CPES_FILE_ADD
+      responses:
+        '200':
+          description: Операция запланирована
+  /networks:
+    post:
+      summary: Массовое создание L3-интерфейсов
+      operationId: NETWORKS_FILE_ADD
+      responses:
+        '200':
+          description: Операция запланирована
+  /rules:
+    post:
+      summary: Массовое создание правил МСЭ
+      operationId: RULES_FILE_ADD
+      responses:
+        '200':
+          description: Операция запланирована
+  /saga/{sagaId}:
+    get:
+      summary: Проверка выполнения операции
+      operationId: SAGA_CHECK
+      responses:
+        '200':
+          description: Результат выполнения
+          content:
+            application/json:
+              example:
+                sagaId: 123456
+                done: 31
+                failed: 1

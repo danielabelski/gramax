@@ -4,14 +4,25 @@ import ModalToOpenService from "@core-ui/ContextServices/ModalToOpenService/Moda
 import ModalToOpen from "@core-ui/ContextServices/ModalToOpenService/model/ModalsToOpen";
 import t from "@ext/localization/locale/translate";
 import { Level } from "@ext/settings/logic/settings";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
+import PageDataContext from "../../../../../ui-logic/ContextServices/PageDataContext";
+import type GesCloudAppSettingsEditor from "../../../../enterprise-cloud/components/GesCloudAppSettingsEditor";
 
 const CatalogPropsTrigger = ({ children }: { children?: ReactNode }) => {
+	const isCloud = Boolean(PageDataContext.value.conf.enterpriseCloud.url);
+
 	const onSelect = () => {
-		ModalToOpenService.setValue(ModalToOpen.AppSettings, {
-			defaultLevel: Level.catalog,
-			onClose: () => ModalToOpenService.resetValue(),
-		});
+		if (isCloud) {
+			ModalToOpenService.setValue<ComponentProps<typeof GesCloudAppSettingsEditor>>(ModalToOpen.GesAppSettings, {
+				defaultLevel: Level.catalog,
+				onClose: () => ModalToOpenService.resetValue(),
+			});
+		} else {
+			ModalToOpenService.setValue(ModalToOpen.AppSettings, {
+				defaultLevel: Level.catalog,
+				onClose: () => ModalToOpenService.resetValue(),
+			});
+		}
 	};
 
 	return (

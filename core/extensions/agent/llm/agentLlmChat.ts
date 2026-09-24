@@ -1,3 +1,5 @@
+import { getExecutingEnvironment } from "@app/resolveModule/env";
+import resolveModule from "@app/resolveModule/frontend";
 import { AgentError, AgentErrorType } from "../core/agentError";
 import type { AgentLlmAdapter } from "./agentLlmAdapter";
 import { agentLlmConfig } from "./agentLlmConfig";
@@ -18,9 +20,8 @@ export class AgentLlmChat {
 		signal?: AbortSignal,
 		onUsage?: (usage: ChatCompletionUsage) => void,
 	): Promise<ChatIterationResult> {
-		const apiKey = adapter.apiKey;
-		if (!apiKey) {
-			throw new AgentError(AgentErrorType.Unauthorized, "API key is not set. Save a key in the agent settings.");
+		if (!adapter.isAuthenticationConfigured()) {
+			throw new AgentError(AgentErrorType.Unauthorized, "API key is not configured for the AI service.");
 		}
 
 		const requestBody: Record<string, unknown> = {
@@ -37,12 +38,17 @@ export class AgentLlmChat {
 
 		let response: Response;
 		try {
-			response = await fetch(adapter.url, {
+			const requestInit: RequestInit = {
 				method: "POST",
 				signal,
+				credentials: adapter.credentials,
 				headers: adapter.getHeaders(),
 				body: JSON.stringify(requestBody),
-			});
+			};
+			response =
+				getExecutingEnvironment() === "tauri" && adapter.endpoint.kind === "enterpriseCloud"
+					? await resolveModule("httpFetch")(adapter.url, requestInit, { timeout: { type: "off" } })
+					: await fetch(adapter.url, requestInit);
 		} catch {
 			throw new AgentError(AgentErrorType.NetworkError, "Network error");
 		}
@@ -58,9 +64,11 @@ export class AgentLlmChat {
 			const errorType =
 				response.status === 401
 					? AgentErrorType.Unauthorized
-					: response.status === 402
-						? AgentErrorType.PaymentRequired
-						: AgentErrorType.Unexpected;
+					: response.status === 403 && adapter.endpoint.kind === "enterprise"
+						? AgentErrorType.Forbidden
+						: response.status === 402
+							? AgentErrorType.PaymentRequired
+							: AgentErrorType.Unexpected;
 			throw new AgentError(errorType, message);
 		}
 

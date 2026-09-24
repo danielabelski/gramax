@@ -6,7 +6,7 @@
 	}
 }
 
-body:has(.article-content) {
+body {
 	background-color: var(--color-article-bg);
 }
 
@@ -163,16 +163,6 @@ img {
 
 span.pk .far {
 	margin-right: 0.3rem;
-}
-
-.group-header {
-	display: flex;
-	align-items: center;
-	margin-top: 20px;
-	font-size: 13px;
-	font-weight: 500;
-	color: var(--color-primary-general);
-	text-transform: uppercase;
 }
 
 .block-elevation-1,

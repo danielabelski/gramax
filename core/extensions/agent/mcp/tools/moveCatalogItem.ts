@@ -3,6 +3,8 @@ import type { Article } from "@core/FileStructue/Article/Article";
 import type { Item } from "@core/FileStructue/Item/Item";
 import type { ItemRef } from "@core/FileStructue/Item/ItemRef";
 import { ItemType } from "@core/FileStructue/Item/ItemType";
+import AgentResourcesProvider from "../../core/agentResourcesProvider";
+import { LinkAdapter } from "../parser/adapters/linkAdapter";
 import { fail, ok, type ToolExecutionContext, type ToolExecutionResult } from "../tool";
 import { CatalogItemLookup } from "../utils/catalogPaths";
 
@@ -14,26 +16,25 @@ type MoveCatalogItemInput = {
 
 export async function runMoveCatalogItem({ app, ctx, input }: ToolExecutionContext): Promise<ToolExecutionResult> {
 	const { catalogName, fromItemPath, toItemPath } = input as MoveCatalogItemInput;
-
-	const fromRef = new Path(Path.join(catalogName, fromItemPath));
-	const toRef = new Path(Path.join(catalogName, toItemPath));
-	if (fromRef.compare(toRef)) {
-		return fail("fromItemPath and toItemPath must be different");
-	}
-
-	const targetType = CatalogItemLookup.getTypeFromPath(toItemPath);
-	if (!targetType) {
-		return fail("toItemPath must end with .md (article) or _index.md (category)");
+	if (AgentResourcesProvider.isSystemCatalog(catalogName)) {
+		return fail("System catalog is read-only");
 	}
 
 	try {
 		const catalog = await app.wm.current().getCatalog(catalogName, ctx);
-		const sourceItem = catalog.findItemByItemPath(fromRef);
+		const sourceItem = CatalogItemLookup.findItem(catalog, fromItemPath);
 		if (!sourceItem) {
 			return fail("Item not found");
 		}
-		const existing = catalog.findItemByItemPath(toRef);
-		if (existing) {
+
+		const fromRef = CatalogItemLookup.fromCatalogItem(catalog, sourceItem).asPath();
+		const toRef = new Path(Path.join(catalog.name, LinkAdapter.toGramaxItemPath(toItemPath)));
+		const targetType = LinkAdapter.isCategory(toItemPath) ? ItemType.category : ItemType.article;
+		if (fromRef.compare(toRef)) {
+			return fail("fromItemPath and toItemPath must be different");
+		}
+
+		if (CatalogItemLookup.findItem(catalog, toItemPath)) {
 			return fail(`Target already exists`);
 		}
 
@@ -48,7 +49,7 @@ export async function runMoveCatalogItem({ app, ctx, input }: ToolExecutionConte
 			}
 		}
 
-		const fromLookup = (await CatalogItemLookup.fromCatalogItem(catalog, sourceItem)).asJSON();
+		const fromLookup = CatalogItemLookup.fromCatalogItem(catalog, sourceItem).asAgentJSON();
 		const toItemRef: ItemRef = {
 			path: toRef,
 			storageId: sourceItem.ref.storageId,
@@ -79,9 +80,9 @@ export async function runMoveCatalogItem({ app, ctx, input }: ToolExecutionConte
 			{
 				type: refreshedItem.type,
 				from: fromLookup,
-				to: (await CatalogItemLookup.fromCatalogItem(refreshedCatalog, refreshedItem)).asJSON(),
+				to: CatalogItemLookup.fromCatalogItem(refreshedCatalog, refreshedItem).asAgentJSON(),
 			},
-			true,
+			{ refreshPage: true },
 		);
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);

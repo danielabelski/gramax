@@ -17,17 +17,17 @@ const init: Command<{ ctx: Context; catalogName: string; data: StorageData; arti
 		kind: ResponseKind.plain,
 
 		async do({ ctx, catalogName, articlePath, data }) {
-			const { rp, wm, em, am, enterpriseCloudManager } = this._app;
+			const { rp, wm, em, amp, enterpriseCloudManager } = this._app;
 			const workspace = wm.current();
 			const services = this._app.settings.resolveServices(workspace);
 
 			const catalog = await workspace.getContextlessCatalog(catalogName);
 			if (!catalog) return;
 
-			const cloudConfig = enterpriseCloudManager.getConfig();
+			const cloudConfig = await enterpriseCloudManager.getConfig();
 			if (cloudConfig.url && cloudConfig.enabled !== false)
-				await initEnterpriseCloudStorage(cloudConfig.url, data);
-			else await initEnterpriseStorage(em.getConfig().gesUrl, data, ctx, am);
+				await initEnterpriseCloudStorage(cloudConfig.url, data, amp.current());
+			else await initEnterpriseStorage(em.getConfig().gesUrl, data, ctx, amp.current());
 
 			await makeSourceApi(data.source, services?.auth?.endpoint).assertStorageExist(data);
 			const fp = workspace.getFileProvider();

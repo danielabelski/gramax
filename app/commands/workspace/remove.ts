@@ -14,7 +14,7 @@ const remove: Command<{ ctx: Context; id: WorkspacePath }, void> = Command.creat
 
 	async do({ id }) {
 		await this._app.wm.removeWorkspace(id);
-		applyWorkspaceServices(await this._app.wm.current().config());
+		applyWorkspaceServices(this._app.settings, this._app.wm.current());
 	},
 
 	params(ctx, q) {

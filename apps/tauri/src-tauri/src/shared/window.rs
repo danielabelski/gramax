@@ -3,6 +3,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::*;
 
+/// Нижняя граница размера окна: меньше этого интерфейс нечитаем, а окно легко
+/// ужать до полоски, которую потом трудно найти на экране (gh#621).
+#[cfg(desktop)]
+const MIN_WINDOW_WIDTH: f64 = 450.0;
+#[cfg(desktop)]
+const MIN_WINDOW_HEIGHT: f64 = 300.0;
+
 #[derive(Default, Debug)]
 pub struct MainWindowBuilder {
 	label: Option<String>,
@@ -82,6 +89,7 @@ impl MainWindowBuilder {
 			.title(&manager.package_info().name)
 			.enable_clipboard_access()
 			.inner_size(1000.0, 700.0)
+			.min_inner_size(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
 			.accept_first_mouse(true);
 
 		#[cfg(all(desktop, not(target_os = "linux")))]

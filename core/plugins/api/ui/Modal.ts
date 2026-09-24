@@ -5,6 +5,7 @@ import type { ModalProps } from "@gramax/sdk/ui";
 import type { ComponentProps } from "react";
 
 export class Modal {
+	private _modalId?: string;
 	title: ModalProps["title"];
 	content?: ModalProps["content"];
 	status?: ModalProps["status"];
@@ -59,7 +60,15 @@ export class Modal {
 			status: this.status,
 			primaryButtonProps: this.primaryButtonProps,
 			secondaryButtonProps: this.secondaryButtonProps,
-			onClose: () => ModalToOpenService.removeModal(modalId),
+			onClose: () => this.close(),
 		});
+		this._modalId = modalId;
+	}
+
+	close(): void {
+		if (!this._modalId) return;
+
+		ModalToOpenService.removeModal(this._modalId);
+		this._modalId = undefined;
 	}
 }

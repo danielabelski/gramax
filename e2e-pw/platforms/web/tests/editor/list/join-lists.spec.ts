@@ -1,10 +1,11 @@
+import { expect } from "@playwright/test";
 import { md } from "@utils/utils";
 import { editorTest } from "@web/fixtures/editor.fixture";
 
 const DRAWIO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="211px" height="101px" viewBox="-0.5 -0.5 211 101" content="&lt;mxfile&gt;&lt;diagram id=&quot;0&quot; name=&quot;Page-1&quot;&gt;&lt;mxGraphModel&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;"><defs/><g><rect x="0" y="20" width="120" height="60" rx="9" ry="9" fill="rgb(255,255,255)" stroke="rgb(0,0,0)" pointer-events="all"/></g></svg>`;
 
 editorTest.describe("Join Lists", () => {
-	editorTest("join ordered lists with note between", async ({ editor }) => {
+	editorTest("join ordered lists with note between", async ({ editor, sharedPage }) => {
 		await editor.setMarkdown(md`
 			1. text
 
@@ -15,7 +16,18 @@ editorTest.describe("Join Lists", () => {
 
 			1. (*)text
 		`);
-		await editor.press("Shift+ArrowUp Backspace");
+		await editor.press("Shift+ArrowUp");
+		// ProseMirror applies an arrow-key selection on a later tick than the keypress, so a Backspace
+		// sent straight after can still meet the collapsed cursor — and a Backspace at the start of a
+		// list item lifts the item out of the list instead of joining the two across the note. Wait for
+		// the selection the deletion is about; without it a loaded runner fails here as a markdown diff
+		// that says nothing about the cause.
+		await expect
+			.poll(() => sharedPage.evaluate(() => window.getSelection()?.isCollapsed === false), {
+				message: "Shift+ArrowUp never extended the selection past the note",
+			})
+			.toBe(true);
+		await editor.press("Backspace");
 		await editor.assertMarkdown(md`
 			1. text
 

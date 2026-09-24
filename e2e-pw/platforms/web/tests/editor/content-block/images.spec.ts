@@ -18,7 +18,7 @@ editorTest.describe("Images", () => {
 		await expect(images).toHaveCount(2);
 		await editor.forceSave();
 		await expect(editor.markdown()).resolves.toMatch(
-			/^!\[\]\(\.\/untitled\.jpeg\)\{width=50px height=50px\}\s+!\[\]\(\.\/untitled-\d+\.jpeg\)\{width=50px height=50px\}\s*$/,
+			/^!\[\]\(\.\/untitled\.webp\)\{width=50px height=50px\}\s+!\[\]\(\.\/untitled-\d+\.webp\)\{width=50px height=50px\}\s*$/,
 		);
 	});
 
@@ -45,7 +45,7 @@ editorTest.describe("Images", () => {
 			`
 before1
 
-![](./untitled.jpeg){width=50px height=50px}
+![](./untitled.webp){width=50px height=50px}
 
 2after
 		`,

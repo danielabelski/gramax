@@ -8,7 +8,7 @@ const createFile = async (files: File[], view: EditorView, apiUrlCreator: ApiUrl
 	if (!files.length) return;
 
 	for (const file of files) {
-		const newName = await rs.setResource(file.name, Buffer.from(await file.arrayBuffer()), undefined, true);
+		const newName = await rs.setResource(file.name, Buffer.from(await file.arrayBuffer()));
 		const newFilePath = new Path(newName);
 
 		const { from, to } = view.state.selection;
@@ -19,7 +19,7 @@ const createFile = async (files: File[], view: EditorView, apiUrlCreator: ApiUrl
 			resourcePath: newName,
 		});
 
-		if (from == to) view.dispatch(view.state.tr.insert(from, view.state.schema.text(value, [mark])));
+		if (from === to) view.dispatch(view.state.tr.insert(from, view.state.schema.text(value, [mark])));
 		else view.dispatch(view.state.tr.addMark(from, to, mark));
 	}
 };

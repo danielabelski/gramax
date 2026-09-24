@@ -9,6 +9,7 @@ import {
 import { LinkMenuInput } from "@ext/markdown/elements/link/edit/components/LinkMenu/EditLinkMenu/LinkMenuInput";
 import { Command, CommandEmpty, CommandItem, CommandList, CommandSeparator } from "@ui-kit/Command";
 import { Icon } from "@ui-kit/Icon";
+import { ComponentVariantProvider } from "@ui-kit/Providers";
 import { type FormEvent, memo, useCallback, useEffect, useState } from "react";
 import type { LinkMenuMode } from "../LinkMenu";
 
@@ -60,74 +61,76 @@ export const EditLinkMenu = memo((props: EditLinkMenuProps) => {
 	);
 
 	return (
-		<Command
-			className={cn("w-full md:w-72 max-h-[min(18.75rem,60vh)] rounded-lg lg:shadow-hard-base")}
-			onValueChange={setSelectedCommand}
-			role="toolbar"
-			shouldFilter={false}
-			value={selectedCommand}
-		>
-			<LinkMenuInput
-				isSearchCatalogs={!isCurrentCatalog}
-				onConfirm={handleConfirm}
-				onValueChange={onValueChange}
-				setMode={changeMode}
-				value={value}
-			/>
-			<CommandList>
-				<CommandEmpty>{t("list.no-results-found")}</CommandEmpty>
-				{!isExternalLink && selectedCatalogName && (
-					<LinkMenuArticleChooser
-						catalogName={selectedCatalogName}
-						isCurrentCatalog={isCurrentCatalog}
-						onCurrentOptionValue={setSelectedCommand}
-						onUpdate={onUpdate}
-						searchValue={value}
-					/>
-				)}
-				{!isExternalLink && !selectedCatalogName && (
-					<LinkMenuCatalogChooser
-						catalogName={selectedCatalogName}
-						searchValue={value}
-						setCatalogName={setSelectedCatalogName}
-					/>
-				)}
-				{!isExternalLink && selectedCatalogName && (
-					<>
-						<CommandSeparator />
+		<ComponentVariantProvider variant="glass">
+			<Command
+				className={cn("w-full md:w-72 max-h-[min(18.75rem,60vh)] rounded-lg")}
+				onValueChange={setSelectedCommand}
+				role="toolbar"
+				shouldFilter={false}
+				value={selectedCommand}
+			>
+				<LinkMenuInput
+					isSearchCatalogs={!isCurrentCatalog}
+					onConfirm={handleConfirm}
+					onValueChange={onValueChange}
+					setMode={changeMode}
+					value={value}
+				/>
+				<CommandList>
+					<CommandEmpty>{t("list.no-results-found")}</CommandEmpty>
+					{!isExternalLink && selectedCatalogName && (
+						<LinkMenuArticleChooser
+							catalogName={selectedCatalogName}
+							isCurrentCatalog={isCurrentCatalog}
+							onCurrentOptionValue={setSelectedCommand}
+							onUpdate={onUpdate}
+							searchValue={value}
+						/>
+					)}
+					{!isExternalLink && !selectedCatalogName && (
+						<LinkMenuCatalogChooser
+							catalogName={selectedCatalogName}
+							searchValue={value}
+							setCatalogName={setSelectedCatalogName}
+						/>
+					)}
+					{!isExternalLink && selectedCatalogName && (
+						<>
+							<CommandSeparator />
+							<div className="p-1">
+								<CommandItem
+									className="px-2 py-1 h-7"
+									onSelect={() => {
+										setSelectedCatalogName(null);
+										setValue("");
+									}}
+									value="other-catalogs"
+								>
+									<div className="flex items-center gap-2">
+										<Icon className="w-3.5 h-3.5" icon="folders" />
+										<span className="text-xs whitespace-nowrap truncate">
+											{t("editor.link.other-catalogs")}
+										</span>
+									</div>
+								</CommandItem>
+							</div>
+						</>
+					)}
+					{isExternalLink && (
 						<div className="p-1">
 							<CommandItem
-								className="px-2 py-1 h-7"
-								onSelect={() => {
-									setSelectedCatalogName(null);
-									setValue("");
-								}}
-								value="other-catalogs"
+								className="px-2 py-1 overflow-hidden max-w-full"
+								onSelect={() => onUpdate(externalLink, externalLink)}
 							>
-								<div className="flex items-center gap-2">
-									<Icon className="w-3.5 h-3.5" icon="folders" />
-									<span className="text-xs whitespace-nowrap truncate">
-										{t("editor.link.other-catalogs")}
-									</span>
+								<div className="flex items-center gap-2 truncate">
+									<Icon className="w-3.5 h-3.5" icon="globe" />
+									<span className="truncate whitespace-nowrap text-xs">{externalLink}</span>
 								</div>
 							</CommandItem>
 						</div>
-					</>
-				)}
-				{isExternalLink && (
-					<div className="p-1">
-						<CommandItem
-							className="px-2 py-1 overflow-hidden max-w-full"
-							onSelect={() => onUpdate(externalLink, externalLink)}
-						>
-							<div className="flex items-center gap-2 truncate">
-								<Icon className="w-3.5 h-3.5" icon="globe" />
-								<span className="truncate whitespace-nowrap text-xs">{externalLink}</span>
-							</div>
-						</CommandItem>
-					</div>
-				)}
-			</CommandList>
-		</Command>
+					)}
+				</CommandList>
+			</Command>
+		</ComponentVariantProvider>
 	);
 });

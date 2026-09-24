@@ -53,8 +53,7 @@ export default class MergeRequestProvider {
 		throw new Error("Not Implemented");
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	findArchiveBySource(sourceBranchRef: string): Promise<MergeRequest | undefined> {
+	findArchiveBySource(_sourceBranchRef: string): Promise<MergeRequest | undefined> {
 		throw new Error("Not Implemented");
 	}
 
@@ -119,7 +118,7 @@ export default class MergeRequestProvider {
 	async afterSync(prev: MergeRequest, data: GitSourceData) {
 		if (!prev) return;
 		if (prev.creator.email === data.userEmail) return;
-		if (!prev.approvers || !prev.approvers?.find((a) => a.email === data.userEmail)) return;
+		if (!prev.approvers?.find((a) => a.email === data.userEmail)) return;
 
 		const currentBranch = await this._repo.gvc.getCurrentBranch();
 		const remoteBranchWasDeleted = !currentBranch.getData().remoteName;
@@ -181,16 +180,15 @@ export default class MergeRequestProvider {
 	}
 
 	private async _isMrDeletedInStatus() {
-		let status = this._repo.gvc.getCachedStatus("index") || (await this._repo.gvc.getChanges("index"));
+		const status = this._repo.gvc.getCachedStatus("index") || (await this._repo.gvc.getChanges("index"));
 		const isDeletedInIndex = status.some(
 			(s) => s.status === FileStatus.delete && s.path.compare(OPEN_MERGE_REQUEST_PATH),
 		);
 		if (isDeletedInIndex) return true;
 
-		status = this._repo.gvc.getCachedStatus("workdir") || (await this._repo.gvc.getChanges("workdir"));
-		const isDeletedInWorkdir = status.some(
-			(s) => s.status === FileStatus.delete && s.path.compare(OPEN_MERGE_REQUEST_PATH),
-		);
+		// one path is asked about, so one path is asked for: a full workdir status costs a walk over the whole working copy
+		const fileStatus = await this._repo.gvc.getFileStatus(OPEN_MERGE_REQUEST_PATH);
+		const isDeletedInWorkdir = fileStatus?.status === FileStatus.delete;
 		return isDeletedInWorkdir;
 	}
 

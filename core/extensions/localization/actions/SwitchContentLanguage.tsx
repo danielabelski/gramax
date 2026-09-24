@@ -1,9 +1,9 @@
 import type { IconCode } from "@components/Atoms/Icon/LucideIcon";
-import ButtonLink from "@components/Molecules/ButtonLink";
+import { CollapsedNavigationTrigger } from "@components/Layouts/CatalogLayout/RightNavigation/CollapsedNavigationTrigger";
+import { RightNavigationButton } from "@components/Layouts/CatalogLayout/RightNavigation/RightNavigationButton";
 import { useRouter } from "@core/Api/useRouter";
 import ArticlePropsService from "@core-ui/ContextServices/ArticleProps";
 import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
-import { usePlatform } from "@core-ui/hooks/usePlatform";
 import { useCatalogPropsStore } from "@core-ui/stores/CatalogPropsStore/CatalogPropsStore.provider";
 import AddContentLanguage from "@ext/localization/actions/AddContentLanguage";
 import ContentLanguageActions from "@ext/localization/actions/ContentLanguageActions";
@@ -21,10 +21,16 @@ import {
 	DropdownMenuTrigger,
 } from "@ui-kit/Dropdown";
 import { Icon } from "@ui-kit/Icon";
+import { ComponentVariantProvider } from "@ui-kit/Providers";
 import { Switch } from "@ui-kit/Switch";
 import { useCallback, useEffect, useState } from "react";
+import { useContentLanguageVisibility } from "./useContentLanguageVisibility";
 
-const SwitchContentLanguage = () => {
+interface SwitchContentLanguageProps {
+	triggerVariant?: "default" | "glass";
+}
+
+const SwitchContentLanguage = ({ triggerVariant = "default" }: SwitchContentLanguageProps) => {
 	const router = useRouter();
 	const isReadOnly = PageDataContextService.value.conf.isReadOnly;
 
@@ -36,7 +42,7 @@ const SwitchContentLanguage = () => {
 	const currentLanguage = PageDataContextService.value.language.content || language;
 
 	const [isLoading, setIsLoading] = useState(false);
-	const { isNext } = usePlatform();
+	const isVisible = useContentLanguageVisibility();
 
 	const showPreviewArticle = useShowPreviewArticle();
 	const setShowPreviewArticle = useSetShowPreviewArticle();
@@ -86,57 +92,71 @@ const SwitchContentLanguage = () => {
 		[setShowPreviewArticle, showPreviewArticle],
 	);
 
-	if (!articleProps || !language || !articleProps?.pathname || articleProps.welcome || !language) return null;
-	if (isNext && supportedLanguages?.length < 2) return null;
+	if (!isVisible) return null;
 
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<ButtonLink
-					dataQa="switch-content-language"
-					iconCode="languages"
-					iconIsLoading={isLoading}
-					text={t(`language.${ContentLanguage[currentLanguage]}`)}
-				/>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start">
-				{!isReadOnly && (
-					<>
-						<AddContentLanguage onChange={switchLanguage} setIsLoading={setIsLoading} />
-						<DropdownMenuItem onSelect={onSwitchPreviewArticle}>
-							<Icon icon={"columns-2" as IconCode} />
-							{t("multilang.preview-article")}
-							<Switch checked={showPreviewArticle} className="pointer-events-none" size="sm" />
-						</DropdownMenuItem>
-						<DropdownMenuSeparator />
-					</>
-				)}
-				<DropdownMenuRadioGroup
-					indicatorIconPosition="start"
-					onValueChange={switchLanguage}
-					value={currentLanguage}
-				>
-					{Object.values(supportedLanguages).map((code) => {
-						const showActions = !isReadOnly && language !== code;
+		<ComponentVariantProvider variant="glass">
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					{triggerVariant === "glass" ? (
+						<CollapsedNavigationTrigger
+							data-qa="switch-content-language"
+							disabled={isLoading}
+							icon="languages"
+							label={t(`language.${ContentLanguage[currentLanguage]}`)}
+						/>
+					) : (
+						<RightNavigationButton
+							asTrigger
+							data-qa="switch-content-language"
+							disabled={isLoading}
+							isLoading={isLoading}
+							startIcon="languages"
+							trailingIcon="chevron-down"
+						>
+							{t(`language.${ContentLanguage[currentLanguage]}`)}
+						</RightNavigationButton>
+					)}
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start">
+					{!isReadOnly && (
+						<>
+							<AddContentLanguage onChange={switchLanguage} setIsLoading={setIsLoading} />
+							<DropdownMenuItem onSelect={onSwitchPreviewArticle}>
+								<Icon icon={"columns-2" as IconCode} />
+								{t("multilang.preview-article")}
+								<Switch checked={showPreviewArticle} className="pointer-events-none" size="sm" />
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
+						</>
+					)}
+					<DropdownMenuRadioGroup
+						indicatorIconPosition="start"
+						onValueChange={switchLanguage}
+						value={currentLanguage}
+					>
+						{Object.values(supportedLanguages).map((code) => {
+							const showActions = !isReadOnly && language !== code;
 
-						return (
-							<DropdownMenuRadioItem key={code} value={code}>
-								<div className="flex items-center justify-between w-full">
-									{t(`language.${ContentLanguage[code]}`)}
-									{showActions && (
-										<ContentLanguageActions
-											canSwitch={code !== currentLanguage}
-											setIsLoading={setIsLoading}
-											targetCode={code}
-										/>
-									)}
-								</div>
-							</DropdownMenuRadioItem>
-						);
-					})}
-				</DropdownMenuRadioGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
+							return (
+								<DropdownMenuRadioItem key={code} value={code}>
+									<div className="flex items-center justify-between w-full">
+										{t(`language.${ContentLanguage[code]}`)}
+										{showActions && (
+											<ContentLanguageActions
+												canSwitch={code !== currentLanguage}
+												setIsLoading={setIsLoading}
+												targetCode={code}
+											/>
+										)}
+									</div>
+								</DropdownMenuRadioItem>
+							);
+						})}
+					</DropdownMenuRadioGroup>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</ComponentVariantProvider>
 	);
 };
 

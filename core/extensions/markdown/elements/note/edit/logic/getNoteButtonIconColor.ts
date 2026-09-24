@@ -5,7 +5,7 @@ const getIconColor = (noteType: NoteType) => {
 		case NoteType.quote:
 			return "currentColor";
 		case NoteType.lab:
-			return "var(--color-purple-700)";
+			return "hsl(var(--status-purple))";
 		case NoteType.tip:
 			return "hsl(var(--status-success))";
 		case NoteType.note:

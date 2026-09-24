@@ -1,11 +1,10 @@
-import type { LinksBreadcrumbReadyData } from "@components/Breadcrumbs/LinksBreadcrumb";
-import type { SearchResultMarkItem } from "@ext/serach/Searcher";
 import type { ExpanderFocusItem } from "../utils/FocusItemsCollector";
 import type {
 	RowArticleSearchResult,
 	RowCatalogSearchResult,
-	SearchItemBlockRowBase,
 	SearchItemDiagramRow,
+	SearchItemFileBlockRow,
+	SearchItemHeaderBlockRow,
 	SearchItemLinkRow,
 } from "../utils/SearchRowsModel";
 
@@ -14,7 +13,6 @@ export type Row = CatalogRow | ArticleRow;
 export interface CatalogRow extends RowCatalogSearchResult {}
 
 export interface ArticleRow extends Omit<RowArticleSearchResult, "items"> {
-	breadcrumbs: LinksBreadcrumbReadyData<SearchResultMarkItem[]>;
 	items: ArticleRowItem[];
 }
 
@@ -22,31 +20,25 @@ export interface ArticleRowItemBase {
 	focusable: boolean;
 }
 
-export interface ArticleRowBlockItemBase extends Omit<SearchItemBlockRowBase, "children">, ArticleRowItemBase {
+export interface ArticleRowBlockItemBase extends ArticleRowItemBase {
 	children: ArticleRowItem[];
+	childrenFocusable: boolean;
 }
 
-export interface ArticleRowHeaderBlockItem extends ArticleRowBlockItemBase {
-	type: "block";
-}
+export interface ArticleRowHeaderBlockItem
+	extends Omit<SearchItemHeaderBlockRow, "children">,
+		ArticleRowBlockItemBase {}
 
-export interface ArticleRowFileBlockItem extends ArticleRowBlockItemBase {
-	type: "file-block";
-}
+export interface ArticleRowFileBlockItem extends Omit<SearchItemFileBlockRow, "children">, ArticleRowBlockItemBase {}
 
 export type ArticleRowBlockItem = ArticleRowHeaderBlockItem | ArticleRowFileBlockItem;
 
 export interface ArticleRowParagraphItem extends SearchItemLinkRow, ArticleRowItemBase {}
 
-export interface ArticleRowDiagramItem extends Omit<SearchItemDiagramRow, "children">, ArticleRowItemBase {
-	children: ArticleRowItem[];
-}
+export interface ArticleRowDiagramItem extends Omit<SearchItemDiagramRow, "children">, ArticleRowBlockItemBase {}
 
 export interface ArticleRowExpanderItem extends ExpanderFocusItem, ArticleRowItemBase {}
 
-export type ArticleRowItem =
-	| ArticleRowBlockItem
-	| ArticleRowFileBlockItem
-	| ArticleRowParagraphItem
-	| ArticleRowDiagramItem
-	| ArticleRowExpanderItem;
+export type ArticleRowNestedItem = ArticleRowBlockItem | ArticleRowDiagramItem;
+
+export type ArticleRowItem = ArticleRowNestedItem | ArticleRowParagraphItem | ArticleRowExpanderItem;

@@ -69,6 +69,8 @@ const TabWrapper = forwardRef<HTMLDivElement, TabWrapperProps>((props, ref) => {
 	} = props;
 	return (
 		<Wrapper
+			aria-hidden={show ? undefined : true}
+			aria-label={title}
 			className={cn(
 				"tab-wrapper bg-secondary-bg border-secondary-border",
 				show && "show",
@@ -79,6 +81,7 @@ const TabWrapper = forwardRef<HTMLDivElement, TabWrapperProps>((props, ref) => {
 			data-qa={dataQa}
 			height={show ? contentHeight : undefined}
 			ref={ref}
+			role={title ? "region" : undefined}
 		>
 			{(titleLeftExtension || titleRightExtension || title) && (
 				<Header

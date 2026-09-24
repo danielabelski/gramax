@@ -17,18 +17,20 @@ import type { CreateMergeRequest } from "@ext/git/core/GitMergeRequest/model/Mer
 import DeleteItem from "@ext/item/actions/DeleteItem";
 import t from "@ext/localization/locale/translate";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ui-kit/Dropdown";
+import { ComponentVariantProvider } from "@ui-kit/Providers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
-import { type ComponentProps, useCallback, useState } from "react";
+import { type ComponentProps, type ReactNode, useCallback, useState } from "react";
 
 interface BranchMenuProps {
 	currentBranchName: string;
 	branchName: string;
+	trigger: ReactNode;
 	refreshList?: () => void;
 	onMergeRequestCreate?: () => void;
 }
 
 const BranchMenu = (props: BranchMenuProps) => {
-	const { currentBranchName, branchName, refreshList, onMergeRequestCreate } = props;
+	const { currentBranchName, branchName, trigger, refreshList, onMergeRequestCreate } = props;
 
 	const [isLoading, setIsLoading] = useState(false);
 
@@ -107,11 +109,9 @@ const BranchMenu = (props: BranchMenuProps) => {
 	}, [branchName, refreshList, isLoading]);
 
 	return (
-		<div className="right-extensions" style={{ marginRight: "-8px" }}>
-			<DropdownMenu>
-				<DropdownMenuTrigger asChild>
-					<Icon code="ellipsis-vertical" isAction />
-				</DropdownMenuTrigger>
+		<ComponentVariantProvider variant="glass">
+			<DropdownMenu modal={false}>
+				<DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
 				<DropdownMenuContent align="start">
 					{hasMergeRequest ? (
 						<>
@@ -165,7 +165,7 @@ const BranchMenu = (props: BranchMenuProps) => {
 					/>
 				</DropdownMenuContent>
 			</DropdownMenu>
-		</div>
+		</ComponentVariantProvider>
 	);
 };
 

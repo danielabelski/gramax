@@ -1,19 +1,18 @@
 /** biome-ignore-all lint/correctness/useExhaustiveDependencies: valid dependencies */
-import isMobileService from "@core-ui/ContextServices/isMobileService";
 import { type TitleItem, useFetchArticleHeaders } from "@core-ui/ContextServices/LinkTitleTooltip";
 import type LinkItem from "@ext/article/LinkCreator/models/LinkItem";
 import t from "@ext/localization/locale/translate";
 import {
 	DropdownMenu,
+	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuTrigger,
-	useHoverDropdown,
 } from "@ui-kit/Dropdown";
 import { Loader } from "@ui-kit/Loader";
 import { MenuItemIconButton } from "@ui-kit/MenuItem";
-import { ToolbarDropdownMenuContent } from "@ui-kit/Toolbar";
-import { useCallback, useEffect } from "react";
+import { ComponentVariantProvider } from "@ui-kit/Providers";
+import { useCallback } from "react";
 
 interface LinkHeadingsProps {
 	linkItem: LinkItem;
@@ -22,13 +21,6 @@ interface LinkHeadingsProps {
 
 export const LinkHeadings = ({ linkItem, onUpdate }: LinkHeadingsProps) => {
 	const { isLoading, headers, fetchArticleHeaders } = useFetchArticleHeaders({ linkItem });
-	const { isOpen, setIsOpen, handleMouseEnter, handleMouseLeave } = useHoverDropdown();
-	const isMobile = isMobileService.value;
-
-	useEffect(() => {
-		if (!isOpen) return;
-		void fetchArticleHeaders();
-	}, [isOpen, linkItem?.relativePath]);
 
 	const handleHeaderClick = useCallback(
 		(header: TitleItem) => {
@@ -42,27 +34,21 @@ export const LinkHeadings = ({ linkItem, onUpdate }: LinkHeadingsProps) => {
 		[linkItem, onUpdate],
 	);
 
-	const onOpenChange = useCallback(
-		(open: boolean) => {
-			if (!isMobile) return;
-			setIsOpen(open);
-		},
-		[isMobile, setIsOpen],
-	);
+	const onOpenChange = useCallback((open: boolean) => {
+		if (open) void fetchArticleHeaders();
+	}, []);
 
 	return (
-		<div className="ml-auto" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-			<DropdownMenu modal={isMobile} onOpenChange={onOpenChange} open={isOpen}>
+		<ComponentVariantProvider variant="glass">
+			<DropdownMenu modal={false} onOpenChange={onOpenChange}>
 				<DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
 					<div>
 						<MenuItemIconButton className="w-5 h-5" icon="chevron-right" size="xs" />
 					</div>
 				</DropdownMenuTrigger>
-				<ToolbarDropdownMenuContent
+				<DropdownMenuContent
 					align="start"
-					className="p-2 px-3 -mt-2 cursor-default"
-					contentClassName="lg:shadow-hard-base"
-					contentStyle={{ maxHeight: "20rem", overflowY: "auto" }}
+					className="max-h-[20rem] overflow-y-auto"
 					onClick={(event) => event.stopPropagation()}
 					side="right"
 				>
@@ -90,8 +76,8 @@ export const LinkHeadings = ({ linkItem, onUpdate }: LinkHeadingsProps) => {
 							{t("loading")}
 						</DropdownMenuItem>
 					)}
-				</ToolbarDropdownMenuContent>
+				</DropdownMenuContent>
 			</DropdownMenu>
-		</div>
+		</ComponentVariantProvider>
 	);
 };

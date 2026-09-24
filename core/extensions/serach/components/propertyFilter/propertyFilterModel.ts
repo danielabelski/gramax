@@ -8,6 +8,7 @@ export const flagPropertyValues = {
 export interface FilterablePropertyItem {
 	property: Property;
 	selection: FilterablePropertySelection;
+	shown: boolean;
 }
 
 export interface FilterablePropertySelection {
@@ -19,6 +20,7 @@ export interface FilterablePropertySelection {
 export interface FilterablePropertyOption {
 	value: string;
 	selected: boolean;
+	shown: boolean;
 }
 
 export function getPropertyValueLabel(propertyType: Property["type"], value: string) {
@@ -39,30 +41,27 @@ export function buildFilterableProperties(
 	propertyValuesQueries: Map<string, string>,
 ) {
 	const selectedPropertiesMap = new Map(filteredProperties.map((item) => [item.property.id, item]));
-	const shownArray: FilterablePropertyItem[] = [];
-	const shownMap = new Map<string, FilterablePropertyItem>();
 	const array: FilterablePropertyItem[] = [];
 	const map = new Map<string, FilterablePropertyItem>();
 
 	for (const property of properties) {
-		const propertyItem = createFilterablePropertyItem(property, selectedPropertiesMap.get(property.id));
-		array.push(propertyItem);
-		map.set(property.id, propertyItem);
+		const propertyQueryLower = propertyQuery.toLowerCase();
+		const valueQuery = propertyValuesQueries.get(property.id);
+		const propertyShown = !propertyQuery || property.id.toLowerCase().includes(propertyQueryLower);
+		const optionFilter = valueQuery ? (value: string) => value.toLowerCase().includes(valueQuery) : () => true;
 
-		if (propertyQuery && !property.id.toLowerCase().includes(propertyQuery)) continue;
-
-		const shownPropertyItem = createItemWithFilteredValues(
+		const propertyItem = createFilterablePropertyItem(
 			property,
 			selectedPropertiesMap.get(property.id),
-			propertyValuesQueries.get(property.id),
+			propertyShown,
+			optionFilter,
 		);
-		shownArray.push(shownPropertyItem);
-		shownMap.set(property.id, shownPropertyItem);
+		array.push(propertyItem);
+		map.set(property.id, propertyItem);
 	}
 
 	return {
 		filterableProperties: { array, map },
-		shownFilterableProperties: { array: shownArray, map: shownMap },
 	};
 }
 
@@ -174,25 +173,15 @@ function cloneItem(property: FilterablePropertyItem): FilterablePropertyItem {
 			emptySelected: property.selection.emptySelected,
 			allSelected: property.selection.allSelected,
 		},
+		shown: property.shown,
 	};
-}
-
-function createItemWithFilteredValues(
-	property: Property,
-	selectedProperty?: FilterablePropertyItem,
-	filter?: string,
-): FilterablePropertyItem {
-	if (filter === undefined || !Array.isArray(property.values)) {
-		return createFilterablePropertyItem(property, selectedProperty);
-	}
-
-	const filteredValues = property.values.filter((value) => value.toLowerCase().includes(filter));
-	return createFilterablePropertyItem({ ...property, values: filteredValues }, selectedProperty);
 }
 
 function createFilterablePropertyItem(
 	property: Property,
 	selectedProperty?: FilterablePropertyItem,
+	shown = true,
+	optionFilter: (value: string) => boolean = () => true,
 ): FilterablePropertyItem {
 	const values = getPropertyFilterValues(property);
 	const selectedValues = new Set(getSelectedValues(selectedProperty));
@@ -204,10 +193,12 @@ function createFilterablePropertyItem(
 			options: values.map((value) => ({
 				value,
 				selected: selectedValues.has(value),
+				shown: optionFilter(value),
 			})),
 			emptySelected,
 			allSelected: isAllSelected(values, emptySelected, selectedValues),
 		},
+		shown,
 	};
 }
 

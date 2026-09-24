@@ -1,16 +1,21 @@
 import type { CommandTree } from "@app/commands";
 import type Application from "@app/types/Application";
 import type Context from "@core/Context/Context";
+import type { AgentLlmClient } from "../llm/agentLlmClient";
+import type { ChatCompletionUsage } from "../llm/agentLlmContracts";
 
 export type ToolExecutionResult = {
 	ok: boolean;
 	data?: unknown;
 	error?: string;
 	refreshPage?: boolean;
+	navChanged?: boolean;
 };
 
-export function ok(data: unknown, refreshPage = false): ToolExecutionResult {
-	return { ok: true, data, error: undefined, refreshPage };
+export function ok(data: unknown, opts?: { refreshPage?: boolean; navChanged?: boolean }): ToolExecutionResult {
+	const refreshPage = opts?.refreshPage ?? false;
+	const navChanged = opts?.navChanged ?? refreshPage;
+	return { ok: true, data, error: undefined, refreshPage, navChanged };
 }
 
 export function fail(error: string, data?: unknown): ToolExecutionResult {
@@ -25,6 +30,8 @@ export type ToolExecutionContext = {
 	sessionId?: string;
 	openCatalogName?: string;
 	openItemPath?: string;
+	llmClient?: AgentLlmClient;
+	onUsage?: (usage: ChatCompletionUsage) => void;
 };
 
 export type ToolDefinition = {

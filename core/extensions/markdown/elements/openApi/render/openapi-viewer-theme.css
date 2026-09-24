@@ -101,10 +101,132 @@
 	line-height: inherit;
 }
 
-/* Article tables reserve inline space for editor controls. Markdown rendered inside OpenAPI descriptions does not
-   have those controls, so let its table use the full description width. */
-[data-theme] openapi-doc .markdown table {
+/* The size the table above is centred on. Declared here rather than in the package: it is the article that
+   asks a table to leave the reading column, so the reference box is the article's business. */
+/* An article's <details> is a spoiler, and article.css:130 draws its marker itself — a Font Awesome plus,
+   positioned into the margin. The viewer has <details> of its own (the server switch, the error shell) with
+   markers of their own, so the article's lands beside them as a second one; on paper, where that icon font
+   is not embedded, it prints as a literal "+" in the margin. */
+[data-theme] openapi-doc summary::before {
+	content: none;
+}
+
+[data-theme] openapi-doc .doc-header {
+	container-type: inline-size;
+}
+
+/* Article tables reserve inline space for editor controls, and a Markdown table has none of them, so its
+   table uses the whole width.
+
+   It has no <colgroup> and no TableWrapper either — nothing that gives an article table its column widths,
+   its horizontal scroll or the shadows that show there is more of it. What `.article table` leaves behind is
+   `display: block; width: 100%` with nothing to scroll, and `word-break: break-word` on the cells. That
+   value is the legacy alias of `overflow-wrap: anywhere`, so every glyph counts as a wrap opportunity when
+   the browser measures a column's minimum width: an 18-column CSV example then fits any width at all, one
+   letter per line. Wrapping at word boundaries gives each column a minimum it can be read at, and the rest
+   is scrolled — the same answer a code block that outgrows the article column already gets.
+
+   The two boxes around it come from the Markdown renderer (openApiMarkdown.ts): the outer one carries the
+   width and the shadows, the inner one is what scrolls. A shadow cannot live inside the box that scrolls, or
+   it travels with the content instead of staying at the edge. */
+[data-theme] openapi-doc .openapi-table-scroll {
+	position: relative;
+	/* `+ 3em` is the cap WidthWrapper uses for a wide article table, and it is there because its inner
+	   TableWrapper pads the table by 1.5em on either side. Keeping the same number here puts the outer edge
+	   of this box exactly where a wide article table's outer edge lands, which is as far as the article lets
+	   anything go. */
+	width: calc(var(--article-content-wrapper-width, 100%) + 3em);
+	max-width: calc(var(--article-content-wrapper-width, 100%) + 3em);
+
+	/* Pulls the extra width evenly out of both sides, the same way an image or a table scaled to "full
+	   article" does it (article/Components/ArticleComponentResizer.tsx).
+
+	   Measured against the header and not against `100%`, because `100%` here is the description, and the
+	   description is the first of the header's two grid columns: centring on it leaves the table half a
+	   column gap left of centre, which reads as a fat margin down the right-hand side. `100cqw` is the
+	   header — the box the block itself is centred in — so the table lands on the article's own edges no
+	   matter how wide the second column is. */
+	margin-left: calc((var(--article-content-wrapper-width, 100%) + 3em - 100cqw) / -2);
+}
+
+[data-theme] openapi-doc .openapi-table-port {
+	overflow-x: auto;
+}
+
+/* Both parents on purpose: the port is what the table sits in on screen, and print takes the port out from
+   between the box and the table (print/descriptionBlocks.ts) so the table can be dealt out row by row. The
+   table's own box is the same either way, and naming only the port left the printed table without its frame,
+   its full width and its zeroed margins. */
+[data-theme] openapi-doc :is(.openapi-table-port, .openapi-table-scroll) > table {
+	/* A real table box, so it keeps its full width past the edge of the port: row backgrounds and the frame
+	   below run the whole width of the table and not just the part currently in view. */
+	display: table;
+	width: 100%;
 	padding-inline: 0;
+	margin: 0;
+
+	/* `.article table` gives the cells their lines but no frame around the whole thing — an article table
+	   gets that from TableWrapper, which this one does not have. Without it the table reads as loose rules
+	   ending in mid-air, and the missing left edge looks like the first column was cut off. Collapsed
+	   borders merge the frame with the cells' own, so it lands as one hairline. */
+	border: 1px solid var(--color-table-border);
+}
+
+[data-theme] openapi-doc .openapi-table-scroll :is(th, td) {
+	word-break: normal;
+	overflow-wrap: break-word;
+}
+
+/* The shadow an article table is supposed to get from ShadowBox: an edge is shaded only while there is
+   content past it, which is what tells a reader the table can be scrolled at all. The attributes are written
+   by tableScrollShadows.ts; without it the table still scrolls, it just says so less.
+
+   Mixed from `--color-article-bg` rather than copied from ShadowBox, which fades
+   `rgba(var(--color-article-bg-rgb), …)` — a variable this repository never defines, so that gradient is
+   invalid and paints nothing. Worth fixing there too; here the colour has to be one that exists. */
+[data-theme] openapi-doc .openapi-table-scroll::before,
+[data-theme] openapi-doc .openapi-table-scroll::after {
+	position: absolute;
+	top: 0;
+	z-index: 2;
+	width: 40px;
+	height: 100%;
+	pointer-events: none;
+	content: "";
+	opacity: 0;
+	transition: opacity 100ms ease;
+}
+
+[data-theme] openapi-doc .openapi-table-scroll::before {
+	left: 0;
+	background: linear-gradient(
+		to left,
+		transparent 0%,
+		color-mix(in srgb, var(--color-article-bg) 90%, transparent) 100%
+	);
+}
+
+[data-theme] openapi-doc .openapi-table-scroll::after {
+	right: 0;
+	background: linear-gradient(
+		to right,
+		transparent 0%,
+		color-mix(in srgb, var(--color-article-bg) 90%, transparent) 100%
+	);
+}
+
+[data-theme] openapi-doc .openapi-table-scroll[data-more-left]::before,
+[data-theme] openapi-doc .openapi-table-scroll[data-more-right]::after {
+	opacity: 1;
+}
+
+/* The hint under a `path`/`query` badge paints itself `color: var(--openapi-border)` on
+   `background: var(--openapi-text)` — the package uses its border token as a light foreground, which holds
+   only while that token is a light grey. Gramax maps it to the article's table border, `rgba(0,0,0,0.13)`,
+   so the text came out as 13%-opacity black on near-black: the empty dark rectangle people reported when
+   hovering the badge. The inverse-text token is the foreground that actually belongs on that surface. */
+[data-theme] openapi-doc api-operation .tip {
+	color: var(--openapi-text-inverse);
 }
 
 /* Inside the editor ProseMirror gives article links a text cursor. OpenAPI is an interactive embedded view, so
@@ -139,11 +261,16 @@
 	border-color: var(--openapi-text-faint);
 }
 
-/* Avoid saturated red text on the dark article surface: it can appear displaced or doubled. */
-[data-theme="dark"] openapi-doc {
-	--openapi-method-delete-bg: hsl(var(--status-error-primary-bg));
-	--openapi-method-delete-text: var(--openapi-text-soft);
-	--openapi-method-delete-border: hsl(var(--status-error-secondary-border));
+/* Not when printing, like every other dark block in the palette (`core/styles/vars.css`,
+   `core/styles/themes.css`, `core/ui-kit/index.css`) and like the package's own — paper is light whatever
+   the reader chose, and a dark override left on would recolour the method label against it. */
+@media not print {
+	/* Avoid saturated red text on the dark article surface: it can appear displaced or doubled. */
+	[data-theme="dark"] openapi-doc {
+		--openapi-method-delete-bg: hsl(var(--status-error-primary-bg));
+		--openapi-method-delete-text: var(--openapi-text-soft);
+		--openapi-method-delete-border: hsl(var(--status-error-secondary-border));
+	}
 }
 
 /* The block's selection frame in the editor is an outline (ProseMirror.css), so it costs no layout width — but
@@ -178,6 +305,26 @@
 	display: none;
 }
 
+/* A wide table's scroll box is meaningless on paper — a reader cannot drag it, and `overflow: hidden` on
+   `.page` would turn the part sticking out into a column that was never printed. The print copy drops the
+   scrolling and gets fitted to the page instead, by print/descriptionBlocks.ts, which takes the scroll port
+   out from between the box and the table and scales the table down until it fits. Both halves are needed:
+   without the fit the table overflows the page, without this rule the fit would be measured against a box
+   that had already clipped it.
+
+   The port is gone by the time these pages are measured, so there is nothing here to switch its scrolling
+   off — what is left is the outer box, which keeps the class the cells' wrapping rules hang on. */
+:is(.render-body, .print-body) openapi-doc .openapi-table-scroll {
+	width: 100%;
+	max-width: 100%;
+	margin-left: 0;
+}
+
+:is(.render-body, .print-body) openapi-doc .openapi-table-scroll::before,
+:is(.render-body, .print-body) openapi-doc .openapi-table-scroll::after {
+	display: none;
+}
+
 /* Chevrons of the cards hidden above point at a closed card, so the page does not promise content that is not
    there. Sections keep theirs open: the list of operations is exactly what is being printed. */
 :is(.render-body, .print-body) :is(api-operation, .model-card) {
@@ -188,9 +335,28 @@
 }
 
 /* Search belongs to the screen. It survives here only because the element's own print mode -- which drops it
-   -- is switched off in OpenApiViewer.tsx, and an empty input on paper is noise. */
-:is(.render-body, .print-body) openapi-doc .search-field {
+   -- is switched off in OpenApiViewer.tsx, and an empty input on paper is noise. Authorize is the same kind
+   of thing, and now that the header is dealt out child by child it would also take a line of its own on
+   whichever page it happened to land on. So is the button that copies the server URL, and so is the list of
+   the other servers behind the switch: paper has no clipboard and nothing to open, and the server the
+   document is written against is printed in the trigger either way. */
+:is(.render-body, .print-body) openapi-doc :is(.search-field, .auth-button, .copy, .server-options) {
 	display: none;
+}
+
+/* What is left of the server switch is a line of text, so it should not keep the chevron that says it opens. */
+:is(.render-body, .print-body) openapi-doc .server-switch-trigger > svg {
+	display: none;
+}
+
+/* The rule under the document header separates it from the operations, and there is nothing to separate on a
+   page the header merely runs through: there it reads as a divider dropped into the middle of the text. The
+   attribute is written by the paginator onto every copy of the chrome but the last (OpenApiPaginator.ts). */
+:is(.render-body, .print-body) openapi-doc .doc-header[data-print-continues] {
+	/* Transparent, not removed: the page's budget counts the chrome's border along with its padding and
+	   margins, and it is counted before the run knows which copy is the last one. Keeping the geometry
+	   identical keeps the budget honest. */
+	border-bottom-color: transparent;
 }
 
 /* A card sits flush against the page's clip boundary, and there its shadow has nowhere to fade: `overflow:

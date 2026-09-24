@@ -1,44 +1,33 @@
-import Icon from "@components/Atoms/Icon";
-import styled from "@emotion/styled";
-
-const Wrapper = styled.div`
-	font-size: 10px;
-	display: flex;
-	align-items: center;
-	height: 100%;
-	padding: 0;
-
-	i {
-		padding-top: 0.05rem;
-		font-size: 8px;
-	}
-`;
+import { cn } from "@core-ui/utils/cn";
+import { Badge } from "@ui-kit/Badge";
+import { Icon } from "@ui-kit/Icon";
 
 export type PullPushCounterProps = {
 	pullCounter: number;
 	pushCounter: number;
-	className?: string;
 };
 
-const PullPushCounter = ({ pullCounter, pushCounter, className }: PullPushCounterProps) => {
-	const showPullCounter = pullCounter > 0 || pushCounter > 0;
+const PullPushCounter = ({ pullCounter, pushCounter }: PullPushCounterProps) => {
+	const showPullCounter = pullCounter > 0;
 	const showPushCounter = pushCounter > 0;
 
+	if (!showPushCounter && !showPullCounter) return null;
+
 	return (
-		<Wrapper className={className}>
-			{showPushCounter && (
-				<>
-					{pushCounter}
-					<Icon code="move-up" strokeWidth="2" viewBox="2 1 20 20"></Icon>
-				</>
-			)}
+		<div className="flex items-center h-4">
 			{showPullCounter && (
-				<>
+				<Badge className={cn("gap-0 px-1", showPushCounter && "-mr-1")} size="sm">
+					<Icon className="text-secondary-fg" icon="arrow-down" size="sm" />
 					{pullCounter}
-					<Icon code="move-down" strokeWidth="2" viewBox="2 4 20 20"></Icon>
-				</>
+				</Badge>
 			)}
-		</Wrapper>
+			{showPushCounter && (
+				<Badge className="gap-0 px-1" focus="high" size="sm">
+					<Icon className="text-primary-bg" icon="arrow-up" size="sm" />
+					{pushCounter}
+				</Badge>
+			)}
+		</div>
 	);
 };
 

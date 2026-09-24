@@ -126,17 +126,6 @@ export const syncOverrides = (catalogName: string, items: ItemLink[], supportedL
 
 	for (const key of Object.keys(overrides)) if (!valid.has(key)) delete mutable()[key];
 
-	const persistExpanded = (list: ItemLink[], level: number) => {
-		for (const item of list) {
-			if (item.type !== ItemType.category) continue;
-			const cat = item as CategoryLink;
-			const key = overrideKey(cat.ref.path, supportedLanguages);
-			if (level > 0 && cat.isExpanded && !(key in overrides)) mutable()[key] = true;
-			persistExpanded(cat.items ?? [], level + 1);
-		}
-	};
-	persistExpanded(items, 0);
-
 	if (next) setCatalogOverrides(catalogName, next);
 };
 

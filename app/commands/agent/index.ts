@@ -7,6 +7,11 @@ import browserScroll from "./browser/scroll";
 import browserSetAllowed from "./browser/setBrowserAllowed";
 import browserType from "./browser/type";
 import messageSend from "./message/send";
+import messageTranscribeAudio from "./message/transcribeAudio";
+import secretsDelete from "./secrets/delete";
+import secretsList from "./secrets/list";
+import secretsSet from "./secrets/set";
+import secretsUpdate from "./secrets/update";
 import sessionCancel from "./session/cancel";
 import sessionContext from "./session/context";
 import createSession from "./session/create";
@@ -42,8 +47,15 @@ export default {
 	},
 	message: {
 		send: messageSend,
+		transcribeAudio: messageTranscribeAudio,
 	},
 	skills: {
 		list: skillsList,
+	},
+	secrets: {
+		list: secretsList,
+		set: secretsSet,
+		update: secretsUpdate,
+		delete: secretsDelete,
 	},
 };

@@ -3,9 +3,10 @@ import { getExecutingEnvironment } from "@app/resolveModule/env";
 import type Application from "@app/types/Application";
 import type Context from "@core/Context/Context";
 import { agentBrowserConfig } from "../browser/config";
-import { getAgentSkills, getToolsDescriptions } from "../prompts";
+import type { AgentLlmClient } from "../llm/agentLlmClient";
+import { getToolsDescriptions } from "../prompts";
 import { type AgentToolCallPolicy, allowAllAgentToolCallPolicy } from "./policy";
-import { fail, type ToolDefinition, type ToolExecutionResult } from "./tool";
+import { fail, type ToolDefinition, type ToolExecutionContext, type ToolExecutionResult } from "./tool";
 import { runBrowserClick } from "./tools/browserClick";
 import { runBrowserNavigate } from "./tools/browserNavigate";
 import { runBrowserReadElement } from "./tools/browserReadElement";
@@ -13,51 +14,47 @@ import { runBrowserReadPage } from "./tools/browserReadPage";
 import { runBrowserScroll } from "./tools/browserScroll";
 import { runBrowserType } from "./tools/browserType";
 import { runSearchWeb } from "./tools/browserWebSearch";
+import { runCompactContext } from "./tools/compactContext";
 import { runCreateCatalogItem } from "./tools/createCatalogItem";
 import { runDeleteCatalogItem } from "./tools/deleteCatalogItem";
 import { runGetCatalogItemHeadings } from "./tools/getCatalogItemHeadings";
 import { runGetFilesNavigation } from "./tools/getFilesNavigation";
 import { runGetNavigation } from "./tools/getNavigation";
+import { runGitBranch } from "./tools/gitBranch";
 import { runGitDiscard } from "./tools/gitDiscard";
 import { runGitInspect } from "./tools/gitInspect";
+import { runGitRestore } from "./tools/gitRestore";
 import { HTTP_METHODS, runHttpRequest } from "./tools/httpRequest";
 import { runListCatalogs } from "./tools/listCatalogs";
+import { runMailRequest } from "./tools/mailRequest";
 import { runMoveCatalogItem } from "./tools/moveCatalogItem";
-import { runReadAgentAttachment } from "./tools/readAgentAttachment";
-import { runReadAgentSkill } from "./tools/readAgentSkill";
 import { runReadCatalogItem } from "./tools/readCatalogItem";
+import { runReadDocument } from "./tools/readDocument";
 import { runReadFile } from "./tools/readFile";
 import { runReplaceCatalogItem } from "./tools/replaceCatalogItem";
+import { runSaveChatAttachment } from "./tools/saveChatAttachment";
 import { runSearchCatalogs } from "./tools/searchCatalogs";
 import { runSearchFiles } from "./tools/searchFiles";
+import { runTranscribeAudio } from "./tools/transcribeAudio";
 import { runWriteCatalogItem } from "./tools/writeCatalogItem";
 
 export class AgentToolRegistry {
 	readonly tools: ToolDefinition[];
 	readonly policy: AgentToolCallPolicy;
+	private readonly _toolsWithSecretResolving = new Set(["http_request", "mail_request"]);
 
 	constructor() {
 		this.policy = allowAllAgentToolCallPolicy;
 		this.tools = this._createTools();
 	}
 
-	async getTools(
-		app: Application,
-		ctx: Context,
-		commands: CommandTree,
-		sessionId?: string,
-	): Promise<ToolDefinition[]> {
-		const session = sessionId ? app.agentManager.sessions.get(sessionId) : null;
-		const catalogName = session?.openCatalogName ?? undefined;
-		const skills = catalogName ? await getAgentSkills(app, ctx, commands, catalogName) : [];
+	getTools(app: Application): ToolDefinition[] {
 		const browserAllowed = !!app.agentManager.browserAllowed;
-		const filteredTools = this.tools.filter((tool) => {
+		return this._createTools(getToolsDescriptions()).filter((tool) => {
 			if ((tool.name.startsWith("browser_") || tool.name === "search_web") && !browserAllowed) return false;
 			if (tool.name === "search_web" && !agentBrowserConfig.provider.trim()) return false;
 			return true;
 		});
-		if (skills.length) return filteredTools;
-		return filteredTools.filter((tool) => tool.name !== "read_agent_skill");
 	}
 
 	async executeTool(
@@ -67,6 +64,8 @@ export class AgentToolRegistry {
 		ctx: Context,
 		commands: CommandTree,
 		sessionId?: string,
+		llmClient?: AgentLlmClient,
+		onUsage?: ToolExecutionContext["onUsage"],
 	): Promise<ToolExecutionResult> {
 		const session = sessionId ? app.agentManager.sessions.get(sessionId) : null;
 		const tool = this.tools.find((tool) => tool.name === name);
@@ -79,19 +78,32 @@ export class AgentToolRegistry {
 		if (tool.name === "search_web" && !agentBrowserConfig.provider.trim()) {
 			return fail("Web search tool is disabled: provider is not configured");
 		}
-		return tool.execute({
-			input,
+		let toolInput = input;
+		if (this._toolsWithSecretResolving.has(tool.name)) {
+			const resolved = app.agentManager.secrets.resolve(JSON.stringify(input));
+			if (resolved.missing.length) {
+				return fail(`Missing secret: ${resolved.missing.join(", ")}`, { secrets: resolved.missing });
+			}
+			toolInput = JSON.parse(resolved.text);
+		}
+		const result = await tool.execute({
+			input: toolInput,
 			app,
 			ctx,
 			commands,
 			sessionId,
 			openCatalogName: session?.openCatalogName ?? undefined,
 			openItemPath: session?.openItemPath ?? undefined,
+			llmClient,
+			onUsage,
 		});
+		if (this._toolsWithSecretResolving.has(tool.name)) {
+			return JSON.parse(app.agentManager.secrets.unresolve(JSON.stringify(result)));
+		}
+		return result;
 	}
 
-	private _createTools(): ToolDefinition[] {
-		const docs = getToolsDescriptions();
+	private _createTools(docs = getToolsDescriptions()): ToolDefinition[] {
 		const tools: ToolDefinition[] = [
 			{
 				name: "browser_navigate",
@@ -171,40 +183,25 @@ export class AgentToolRegistry {
 				},
 			},
 			{
-				name: "read_agent_attachment",
-				description: docs.readAgentAttachment.description,
+				name: "read_document",
+				description: docs.readDocument.description,
 				inputSchema: {
 					type: "object",
 					properties: {
-						attachmentName: {
+						attachmentItemPath: {
 							type: "string",
-							description: docs.readAgentAttachment.input.attachmentName,
+							description: docs.readDocument.input.attachmentItemPath,
 						},
 						headingId: {
 							type: "string",
-							description: docs.readAgentAttachment.input.headingId,
+							description: docs.readDocument.input.headingId,
 						},
 					},
-					required: ["attachmentName"],
+					required: ["attachmentItemPath"],
 					additionalProperties: false,
 				},
 				async execute(context) {
-					return runReadAgentAttachment(context);
-				},
-			},
-			{
-				name: "read_agent_skill",
-				description: docs.readAgentSkill.description,
-				inputSchema: {
-					type: "object",
-					properties: {
-						skillName: { type: "string", description: docs.readAgentSkill.input.skillName },
-					},
-					required: ["skillName"],
-					additionalProperties: false,
-				},
-				async execute(context) {
-					return runReadAgentSkill(context);
+					return runReadDocument(context);
 				},
 			},
 			{
@@ -320,15 +317,10 @@ export class AgentToolRegistry {
 					type: "object",
 					properties: {
 						catalogName: { type: "string", description: docs.createCatalogItem.input.catalogName },
-						type: {
-							type: "string",
-							enum: ["article", "category"],
-							description: docs.createCatalogItem.input.type,
-						},
+						itemPath: { type: "string", description: docs.createCatalogItem.input.itemPath },
 						title: { type: "string", description: docs.createCatalogItem.input.title },
-						parentItemPath: { type: "string", description: docs.createCatalogItem.input.parentItemPath },
 					},
-					required: ["catalogName", "type", "title"],
+					required: ["catalogName", "itemPath", "title"],
 					additionalProperties: false,
 				},
 				async execute(context) {
@@ -370,6 +362,26 @@ export class AgentToolRegistry {
 				},
 				async execute(context) {
 					return runReplaceCatalogItem(context);
+				},
+			},
+			{
+				name: "save_chat_attachment",
+				description: docs.saveChatAttachment.description,
+				inputSchema: {
+					type: "object",
+					properties: {
+						attachmentItemPath: {
+							type: "string",
+							description: docs.saveChatAttachment.input.attachmentItemPath,
+						},
+						catalogName: { type: "string", description: docs.saveChatAttachment.input.catalogName },
+						targetItemPath: { type: "string", description: docs.saveChatAttachment.input.targetItemPath },
+					},
+					required: ["attachmentItemPath", "catalogName", "targetItemPath"],
+					additionalProperties: false,
+				},
+				async execute(context) {
+					return runSaveChatAttachment(context);
 				},
 			},
 			{
@@ -430,10 +442,13 @@ export class AgentToolRegistry {
 						catalogName: { type: "string", description: docs.gitInspect.input.catalogName },
 						action: {
 							type: "string",
-							enum: ["status", "file_diff"],
+							enum: ["status", "log", "diff"],
 							description: docs.gitInspect.input.action,
 						},
 						filePath: { type: "string", description: docs.gitInspect.input.filePath },
+						limit: { type: "number", description: docs.gitInspect.input.limit },
+						from: { type: "string", description: docs.gitInspect.input.from },
+						to: { type: "string", description: docs.gitInspect.input.to },
 					},
 					required: ["catalogName", "action"],
 					additionalProperties: false,
@@ -463,6 +478,48 @@ export class AgentToolRegistry {
 				},
 			},
 			{
+				name: "git_branch",
+				description: docs.gitBranch.description,
+				inputSchema: {
+					type: "object",
+					properties: {
+						catalogName: { type: "string", description: docs.gitBranch.input.catalogName },
+						action: {
+							type: "string",
+							enum: ["branches", "checkout"],
+							description: docs.gitBranch.input.action,
+						},
+						branch: { type: "string", description: docs.gitBranch.input.branch },
+					},
+					required: ["catalogName", "action"],
+					additionalProperties: false,
+				},
+				async execute(context) {
+					return runGitBranch(context);
+				},
+			},
+			{
+				name: "git_restore",
+				description: docs.gitRestore.description,
+				inputSchema: {
+					type: "object",
+					properties: {
+						catalogName: { type: "string", description: docs.gitRestore.input.catalogName },
+						from: { type: "string", description: docs.gitRestore.input.from },
+						filePaths: {
+							type: "array",
+							items: { type: "string" },
+							description: docs.gitRestore.input.filePaths,
+						},
+					},
+					required: ["catalogName", "from"],
+					additionalProperties: false,
+				},
+				async execute(context) {
+					return runGitRestore(context);
+				},
+			},
+			{
 				name: "http_request",
 				description: docs.httpRequest.description,
 				inputSchema: {
@@ -480,12 +537,57 @@ export class AgentToolRegistry {
 							description: docs.httpRequest.input.headers,
 						},
 						body: { type: "string", description: docs.httpRequest.input.body },
+						auth: { type: "object", description: docs.httpRequest.input.auth },
 					},
 					required: ["url"],
 					additionalProperties: false,
 				},
 				async execute(context) {
 					return runHttpRequest(context);
+				},
+			},
+			{
+				name: "mail_request",
+				description: docs.mailRequest.description,
+				inputSchema: {
+					type: "object",
+					properties: {
+						url: { type: "string", description: docs.mailRequest.input.url },
+						command: { type: "string", description: docs.mailRequest.input.command },
+						body: { type: "string", description: docs.mailRequest.input.body },
+						auth: { type: "object", description: docs.mailRequest.input.auth },
+					},
+					required: ["url"],
+					additionalProperties: false,
+				},
+				async execute(context) {
+					return runMailRequest(context);
+				},
+			},
+			{
+				name: "transcribe_audio",
+				description: docs.transcribeAudio.description,
+				inputSchema: {
+					type: "object",
+					properties: {
+						attachmentItemPath: {
+							type: "string",
+							description: docs.transcribeAudio.input.attachmentItemPath,
+						},
+					},
+					required: ["attachmentItemPath"],
+					additionalProperties: false,
+				},
+				async execute(context) {
+					return runTranscribeAudio(context);
+				},
+			},
+			{
+				name: "compact_context",
+				description: docs.compactContext.description,
+				inputSchema: { type: "object", properties: {}, additionalProperties: false },
+				async execute(context) {
+					return runCompactContext(context);
 				},
 			},
 			{
@@ -507,27 +609,21 @@ export class AgentToolRegistry {
 		];
 
 		if (getExecutingEnvironment() !== "tauri") {
-			return tools.filter((tool) => !tool.name.startsWith("browser_") && tool.name !== "search_web");
+			return tools.filter(
+				(tool) =>
+					!tool.name.startsWith("browser_") && tool.name !== "search_web" && tool.name !== "mail_request",
+			);
 		}
 
 		return tools;
 	}
 }
 
-export async function getAgentToolsRegistryForSession(
-	app: Application,
-	ctx: Context,
-	commands: CommandTree,
-	session?: { openCatalogName: string | null } | null,
-): Promise<ToolDefinition[]> {
-	const catalogName = session?.openCatalogName ?? undefined;
+export function getAgentToolsRegistryForSession(app: Application): ToolDefinition[] {
 	const browserAllowed = !!app.agentManager.browserAllowed;
-	const tools = new AgentToolRegistry().tools.filter((tool) => {
+	return new AgentToolRegistry().tools.filter((tool) => {
 		if ((tool.name.startsWith("browser_") || tool.name === "search_web") && !browserAllowed) return false;
 		if (tool.name === "search_web" && !agentBrowserConfig.provider.trim()) return false;
 		return true;
 	});
-	const skills = catalogName ? await getAgentSkills(app, ctx, commands, catalogName) : [];
-	if (skills.length) return tools;
-	return tools.filter((tool) => tool.name !== "read_agent_skill");
 }

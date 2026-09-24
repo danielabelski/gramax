@@ -1,4 +1,3 @@
-import styled from "@emotion/styled";
 import { CatalogViewSettingsContext } from "@ext/catalog/views/components/Context/CatalogViewSettingsContext";
 import { CatalogViewSection } from "@ext/catalog/views/components/Helpers/CatalogViewSection";
 import { CatalogViewFooter } from "@ext/catalog/views/components/Sections/CatalogViewFooter";
@@ -13,7 +12,7 @@ import { Form } from "@ui-kit/Form";
 import { Label } from "@ui-kit/Label";
 import { PopoverContent } from "@ui-kit/Popover";
 import { ScrollShadowContainer } from "@ui-kit/ScrollShadowContainer";
-import { type RefObject, useMemo } from "react";
+import { type ComponentProps, type RefObject, useMemo } from "react";
 
 interface CatalogViewSettingsContentProps {
 	items: CatalogView[];
@@ -28,9 +27,14 @@ interface CatalogViewSettingsContentProps {
 	onDeleteClick?: (view: CatalogView) => void;
 }
 
-const ScrollContainer = styled(ScrollShadowContainer)`
-	max-height: min(75dvh, var(--radix-popover-content-available-height));
-`;
+const keepOpenForNestedDropdown: NonNullable<ComponentProps<typeof PopoverContent>["onInteractOutside"]> = (event) => {
+	const target = event.target;
+	if (target instanceof Element && target.closest("[data-dropdown-menu-content]")) event.preventDefault();
+};
+
+const keepOpenOnFocusOutside: NonNullable<ComponentProps<typeof PopoverContent>["onFocusOutside"]> = (event) => {
+	event.preventDefault();
+};
 
 export const CatalogViewSettingsContent = (props: CatalogViewSettingsContentProps) => {
 	const {
@@ -68,6 +72,7 @@ export const CatalogViewSettingsContent = (props: CatalogViewSettingsContentProp
 				editable,
 				editingId,
 				isEditingOrSaving,
+				showFooter,
 				onLoadMore,
 				onEditClick,
 				onUpdateDocportalVisible,
@@ -78,10 +83,16 @@ export const CatalogViewSettingsContent = (props: CatalogViewSettingsContentProp
 				onChange,
 			}}
 		>
-			<PopoverContent align="start" className="p-0 w-60" onOpenAutoFocus={(e) => e.preventDefault()}>
+			<PopoverContent
+				align="start"
+				className="p-0 w-60"
+				onFocusOutside={keepOpenOnFocusOutside}
+				onInteractOutside={keepOpenForNestedDropdown}
+				onOpenAutoFocus={(e) => e.preventDefault()}
+			>
 				{state === "editing" && (
 					<>
-						<CatalogViewSection className="flex items-center gap-2" style={{ paddingBottom: "0.75rem" }}>
+						<CatalogViewSection className="flex items-center gap-2 pb-3">
 							<Label>{t("catalog.views.editing")}</Label>
 						</CatalogViewSection>
 						<Divider />
@@ -89,7 +100,7 @@ export const CatalogViewSettingsContent = (props: CatalogViewSettingsContentProp
 				)}
 				<Form asChild {...form}>
 					<form className="contents ui-kit" onSubmit={onSubmit}>
-						<ScrollContainer>
+						<ScrollShadowContainer className="max-h-[min(75dvh,var(--radix-popover-content-available-height))]">
 							<CatalogViewSavedSection editable={editable} />
 							{editable && (
 								<EditCatalogView disabled={state === "saving"} form={form} onChange={onChange} />
@@ -113,7 +124,7 @@ export const CatalogViewSettingsContent = (props: CatalogViewSettingsContentProp
 									</CatalogViewSection>
 								</>
 							)}
-						</ScrollContainer>
+						</ScrollShadowContainer>
 					</form>
 				</Form>
 			</PopoverContent>

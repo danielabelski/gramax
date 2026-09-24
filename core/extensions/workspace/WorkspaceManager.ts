@@ -3,6 +3,7 @@ import { WORKSPACE_CONFIG_FILENAME } from "@app/config/const";
 import resolveModule from "@app/resolveModule/backend";
 import { getExecutingEnvironment } from "@app/resolveModule/env";
 import { createEventEmitter, type Event } from "@core/Event/EventEmitter";
+import { isPermissionDenied } from "@core/FileProvider/DiskFileProvider/DFPIOError";
 import type MountFileProvider from "@core/FileProvider/MountFileProvider/MountFileProvider";
 import type FileProvider from "@core/FileProvider/model/FileProvider";
 import Path from "@core/FileProvider/Path/Path";
@@ -18,9 +19,9 @@ import type RepositoryProvider from "@ext/git/core/Repository/RepositoryProvider
 import t from "@ext/localization/locale/translate";
 import { Level, trace } from "@ext/loggers/opentelemetry";
 import { migrateWorkspaceConfig } from "@ext/settings/migration/workspaceMigration";
-import { feature } from "@ext/toggleFeatures/features";
 import NoActiveWorkspace from "@ext/workspace/error/NoActiveWorkspaceError";
 import WorkspaceMissingPath from "@ext/workspace/error/UnknownWorkspace";
+import WorkspaceAccessDenied from "@ext/workspace/error/WorkspaceAccessDenied";
 import UnintializedWorkspace from "@ext/workspace/UnintializedWorkspace";
 import { Workspace, type WorkspaceInitCallback } from "@ext/workspace/Workspace";
 import WorkspaceAssets from "@ext/workspace/WorkspaceAssets";
@@ -45,6 +46,7 @@ export type WorkspaceConfigWithCatalogs = {
 	catalogNames: string[];
 	config: YamlFileConfig<WorkspaceConfig>;
 };
+export type CatalogMatcher = (catalog: Catalog) => boolean | Promise<boolean>;
 
 export type WorkspaceManagerEvents = Event<"workspace-changed", { workspace: Workspace }>;
 
@@ -70,7 +72,7 @@ export default class WorkspaceManager {
 		private _workspacesConfig: YamlFileConfig<WorkspaceManagerConfig>,
 	) {
 		this._rp.events.on("before-connect-repository", ({ catalog }) => {
-			this._current.events.emit("before-connect-repository", { catalog });
+			void this._current.events.emit("before-connect-repository", { catalog });
 		});
 	}
 
@@ -92,15 +94,19 @@ export default class WorkspaceManager {
 
 	@trace({ level: Level.Important })
 	async getUnintializedWorkspace(path: WorkspacePath) {
-		return await UnintializedWorkspace.init({
-			path,
-			fs: new FileStructure(
-				this._makeFileProvider(path),
-				this._config.isReadOnly,
-				Array.from(this._workspaces.keys()),
-			),
-			rp: this._rp,
-		});
+		// Enumerating workspaces scans each one's catalogs; a single unreadable directory must not
+		// take the whole switcher down with raw rustcall text.
+		return await this._nameRefusals(path, () =>
+			UnintializedWorkspace.init({
+				path,
+				fs: new FileStructure(
+					this._makeFileProvider(path),
+					this._config.isReadOnly,
+					Array.from(this._workspaces.keys()),
+				),
+				rp: this._rp,
+			}),
+		);
 	}
 
 	@trace({ level: Level.Important })
@@ -109,33 +115,38 @@ export default class WorkspaceManager {
 		const { config: init } = this._workspaces.get(path);
 		if (!init) throw new Error(`There is no workspace with id '${path}'`);
 
-		if (feature("native-fs")) await watchWorkspace(path);
+		await watchWorkspace(path);
 
-		const fp = this._makeFileProvider(path);
-		await fp.createRootPathIfNeed();
-		const fs = new FileStructure(fp, this._config.isReadOnly, Array.from(this._workspaces.keys()));
-		this._callback(fs);
+		// The guard covers the catalog scan, not just the root probe: `exists` on a directory that
+		// is present but unreadable answers `true`, so `createRootPathIfNeed` returns without
+		// touching anything and the refusal lands inside `Workspace.init`.
+		await this._nameRefusals(path, async () => {
+			const fp = this._makeFileProvider(path);
+			await fp.createRootPathIfNeed();
+			const fs = new FileStructure(fp, this._config.isReadOnly, Array.from(this._workspaces.keys()));
+			this._callback(fs);
 
-		const workspaceConfig = {
-			fs,
-			rp: this._rp,
-			path,
-			config: init,
-			assets: this.getWorkspaceAssets(path),
-			onInit: (workspace) => this._onInit?.(workspace),
-		};
+			const workspaceConfig = {
+				fs,
+				rp: this._rp,
+				path,
+				config: init,
+				assets: this.getWorkspaceAssets(path),
+				onInit: (workspace) => this._onInit?.(workspace),
+			};
 
-		const workspaceClass = await this._getWorkspaceClass(init.inner());
-		switch (workspaceClass) {
-			case "enterprise":
-				this._current = await EnterpriseWorkspace.init(workspaceConfig);
-				break;
-			case "enterpriseCloud":
-				this._current = await GesCloudWorkspace.init(workspaceConfig);
-				break;
-			default:
-				this._current = await Workspace.init(workspaceConfig);
-		}
+			const workspaceClass = await this._getWorkspaceClass(init.inner());
+			switch (workspaceClass) {
+				case "enterprise":
+					this._current = await EnterpriseWorkspace.init(workspaceConfig);
+					break;
+				case "enterpriseCloud":
+					this._current = await GesCloudWorkspace.init(workspaceConfig);
+					break;
+				default:
+					this._current = await Workspace.init(workspaceConfig);
+			}
+		});
 
 		this._current.events.on("catalog-changed", (catalog) => {
 			this._rules?.forEach((fn) => fn(catalog));
@@ -198,20 +209,23 @@ export default class WorkspaceManager {
 		skipIfNoDirs = false,
 	): Promise<WorkspacePath> {
 		if (!path || typeof path !== "string") throw new WorkspaceMissingPath(config?.name);
-		const fp = this._makeFileProvider(path);
 
-		if (!(await fp.isRootPathExists())) {
-			if (!create) return;
-			await fp.createRootPathIfNeed();
-		}
+		return this._nameRefusals(path, async () => {
+			const fp = this._makeFileProvider(path);
 
-		if (skipIfNoDirs && (await fp.readdir(Path.empty)).length === 0) return;
+			if (!(await fp.isRootPathExists())) {
+				if (!create) return;
+				await fp.createRootPathIfNeed();
+			}
 
-		const yaml = await this._readWorkspace(fp, config);
+			if (skipIfNoDirs && (await fp.readdir(Path.empty)).length === 0) return;
 
-		this._workspaces.set(path, yaml);
+			const yaml = await this._readWorkspace(fp, config);
 
-		return path;
+			this._workspaces.set(path, yaml);
+
+			return path;
+		});
 	}
 
 	async currentOrDefault() {
@@ -284,20 +298,23 @@ export default class WorkspaceManager {
 	}
 
 	@trace({ level: Level.Important })
-	async getCatalogOrFindAtAnyWorkspace(catalogName: string): Promise<Catalog> {
+	async getCatalogOrFindAtAnyWorkspace(catalogName: string, matches: CatalogMatcher = () => true): Promise<Catalog> {
 		const current = this.maybeCurrent();
 
 		if (!current) return null;
+		const currentPath = current.path();
 		const catalog = await current.getContextlessCatalog(catalogName);
-		if (catalog) return catalog;
+		if (catalog && (await matches(catalog))) return catalog;
 
 		for (const [path, { catalogNames }] of this._workspaces.entries()) {
-			if (catalogNames.includes(catalogName)) {
+			if (path !== currentPath && catalogNames.includes(catalogName)) {
 				await this.setWorkspace(path);
-				return this.current().getContextlessCatalog(catalogName);
+				const catalog = await this.current().getContextlessCatalog(catalogName);
+				if (catalog && (await matches(catalog))) return catalog;
 			}
 		}
 
+		if (this.current().path() !== currentPath) await this.setWorkspace(currentPath);
 		return null;
 	}
 
@@ -342,6 +359,8 @@ export default class WorkspaceManager {
 			webEditorUrl: config?.webEditorUrl ?? null,
 			groups: config?.groups ?? null,
 			sections: config?.sections ?? null,
+			personalSections: config?.personalSections ?? null,
+			layout: config?.layout ?? null,
 			enterprise: {
 				gesUrl: config?.enterprise?.gesUrl ?? null,
 				lastUpdateDate: config?.enterprise?.lastUpdateDate ?? null,
@@ -390,6 +409,22 @@ export default class WorkspaceManager {
 		}
 	}
 
+	/**
+	 * A directory the OS refuses to open is not a directory that is missing, and the difference has
+	 * to survive: "missing" is an offer to create it, "refused" is an offer to grant access. Wraps a
+	 * whole operation rather than a single probe — the refusal lands wherever the workspace first
+	 * touches the disk, on the directory listing or on `workspace.yaml` inside it, and an unwrapped
+	 * one reaches the user as raw rustcall text. Everything else propagates untouched.
+	 */
+	private async _nameRefusals<T>(path: WorkspacePath, operation: () => Promise<T>): Promise<T> {
+		try {
+			return await operation();
+		} catch (e) {
+			if (!isPermissionDenied(e)) throw e;
+			throw new WorkspaceAccessDenied(path, e as Error);
+		}
+	}
+
 	private async _importWorkspaceFromRootPath() {
 		const init = {
 			name: t(DEFAULT_WORKSPACE_NAME),
@@ -398,8 +433,11 @@ export default class WorkspaceManager {
 		const path = this._config.paths.root.value;
 		const rootFp = this._makeFileProvider(path);
 
-		if (!(await rootFp.isRootPathExists()) || !(await rootFp.readdir(Path.empty).then((r) => r.length)))
-			return false;
+		const usable = await this._nameRefusals(
+			path,
+			async () => (await rootFp.isRootPathExists()) && (await rootFp.readdir(Path.empty)).length > 0,
+		);
+		if (!usable) return false;
 
 		await this.addWorkspace(path, init);
 		await this.saveWorkspaces();

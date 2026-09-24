@@ -5,6 +5,7 @@ import { useAdminNavigation } from "@ext/enterprise/components/admin/contexts/Ad
 import { useSettings } from "@ext/enterprise/components/admin/contexts/SettingsContext";
 import { useAdminHeader } from "@ext/enterprise/components/admin/hooks/useAdminHeader";
 import { useAlertMessage } from "@ext/enterprise/components/admin/hooks/useAlertMessage";
+import { filterOutBuiltInPlugins } from "@ext/enterprise/components/admin/settings/plugins/filterOutBuiltInPlugins";
 import { Button } from "@ext/enterprise/components/admin/ui-kit/Button";
 import { toGesErrorCode } from "@ext/enterprise/errors/GesError";
 import { getGesErrorBadgeText, getGesErrorTitle, getSaveErrorText } from "@ext/enterprise/errors/getGesErrorText";
@@ -12,6 +13,9 @@ import { Page } from "@ext/enterprise/types/Page";
 import type { PluginsSettings } from "@ext/enterprise/types/PluginsSettings";
 import { getAdminPageTitle } from "@ext/enterprise/utils/getAdminPageTitle";
 import t from "@ext/localization/locale/translate";
+import { showPluginCompatibilityToast } from "@plugins/components/showPluginCompatibilityToast";
+import { GRAMAX_SDK_VERSION, LEGACY_PLUGIN_MAX_SDK_VERSION } from "@plugins/constants/sdkVersion";
+import { pluginValidator } from "@plugins/core/PluginValidator";
 import { deletePlugin, togglePluginState } from "@plugins/store";
 import { Icon } from "@ui-kit/Icon";
 import { FieldLabel } from "@ui-kit/Label";
@@ -41,19 +45,21 @@ const PluginDetailComponent = () => {
 	const isDisabled = pluginConfig?.metadata.disabled;
 
 	const handleToggleState = useCallback(async () => {
-		if (!selectedPluginId || isProcessing || !pluginsSettings) return;
+		if (!selectedPluginId || isProcessing || !pluginsSettings || !pluginConfig) return;
 
 		saveError.hide();
 		setIsProcessing(true);
 		try {
 			const newDisabled = !isDisabled;
+			if (!newDisabled && !pluginValidator.validateSdkCompatibility(pluginConfig.metadata).compatible) {
+				showPluginCompatibilityToast(pluginConfig.metadata.name);
+				return;
+			}
 			const updatedPlugins = pluginsSettings.plugins.map((p) =>
 				p.metadata.id === selectedPluginId ? { ...p, metadata: { ...p.metadata, disabled: newDisabled } } : p,
 			);
 			// Filter out built-in plugins before saving to prevent duplicates
-			const updatedSettings: PluginsSettings = {
-				plugins: updatedPlugins.filter((p) => !p.metadata.isBuiltIn),
-			};
+			const updatedSettings: PluginsSettings = { plugins: filterOutBuiltInPlugins(updatedPlugins) };
 			await update("plugins", updatedSettings);
 			await togglePluginState(selectedPluginId, newDisabled);
 		} catch (e) {
@@ -62,7 +68,17 @@ const PluginDetailComponent = () => {
 		} finally {
 			setIsProcessing(false);
 		}
-	}, [selectedPluginId, isDisabled, isProcessing, pluginsSettings, update, saveError.hide, saveError.alert, gesUrl]);
+	}, [
+		selectedPluginId,
+		isDisabled,
+		isProcessing,
+		pluginsSettings,
+		pluginConfig,
+		update,
+		saveError.hide,
+		saveError.alert,
+		gesUrl,
+	]);
 
 	const handleDelete = useCallback(async () => {
 		if (!selectedPluginId || isProcessing || !pluginsSettings) return;
@@ -71,7 +87,9 @@ const PluginDetailComponent = () => {
 		setIsProcessing(true);
 		try {
 			const updatedSettings: PluginsSettings = {
-				plugins: pluginsSettings.plugins.filter((p) => p.metadata.id !== selectedPluginId),
+				plugins: filterOutBuiltInPlugins(
+					pluginsSettings.plugins.filter((plugin) => plugin.metadata.id !== selectedPluginId),
+				),
 			};
 			await update("plugins", updatedSettings);
 			deletePlugin(selectedPluginId);
@@ -92,8 +110,7 @@ const PluginDetailComponent = () => {
 			primaryButtonProps: {
 				text: t("plugins.delete-modal.confirm"),
 				onClick: () => {
-					// biome-ignore lint/nursery/noFloatingPromises: TODO: fix
-					handleDelete();
+					void handleDelete();
 					ModalToOpenService.removeModal(modalId);
 				},
 			},
@@ -174,6 +191,18 @@ const PluginDetailComponent = () => {
 					<StyledField
 						control={() => <FieldLabel>{pluginConfig?.metadata?.description || "—"}</FieldLabel>}
 						title={t("plugins.detail.fields.description")}
+					/>
+					<StyledField
+						control={() => <FieldLabel>{GRAMAX_SDK_VERSION}</FieldLabel>}
+						title={t("plugins.detail.fields.sdk-version")}
+					/>
+					<StyledField
+						control={() => (
+							<FieldLabel>
+								{pluginConfig.metadata.engines?.gramaxSdk ?? `<=${LEGACY_PLUGIN_MAX_SDK_VERSION}`}
+							</FieldLabel>
+						)}
+						title={t("plugins.detail.fields.sdk-range")}
 					/>
 				</FieldsContainer>
 			</DetailsSection>

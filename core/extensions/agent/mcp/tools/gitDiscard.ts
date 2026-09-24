@@ -35,7 +35,7 @@ export async function runGitDiscard({ app, input }: ToolExecutionContext): Promi
 					discarded: [],
 					mode: hasFilePaths ? "paths" : "all",
 				},
-				true,
+				{ refreshPage: true },
 			);
 		}
 
@@ -47,7 +47,7 @@ export async function runGitDiscard({ app, input }: ToolExecutionContext): Promi
 				discarded: targetPaths.map((path) => path.value),
 				mode: hasFilePaths ? "paths" : "all",
 			},
-			true,
+			{ refreshPage: true },
 		);
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);

@@ -15,7 +15,7 @@ interface SmallEditorToolbarProps extends ToolbarMenuProps {
 const SmallEditorToolbarInner = ({ editor, ...menuProps }: SmallEditorToolbarProps) => {
 	return (
 		<div className="w-full" data-toolbar="bottom">
-			<div className="lg:shadow-hard-base rounded-lg">
+			<div className="rounded-lg">
 				<ButtonStateService.Provider editor={editor}>
 					<ToolbarMenu editor={editor} isSmallEditor {...menuProps} />
 				</ButtonStateService.Provider>

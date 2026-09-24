@@ -1,10 +1,13 @@
 import ContextProviders from "@components/ContextProviders";
 import type { PageProps } from "@components/Pages/models/Pages";
 import getPageTitle from "@core-ui/getPageTitle";
+import useSessionExpirationToast from "@ext/enterprise/components/SingInOut/hooks/useSessionExpirationToast";
 import ErrorBoundary from "@ext/errorHandlers/client/components/ErrorBoundary";
 import type DefaultError from "@ext/errorHandlers/logic/DefaultError";
+import Localizer from "@ext/localization/core/Localizer";
 import { useApplyTheme } from "@ext/Theme/utils";
 import { usePluginEvent } from "@plugins/api/events";
+import { Toaster } from "@ui-kit/Toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Router } from "wouter";
 import { DocportalPage } from "../../../../core/components/Pages/components/DocportalPage";
@@ -16,12 +19,15 @@ interface AppProps {
 	initialData: PageProps;
 }
 
-const fetchPageData = async (path: string): Promise<PageProps> => {
+export const fetchPageData = async (path: string): Promise<PageProps> => {
 	const URLParams = new URLSearchParams();
 	URLParams.set("path", path);
 	URLParams.set("mode", "read");
 
-	const res = await fetch(`${getBasePath()}/api/page/getPageData?${URLParams.toString()}`);
+	const language = Localizer.extract(path);
+	const res = await fetch(`${getBasePath()}/api/page/getPageData?${URLParams.toString()}`, {
+		headers: language ? { "x-gramax-language": language } : undefined,
+	});
 	if (!res.ok) throw new Error(`Failed to fetch page data: ${res.status}`);
 	return res.json();
 };
@@ -71,6 +77,8 @@ export const App = ({ initialData }: AppProps) => {
 		else void refresh();
 	}, [refresh]);
 
+	useSessionExpirationToast(pageData.context?.user?.sessionExpired);
+
 	useApplyTheme();
 	usePluginEvent("app:open", { ...pageData, path });
 	usePluginEvent("app:close");
@@ -80,12 +88,15 @@ export const App = ({ initialData }: AppProps) => {
 	}
 
 	return (
-		<ContextProviders pageProps={pageData} platform="next" refreshPage={refresh}>
-			<ErrorBoundary context={pageData.context}>
-				<Router base={basePath} hook={() => [path, setLocation]}>
-					<DocportalPage data={pageData} />
-				</Router>
-			</ErrorBoundary>
-		</ContextProviders>
+		<>
+			<Toaster />
+			<ContextProviders pageProps={pageData} platform="next" refreshPage={refresh}>
+				<ErrorBoundary context={pageData.context}>
+					<Router base={basePath} hook={() => [path, setLocation]}>
+						<DocportalPage data={pageData} />
+					</Router>
+				</ErrorBoundary>
+			</ContextProviders>
+		</>
 	);
 };

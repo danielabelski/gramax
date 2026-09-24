@@ -1,4 +1,3 @@
-import resolveTabHeight from "@components/Layouts/StatusBar/Extensions/logic/resolveTabHeight";
 import { useDebounce } from "@core-ui/hooks/useDebounce";
 import { RevisionListItem } from "@ext/git/actions/Revisions/components/RevisionsList/RevisionListItem";
 import { useRevisionCatalogStore } from "@ext/git/actions/Revisions/logic/store/RevisionCatalogStore";
@@ -7,42 +6,36 @@ import type GitVersionData from "@ext/git/core/model/GitVersionData";
 import t from "@ext/localization/locale/translate";
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
 import { EmptyState } from "@ui-kit/EmptyState";
+import {
+	PanelEmptyState,
+	PanelEmptyStateDescription,
+	PanelEmptyStateIcon,
+	PanelEmptyStateTitle,
+} from "@ui-kit/FloatingPanel";
 import { LoadMoreTrigger } from "@ui-kit/LoadMoreTrigger";
 import { ScrollShadowContainer } from "@ui-kit/ScrollShadowContainer";
 import { Stepper } from "@ui-kit/Stepper";
-import { type RefObject, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 interface RevisionCommitsListProps {
 	revisions: GitVersionData[];
 	currentRevision: string;
 	shouldLoadMoreAtScrollEnd: boolean;
-	show: boolean;
-	tabWrapperRef: RefObject<HTMLDivElement>;
 	diffTree: DiffTree;
 	isDiffTreeLoading: boolean;
-	setContentHeight: (height: number) => void;
 	requestMore?: (lastRevision: string) => void | Promise<void>;
 	onClick?: (revision: string) => void;
 }
 
 const RevisionCommitsList = (props: RevisionCommitsListProps) => {
-	const {
-		revisions,
-		currentRevision,
-		shouldLoadMoreAtScrollEnd,
-		requestMore,
-		show,
-		tabWrapperRef,
-		setContentHeight,
-		diffTree,
-		isDiffTreeLoading,
-		onClick,
-	} = props;
+	const { revisions, currentRevision, shouldLoadMoreAtScrollEnd, requestMore, diffTree, isDiffTreeLoading, onClick } =
+		props;
 
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const openPopoverIndexRef = useRef<number | null>(null);
 
-	const { fromOid, toOid, scrollY, setScrollY } = useRevisionCatalogStore((state) => ({
+	const { fromOid, toOid, scrollY, setScrollY, filter } = useRevisionCatalogStore((state) => ({
+		filter: state.filter,
 		fromOid: state.revisionsCompare?.from?.oid,
 		toOid: state.revisionsCompare?.to?.oid,
 		scrollY: state.scrollY,
@@ -70,26 +63,33 @@ const RevisionCommitsList = (props: RevisionCommitsListProps) => {
 		rangeExtractor,
 	});
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
-	useEffect(() => {
-		if (!tabWrapperRef.current || !show) return;
-		const newHeight = resolveTabHeight(tabWrapperRef.current);
-		const oldHeight = tabWrapperRef.current.getBoundingClientRect().height;
-		setContentHeight(Math.max(newHeight, oldHeight));
-	}, [tabWrapperRef.current, show, revisions]);
-
 	// biome-ignore lint/correctness/useExhaustiveDependencies: restore scroll position on mount
 	useEffect(() => {
-		if (!show || !scrollY) return;
+		if (!scrollY) return;
 		virtualizer.scrollToOffset(scrollY);
-	}, [show]);
+	}, []);
 
 	const { start: onScrollDebounced } = useDebounce(() => setScrollY(virtualizer.scrollElement.scrollTop), 150);
 
 	const virtualItems = virtualizer.getVirtualItems();
 	const sortedItems = [...virtualItems].sort((a, b) => a.index - b.index);
 
-	if (Array.isArray(revisions) && !revisions?.length) return <EmptyState>{t("git.history.error.empty")}</EmptyState>;
+	if (revisions?.length === 0) {
+		const hasActiveFilters = Boolean(
+			filter?.authors?.length || filter?.afterDate || filter?.beforeDate || filter?.articles?.length,
+		);
+		if (hasActiveFilters) return <EmptyState>{t("git.history.error.empty")}</EmptyState>;
+
+		return (
+			<PanelEmptyState>
+				<PanelEmptyStateIcon icon="history" />
+				<PanelEmptyStateTitle>{t("git.history.empty-state.title")}</PanelEmptyStateTitle>
+				<PanelEmptyStateDescription className="max-w-64 whitespace-pre-line">
+					{t("git.history.empty-state.description")}
+				</PanelEmptyStateDescription>
+			</PanelEmptyState>
+		);
+	}
 
 	return (
 		<ScrollShadowContainer data-commits-list onScroll={onScrollDebounced} ref={scrollRef} role="listbox">

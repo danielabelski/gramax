@@ -18,7 +18,7 @@ import type NextCookie from "apps/next/logic/NextCookie";
 import type TauriCookie from "apps/tauri/src/cookie/TauriCookie";
 import type useUrlObjectImage from "apps/web/src/hooks/useUrlObjectImage";
 import type WebCookie from "apps/web/src/logic/WebCookie";
-import type { httpFetch, updateCheck } from "../../apps/tauri/src/window/commands";
+import type { httpFetch, mailFetch, updateCheck } from "../../apps/tauri/src/window/commands";
 import type Link from "../../core/components/Atoms/Link";
 
 export type { UpdateCheckResult } from "../../apps/tauri/src/window/commands";
@@ -34,6 +34,7 @@ export interface DynamicModules {
 	openInWeb: (url: string) => void | Promise<void> | Window;
 	enterpriseLogin: (url: string, apiUrlCreator: ApiUrlCreator, router: Router) => Promise<void>;
 	gesCloudLogin: (url: string, apiUrlCreator: ApiUrlCreator, router: Router, gesCloudUrl: string) => Promise<void>;
+	gesCloudPaymentMethodBinding: (url: string) => Promise<void>;
 	openDirectory: () => string | Promise<string>;
 	openWindowWithUrl: (url: string) => void | Promise<void>;
 	openChildWindow: ({
@@ -48,12 +49,11 @@ export interface DynamicModules {
 		features?: string;
 	}) => Promise<Window> | Window;
 	httpFetch: typeof httpFetch;
+	mailFetch: typeof mailFetch;
 	setBadge: (count: number | null) => void | Promise<void>;
 	getPdfjs: () => Promise<typeof import("pdfjs-dist")>;
 	updateCheck: typeof updateCheck;
 	updateInstallFromCache: () => Promise<void>;
-	/** Marks a found update as accepted: it installs as soon as it is downloaded. */
-	updateAccept: () => void;
 }
 
 export interface BackendDynamicModules {

@@ -32,6 +32,7 @@ export type GlobalSyncCountContext = {
 
 const FOCUS_REFRESH_DELAY = 5000;
 const FETCH_BACKGROUND_INTERVAL = 1000 * 60 * 10; // 10 min
+const INITIAL_NETWORK_REFRESH_DELAY = 5000; // let the app paint before the first networked fetch
 
 const GlobalSyncCountContext = createContext<GlobalSyncCountContext | null>(null);
 
@@ -70,11 +71,11 @@ export default class GlobalSyncCountService {
 			return Object.values(syncCounts).filter((v) => v.pull > 0 || v.hasChanges).length;
 		}, [syncCounts]);
 
-		const fetchSyncCounts = useCallback(
-			async (fetch = false) => {
+		// actualFetch = false → local git-index counts only (instant, no network);
+		// actualFetch = true → networked fetch of every catalog before counting (slow).
+		const loadSyncCounts = useCallback(
+			async (actualFetch: boolean) => {
 				if (!hasWorkspace || !fetchAllowed) return;
-
-				const actualFetch = fetch || CatalogFetchTimersService.canFetch(key);
 
 				try {
 					setIsLoading(true);
@@ -95,10 +96,23 @@ export default class GlobalSyncCountService {
 			[hasWorkspace, fetchAllowed, key, apiUrlCreator],
 		);
 
+		const fetchSyncCounts = useCallback(
+			async (fetch = false) => {
+				if (!hasWorkspace || !fetchAllowed) return;
+				await loadSyncCounts(fetch || CatalogFetchTimersService.canFetch(key));
+			},
+			[hasWorkspace, fetchAllowed, key, loadSyncCounts],
+		);
+
 		useEffect(() => {
 			if (!fetchAllowed || !hasWorkspace || !sourceDatas || sourceDatas.length === 0) return;
-			fetchSyncCounts(false);
-		}, [fetchAllowed, hasWorkspace, fetchSyncCounts, sourceDatas?.length]);
+
+			// Cold start: paint local counts immediately, then refresh over the network after the
+			// first paint — so a slow multi-catalog git fetch never sits in front of app-load calls.
+			void loadSyncCounts(false);
+			const timer = setTimeout(() => void loadSyncCounts(true), INITIAL_NETWORK_REFRESH_DELAY);
+			return () => clearTimeout(timer);
+		}, [fetchAllowed, hasWorkspace, loadSyncCounts, sourceDatas?.length]);
 
 		const fetchSyncCountsBackground = useCallback(
 			(delay: number): Promise<NodeJS.Timeout> => {
@@ -107,7 +121,7 @@ export default class GlobalSyncCountService {
 				clearTimeout(fetchTimeoutRef.current);
 				fetchTimeoutRef.current = setTimeout(async () => {
 					await fetchSyncCounts(true);
-					fetchSyncCountsBackground(delay);
+					void fetchSyncCountsBackground(delay);
 				}, delay);
 			},
 			[fetchSyncCounts, fetchAllowed],

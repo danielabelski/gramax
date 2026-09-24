@@ -18,15 +18,16 @@ export const getDocportalModules = (): DynamicModules => {
 		FileInput: () => null,
 		DiffFileInput: () => null,
 		httpFetch: () => undefined,
+		mailFetch: () => undefined,
 		setBadge: () => undefined,
 		openInExplorer: () => undefined,
 		openWindowWithUrl: () => undefined,
 		openInWeb: () => undefined,
 		gesCloudLogin: () => undefined,
+		gesCloudPaymentMethodBinding: () => Promise.resolve(),
 		getPdfjs,
 		updateCheck: () => undefined,
 		updateInstallFromCache: () => undefined,
-		updateAccept: () => undefined,
 	};
 };
 

@@ -9,20 +9,21 @@ import { SignInGesCloudForm } from "@ext/enterprise-cloud/components/GesCloudSig
 import { GesCloudTopMenu } from "@ext/enterprise-cloud/components/HomePage/GesCloudTopMenu";
 
 export const GesCloudEditorHomePage = ({ data }: { data: HomePageData }) => {
-	const isLogged = PageDataContextService.value.isLogged;
-	const { enabled } = PageDataContextService.value.conf.enterpriseCloud;
+	const { conf, isLogged } = PageDataContextService.value;
+	const { enabled } = conf.enterpriseCloud;
 	const router = useRouter();
 	const inviteId = router.query.inviteId;
+	const showCatalogs = isLogged || !enabled;
 
 	return (
 		<HomePageWrapper>
-			<GesCloudTopMenu section={data.section} />
-			{!isLogged && enabled ? (
+			<GesCloudTopMenu section={data.views.global.section} />
+			{showCatalogs ? (
+				<HomePageCatalogListContent data={data} />
+			) : (
 				<div className="flex justify-center items-center h-screen">
 					<SignInGesCloudForm allowContinueWithoutAccount={!inviteId} />
 				</div>
-			) : (
-				<HomePageCatalogListContent data={data} />
 			)}
 			<BottomInfo />
 			<GlobalAudioToolbar />

@@ -1,34 +1,35 @@
-import {
-	CATEGORY_ROOT_FILENAME,
-	CATEGORY_ROOT_FILENAMES,
-	CATEGORY_ROOT_REGEXP,
-	DOC_ROOT_FILENAME,
-	DOC_ROOT_FILENAMES,
-	DOC_ROOT_REGEXP,
-	WORKSPACE_CONFIG_FILENAME,
-} from "@app/config/const";
+import { CATEGORY_ROOT_FILENAME, DOC_ROOT_FILENAME, DOC_ROOT_FILENAMES } from "@app/config/const";
 import { getExecutingEnvironment } from "@app/resolveModule/env";
-import rustCall from "@app/resolveModule/rustcall";
 import { createEventEmitter, type Event, type EventArgs } from "@core/Event/EventEmitter";
 import type MountFileProvider from "@core/FileProvider/MountFileProvider/MountFileProvider";
 import type FileInfo from "@core/FileProvider/model/FileInfo";
 import type FileProvider from "@core/FileProvider/model/FileProvider";
 import Path from "@core/FileProvider/Path/Path";
 import { Article, type ArticleProps } from "@core/FileStructue/Article/Article";
+import type FileStructureBackend from "@core/FileStructue/backend/FileStructureBackend";
+import type {
+	ArticleNodeDto,
+	CatalogTreeDto,
+	CategoryNodeDto,
+	NodeDto,
+	WorkspaceEntryDto,
+} from "@core/FileStructue/backend/FileStructureBackend";
+import findDocroot from "@core/FileStructue/backend/findDocroot";
+import resolveFileStructureBackend from "@core/FileStructue/backend/resolveFileStructureBackend";
+import { FS_EXCLUDE_CATALOG_NAMES } from "@core/FileStructue/backend/scanExcludes";
 import type BaseCatalog from "@core/FileStructue/Catalog/BaseCatalog";
 import { Catalog } from "@core/FileStructue/Catalog/Catalog";
 import CatalogEntry from "@core/FileStructue/Catalog/CatalogEntry";
 import type CatalogEvents from "@core/FileStructue/Catalog/CatalogEvents";
-import { type CatalogProps, ExcludedProps } from "@core/FileStructue/Catalog/CatalogProps";
+import { type CatalogProps, ExcludedProps, normalizeCatalogProps } from "@core/FileStructue/Catalog/CatalogProps";
 import { Category, type CategoryProps } from "@core/FileStructue/Category/Category";
 import type { Item } from "@core/FileStructue/Item/Item";
 import { roundedOrderAfter } from "@core/FileStructue/Item/ItemOrderUtils";
+import type PathnameData from "@core/RouterPath/model/PathnameData";
 import { uniqueName } from "@core/utils/uniqueName";
 import type CatalogEditProps from "@ext/catalog/actions/propsEditor/model/CatalogEditProps";
 import { resolveLanguage } from "@ext/localization/core/model/Language";
 import { addEvent, Level, trace } from "@ext/loggers/opentelemetry";
-import { feature } from "@ext/toggleFeatures/features";
-import type GitTreeFileProvider from "@ext/versioning/GitTreeFileProvider";
 import assert from "assert";
 import matter from "gray-matter";
 import * as yaml from "js-yaml";
@@ -42,6 +43,7 @@ export type FSEvents = Event<
 	{ path: Path; checkIsExists: boolean; initProps: CatalogProps }
 > &
 	Event<"catalog-entry-read", { entry: CatalogEntry }> &
+	Event<"catalog-pathname-resolve", { pathnameData: PathnameData; mutable: { pathname: string } }> &
 	Event<"catalog-read", { fs: FileStructure; catalog: Catalog }> &
 	Event<"catalog-collision-healed", { fs: FileStructure; catalog: Catalog; movements: CollisionMovement[] }> &
 	Event<"item-filter", { fs: FileStructure; item: Item; parent: Category; catalogProps: CatalogProps }> &
@@ -65,77 +67,50 @@ export type MarkdownProps = {
 	content: string;
 };
 
-export type WorkspaceEntryDto = {
-	relPath: string;
-	docrootRel: string | null;
-	catalogProps: Partial<CatalogProps>;
-	isGitRepo: boolean;
-	isBareRepo: boolean;
-	hasGitmodules: boolean;
+/**
+ * Git flags a backend saw while scanning. A backend that cannot see the repository reports none, and
+ * the absence is the signal for `FSCatalogEntryAttachGit` to probe the directory itself — so the keys
+ * must stay out of the props entirely rather than be set to `undefined`.
+ */
+type GitCatalogProps = Pick<CatalogProps, "isGitRepo" | "isBareRepo" | "hasGitmodules">;
+
+const gitPropsOf = (dto: WorkspaceEntryDto): GitCatalogProps => {
+	if (dto.isGitRepo === undefined) return {};
+	return { isGitRepo: dto.isGitRepo, isBareRepo: dto.isBareRepo, hasGitmodules: dto.hasGitmodules };
 };
-
-export type ArticleNodeDto = {
-	kind: "article";
-	relPath: string;
-	frontMatter: Partial<ArticleProps>;
-	parseError: string | null;
-};
-
-export type CategoryNodeDto = {
-	kind: "category";
-	relPath: string;
-	directory: string;
-	hasIndex: boolean;
-	frontMatter: Partial<CategoryProps>;
-	children: NodeDto[];
-};
-
-export type NodeDto = ArticleNodeDto | CategoryNodeDto;
-
-export type CatalogTreeDto = {
-	docrootRel: string | null;
-	catalogProps: Partial<CatalogProps>;
-	children: NodeDto[];
-};
-
-const functionalFolders = [".git", ".idea", ".vscode", "node_modules", ".DS_Store"];
-export const FS_EXCLUDE_FILENAMES = [
-	...functionalFolders,
-	".snippets", // legacy
-	".icons",
-	".gramax",
-	".claude",
-	".codex",
-];
-export const FS_EXCLUDE_CATALOG_NAMES = [
-	...functionalFolders,
-	"IndexCaches", // Legacy
-	".storage",
-	".workspace",
-];
 
 export default class FileStructure {
 	private _events = createEventEmitter<FSEvents>();
 	private _collisionMovements = new WeakMap<Catalog, CollisionMovement[]>();
+	private _backend: FileStructureBackend;
 
 	constructor(
 		private _fp: MountFileProvider,
 		private _isReadOnly: boolean,
-		private _knownWorkspacePaths: string[] = [],
-	) {}
-
-	static isCatalog(path: Path): boolean {
-		return DOC_ROOT_REGEXP.test(path.toString());
+		knownWorkspacePaths: string[] = [],
+		backend?: FileStructureBackend,
+	) {
+		this._backend = backend ?? resolveFileStructureBackend(_fp, knownWorkspacePaths);
 	}
 
-	static isCategory(path: string): boolean {
-		return !!path.match(CATEGORY_ROOT_REGEXP)?.[1];
+	get backend(): FileStructureBackend {
+		return this._backend;
+	}
+
+	/**
+	 * Exact names, matching what `findDocroot` and the Rust scan accept. The loose regexp this used
+	 * also matched e.g. `my-root.yaml`, so editing such a file made `Workspace` reload a catalog whose
+	 * doc-root the scan could not then resolve.
+	 */
+	static isCatalog(path: Path): boolean {
+		return (DOC_ROOT_FILENAMES as readonly string[]).includes(path.nameWithExtension);
 	}
 
 	static getCatalogPath(catalog: BaseCatalog): Path {
 		return new Path(catalog.name);
 	}
 
+	/** Top-level directories of a workspace that may hold a catalog. */
 	static async getCatalogDirs(fp: FileProvider): Promise<FileInfo[]> {
 		const items = await fp.getItems(Path.empty);
 		const predicate = (i: FileInfo) =>
@@ -153,134 +128,52 @@ export default class FileStructure {
 
 	@trace({ level: Level.Internal, omitResult: true })
 	async getCatalogEntries(): Promise<CatalogEntry[]> {
-		const native = feature("native-fs") ? await this._tryNativeScanWorkspace() : null;
-		if (native) {
-			addEvent("used-method", Level.Internal, { method: "native" });
-			return await this._buildEntriesFromNative(native);
-		}
-
-		addEvent("used-method", Level.Internal, { method: "js" });
-		return await this._getCatalogEntriesJs();
-	}
-
-	/**
-	 * @deprecated Consider using FileStructue._tryNativeScanWorkspace
-	 */
-	@trace({ level: Level.Internal, omitArgs: true, omitResult: true })
-	private async _getCatalogEntriesJs(): Promise<CatalogEntry[]> {
-		const dirs = await FileStructure.getCatalogDirs(this._fp.default());
-		const basePath = this._fp.rootPath;
-
-		const filtered = (
-			await dirs.mapAsync(async (dir) => {
-				const workspaceFilePath = dir.path.join(new Path(WORKSPACE_CONFIG_FILENAME));
-				const hasWorkspaceYaml = await this._fp.exists(workspaceFilePath);
-				const dirAbsPath = basePath.join(new Path(dir.name));
-				const isKnownWorkspace = this._knownWorkspacePaths.some((wp) => new Path(wp).startsWith(dirAbsPath));
-
-				if (hasWorkspaceYaml || isKnownWorkspace) {
-					addEvent("nested-workspace-skipped", Level.Internal, {
-						dir: dir.name,
-						reason: hasWorkspaceYaml ? "workspace.yaml" : "known-workspace-path",
-					});
-					return null;
-				}
-
-				return dir;
-			})
-		).filter(Boolean);
-
-		const catalogs = await filtered.mapAsync((dir) => this.getCatalogEntryByPath(dir.path));
-		return catalogs.filter((c) => c);
-	}
-
-	@trace({ level: Level.Internal, omitArgs: true, omitResult: true })
-	private async _tryNativeScanWorkspace(): Promise<WorkspaceEntryDto[] | null> {
-		const env = getExecutingEnvironment();
-		if (env === "static" || env === "cli") return null;
-
-		const entries = await rustCall<WorkspaceEntryDto[]>("fs.scan_workspace", {
-			scope: { kind: this._fp.kind, root: this._fp.rootPath.value },
-			path: "",
-			opts: {
-				excludeDirs: FS_EXCLUDE_CATALOG_NAMES,
-				categoryIndexFilename: CATEGORY_ROOT_FILENAMES,
-				docrootFilenames: DOC_ROOT_FILENAMES,
-				workspaceConfigFilename: WORKSPACE_CONFIG_FILENAME,
-				docrootSearchDepth: 5,
-				optionalCategoryIndex: true,
-				maxConcurrency: 1,
-				followSymlinks: false,
-				knownWorkspacePaths: this._knownWorkspacePaths,
-			},
-		});
-
-		return entries;
-	}
-
-	@trace({ level: Level.Internal, omitArgs: true, omitResult: true })
-	private async _buildEntriesFromNative(entries: WorkspaceEntryDto[]): Promise<CatalogEntry[]> {
-		const out = await entries.mapAsync(async (e) => {
-			const dirPath = new Path(e.relPath);
-			const initProps: CatalogProps = {
-				isGitRepo: e.isGitRepo,
-				isBareRepo: e.isBareRepo,
-				hasGitmodules: e.hasGitmodules,
-			};
-
-			// Bare repos: native scan walks disk and only sees `.git/` (excluded),
-			// so the docroot is invisible. Defer to the JS path; its emit mounts gitfp
-			// and the subsequent read goes through that mount.
-			if (e.isBareRepo && !e.docrootRel) return await this.getCatalogEntryByPath(dirPath, true, initProps);
-
-			await this._events.emit("before-catalog-entry-read", { path: dirPath, checkIsExists: true, initProps });
-
-			const docrootPath = dirPath.join(new Path(e.docrootRel ?? DOC_ROOT_FILENAME));
-			const props: CatalogProps = e.docrootRel ? e.catalogProps : this._defaultProps(dirPath);
-			const entry = this._makeCatalogEntry(dirPath, docrootPath, { ...initProps, ...props });
-
-			await this._events.emit("catalog-entry-read", { entry });
-			return entry;
-		});
-
+		const entries = await this._backend.scanWorkspace();
+		const out = await entries.mapAsync((entry) => this._makeEntryFromWorkspace(entry));
 		return out.filter(Boolean);
+	}
+
+	private async _makeEntryFromWorkspace(dto: WorkspaceEntryDto): Promise<CatalogEntry> {
+		const dirPath = new Path(dto.relPath);
+		const initProps = gitPropsOf(dto);
+
+		// A bare repo has no working copy on disk — the scan only sees `.git/`, which it excludes, so
+		// the doc-root is invisible to it. Reread through the mount: emitting the entry event there
+		// mounts the git provider first, and the doc-root search then runs against the git tree.
+		if (dto.isBareRepo && !dto.docrootRel) return await this.getCatalogEntryByPath(dirPath, true, initProps);
+
+		await this._events.emit("before-catalog-entry-read", { path: dirPath, checkIsExists: true, initProps });
+
+		const docrootPath = dirPath.join(new Path(dto.docrootRel ?? DOC_ROOT_FILENAME));
+		const props: CatalogProps = dto.docrootRel ? dto.catalogProps : this._defaultProps(dirPath);
+		const entry = this._makeCatalogEntry(dirPath, docrootPath, { ...initProps, ...props });
+
+		await this._events.emit("catalog-entry-read", { entry });
+		return entry;
 	}
 
 	@trace({ level: Level.Internal })
 	async getCatalogByPath(path: Path, checkIsExists = true): Promise<Catalog> {
-		const env = getExecutingEnvironment();
-		const useNative = feature("native-fs") && env !== "static" && env !== "cli";
-		if (useNative) {
-			const initProps: CatalogProps = {};
-			// Mount the gitfp first (bare repos) so the scan below resolves `at(path)` to the git
-			// provider and reads the docroot straight from the tree — a bare repo has no working
-			// copy on disk, only `.git/`, so a pre-mount disk scan would find nothing.
-			await this._events.emit("before-catalog-entry-read", { path, checkIsExists, initProps });
+		const initProps: CatalogProps = {};
+		// Mount the git provider first (bare repos) so the scan below resolves `at(path)` to it and
+		// reads the doc-root straight from the tree — a bare repo has no working copy on disk, only
+		// `.git/`, so a pre-mount disk scan would find nothing.
+		await this._events.emit("before-catalog-entry-read", { path, checkIsExists, initProps });
 
-			const tree = await this._tryNativeScanCatalogByPath(path);
-			if (tree) {
-				addEvent("used-method", Level.Internal, { method: "native", scope: "catalog-by-path" });
-				const entry = this._makeEntryFromTree(path, tree, initProps);
-				await this._events.emit("catalog-entry-read", { entry });
-				return await this._hydrateCatalogFromTree(entry, tree);
-			}
+		if (checkIsExists) await this._assertReadable(path);
 
-			// Native scan unavailable (e.g. it threw) — fall back to the JS tree walk over the
-			// now-mounted fp.
-			addEvent("used-method", Level.Internal, { method: "js", scope: "catalog-by-path" });
-			const entry = await this.getCatalogEntryByPath(path, checkIsExists, initProps);
-			return await entry.load();
-		}
+		const tree = await this._backend.scanCatalog(path);
+		const entry = this._makeEntryFromTree(path, tree, initProps);
 
-		const entry = await this.getCatalogEntryByPath(path, checkIsExists, {});
-		return await entry.load();
+		await this._events.emit("catalog-entry-read", { entry });
+		return await this._hydrateCatalogFromTree(entry, tree);
 	}
 
 	@trace({ level: Level.Internal })
 	async getCatalogEntryByPath(path: Path, checkIsExists = true, initProps: CatalogProps = {}): Promise<CatalogEntry> {
 		await this._events.emit("before-catalog-entry-read", { path, checkIsExists, initProps });
 
-		const docroot = await this._search(path, DOC_ROOT_REGEXP);
+		const docroot = await findDocroot(this._fp, path);
 
 		if (checkIsExists && !(docroot || (await this.fp.exists(path)))) return;
 
@@ -297,7 +190,7 @@ export default class FileStructure {
 			name: basePath.nameWithExtension,
 			rootCaterogyRef: this._fp.getItemRef(docrootPath),
 			basePath,
-			props,
+			props: normalizeCatalogProps(props),
 			load: (entry) => this._getCatalogByEntry(entry),
 			isReadOnly: this._isReadOnly,
 			fs: this,
@@ -310,7 +203,14 @@ export default class FileStructure {
 		const path = base ? url.join(base) : url;
 		delete props.url;
 
+		// A catalog born after this feature starts with automatic LFS on; a cloned or pre-existing
+		// one has no `lfs` key and stays off until its owner turns it on.
+		if (!props.lfs) props.lfs = { auto: true, exclude: [] };
+
 		await this._fp.mkdir(path);
+		// The only doc-root write that skips `ExcludedProps`, and it is safe because `props` comes
+		// from the create form rather than from a scan. Route scan props through here and the git
+		// flags leak back into the file.
 		await this._fp.write(path.join(new Path(DOC_ROOT_FILENAME)), this._serializeProps(props));
 
 		const entry = await this.getCatalogEntryByPath(url);
@@ -384,6 +284,35 @@ export default class FileStructure {
 		const logicPath = Path.join(parent.logicPath, articleCodeInCategory);
 
 		return await this._createArticleByProps(props ?? {}, parent, path, logicPath, content, lastModified, catalog);
+	}
+
+	/** Builds an article that already has its content in hand — a fresh one, or one just moved. */
+	private async _createArticleByProps(
+		props: ArticleProps,
+		parent: Category,
+		path: Path,
+		logicPath: string,
+		content: string,
+		lastModified?: number,
+		catalog?: Catalog,
+	): Promise<Article> {
+		const mutable = { content, props };
+		await this.events.emit("item-read", { catalog, mutable });
+
+		const article = new Article({
+			ref: this._fp.getItemRef(path),
+			parent,
+			fs: this,
+			lastModified: lastModified || 0,
+			content: mutable.content,
+			logicPath,
+			props: mutable.props,
+		});
+
+		const mutableItem = { item: article };
+		this.events.emitSync("before-item-create", { catalog, mutableItem });
+
+		return mutableItem.item;
 	}
 
 	async makeCategory(path: Path, parent: Category, catalog: Catalog, indexPath?: Path): Promise<Category> {
@@ -491,60 +420,34 @@ export default class FileStructure {
 	private async _getCatalogByEntry(entry: CatalogEntry): Promise<Catalog> {
 		assert(entry, "cannot resolve catalog from entry; entry is undefined");
 
-		const env = getExecutingEnvironment();
-		const useNative = feature("native-fs") && env !== "static" && env !== "cli";
 		const docrootRel = entry.props.docrootIsNoneExistent
 			? null
 			: (entry.basePath.subDirectory(entry.getRootCategoryRef().path)?.value ?? null);
-		const tree = useNative
-			? await this._tryNativeScanCatalogByPath(entry.basePath, {
-					docrootRel,
-					optionalCategoryIndex: !!entry.props.optionalCategoryIndex,
-				})
-			: null;
-		if (tree) {
-			addEvent("used-method", Level.Internal, { method: "native", scope: "catalog" });
-			return this._hydrateCatalogFromTree(entry, tree);
-		}
 
-		addEvent("used-method", Level.Internal, { method: "js", scope: "catalog" });
+		// Same guard as `getCatalogByPath`: an entry outlives the directory it was read from, and a
+		// catalog opened after its directory was removed would otherwise hydrate as empty.
+		await this._assertReadable(entry.basePath);
 
-		const category = new Category({
-			ref: this._fp.getItemRef(entry.getRootCategoryRef().path),
-			parent: null,
-			content: null,
-			props: entry.props,
-			items: [],
-			logicPath: entry.name,
-			directory: entry.getRootCategoryDirectoryPath(),
-			fs: this,
-			lastModified: 0,
-		});
+		const tree = await this._backend.scanCatalog(entry.basePath, { docrootRel });
 
-		const catalog = new Catalog({
-			name: entry.name,
-			root: category,
-			rootCaterogyRef: category.ref,
-			basePath: entry.basePath,
-			fs: this,
-			fp: this._fp.at(entry.basePath) as FileProvider,
-			isReadOnly: this._isReadOnly,
-		});
+		return await this._hydrateCatalogFromTree(entry, tree);
+	}
 
-		const mutableItem = { item: category };
-		this.events.emitSync("before-item-create", { catalog, mutableItem });
-
-		await this._readCategoryItems(entry.getRootCategoryDirectoryPath(), category, catalog);
-
-		catalog.bindItemEvents();
-
-		this._bindCatalogEvents(catalog);
-
-		await this._emitCollisionHealed(catalog);
-
-		await this.events.emit("catalog-read", { fs: this, catalog });
-
-		return catalog;
+	/**
+	 * Scanning a path that is gone yields an empty tree, not an error, and the caller would then
+	 * register an empty catalog over a live one — `Workspace._reloadCatalog` reloads by path and would
+	 * wipe the very catalog it was refreshing. Only `getCatalogByPath` offers an opt-out, which
+	 * `ScopedCatalogs` takes because a git-scoped path has no on-disk directory by design; loading a
+	 * catalog from an entry always checks.
+	 *
+	 * It deliberately resolves through mounts, and that is load-bearing: a version-scoped catalog
+	 * (`mycat:releases%2Fv1.0`) fails `exists`, which answers from the root disk mount, and passes only
+	 * because `findDocroot` reads through the mounted git provider. Both checks are required.
+	 */
+	private async _assertReadable(path: Path): Promise<void> {
+		if (await this._fp.exists(path)) return;
+		if (await findDocroot(this._fp, path)) return;
+		throw new Error(`cannot read catalog: nothing at '${path.value}'`);
 	}
 
 	private _bindCatalogEvents(catalog: Catalog) {
@@ -553,43 +456,6 @@ export default class FileStructure {
 		catalog.events.on("item-deleted", (args) => this.events.emit("item-deleted", args));
 		catalog.events.on("item-props-updated", (args) => this.events.emit("item-props-updated", args));
 		catalog.events.on("item-order-updated", (args) => this.events.emit("item-order-updated", args));
-	}
-
-	@trace({ level: Level.Internal, omitArgs: true, omitResult: true })
-	private async _tryNativeScanCatalogByPath(
-		path: Path,
-		opts?: { docrootRel?: string | null; optionalCategoryIndex?: boolean },
-	): Promise<CatalogTreeDto | null> {
-		try {
-			const fp = this._fp.at(path);
-			// For git-mounted catalogs (bare repos) the gitfp builds the proper `FsScope::Git`
-			// (repo + tree read scope) and a tree-relative path — Rust's GitFs reads straight
-			// from the git tree. Disk providers just scan from the workspace-relative path.
-			const { scope, scopedPath } =
-				fp.kind === "git"
-					? (fp as unknown as GitTreeFileProvider).getNativeScope(path)
-					: { scope: { kind: "disk" as const, root: fp.rootPath.value }, scopedPath: path.value };
-			const tree = await rustCall<CatalogTreeDto>("fs.scan_catalog", {
-				scope,
-				path: scopedPath,
-				docrootRel: opts?.docrootRel ?? null,
-				opts: {
-					excludeDirs: FS_EXCLUDE_FILENAMES,
-					categoryIndexFilename: CATEGORY_ROOT_FILENAMES,
-					docrootFilenames: DOC_ROOT_FILENAMES,
-					workspaceConfigFilename: WORKSPACE_CONFIG_FILENAME,
-					docrootSearchDepth: 5,
-					optionalCategoryIndex: opts?.optionalCategoryIndex ?? true,
-					maxConcurrency: 5,
-					followSymlinks: false,
-					knownWorkspacePaths: this._knownWorkspacePaths,
-				},
-			});
-			return tree;
-		} catch (e) {
-			addEvent("native-scan-catalog-failed", Level.Internal, { error: String(e) });
-			return null;
-		}
 	}
 
 	private _makeEntryFromTree(basePath: Path, tree: CatalogTreeDto, initProps: CatalogProps): CatalogEntry {
@@ -643,7 +509,7 @@ export default class FileStructure {
 		catalog: Catalog,
 		basePath: Path,
 	): Promise<void> {
-		const resolvedChildren = await this._healCollisionsNative(children, catalog, basePath);
+		const resolvedChildren = await this._healCollisions(children, catalog, basePath);
 		for (const child of resolvedChildren) {
 			if (child.kind === "article") {
 				const article = await this._hydrateArticle(child, parent, catalog, basePath);
@@ -698,8 +564,8 @@ export default class FileStructure {
 		await parent.sortItems("no-sort");
 	}
 
-	/** Resolves article/category name collisions among sibling nodes of the native scan tree. */
-	private async _healCollisionsNative(children: NodeDto[], catalog: Catalog, basePath: Path): Promise<NodeDto[]> {
+	/** Resolves article/category name collisions among sibling nodes of a scanned tree. */
+	private async _healCollisions(children: NodeDto[], catalog: Catalog, basePath: Path): Promise<NodeDto[]> {
 		const categories = new Map<string, CategoryNodeDto>();
 		for (const child of children) {
 			if (child.kind === "category" && child.hasIndex) categories.set(new Path(child.directory).name, child);
@@ -742,6 +608,9 @@ export default class FileStructure {
 		const absPath = basePath.join(new Path(node.relPath));
 		const articleCodeInCategory = parent.folderPath.subDirectory(absPath).name;
 		const logicPath = Path.join(parent.logicPath, articleCodeInCategory);
+
+		if (node.parseError)
+			addEvent("frontmatter-parse-failed", Level.Internal, { path: node.relPath, error: node.parseError });
 
 		const mutable = { content: "", props: node.frontMatter as ArticleProps };
 		await this.events.emit("item-read", { catalog, mutable });
@@ -828,7 +697,7 @@ export default class FileStructure {
 			lastModified: 0,
 			fs: this,
 		});
-		await this._readCategoryItems(path, category, catalog);
+		await this._hydrateChildren(await this._backend.scanDirectory(path), category, catalog, path);
 
 		const mutableItem = { item: category };
 		this.events.emitSync("before-item-create", { catalog, mutableItem });
@@ -836,231 +705,15 @@ export default class FileStructure {
 		return mutableItem.item;
 	}
 
-	/**
-	 * @deprecated Replaced by native `_hydrateCatalogFromTree` under `feature("native-fs")`.
-	 */
-	private async _readCategory(folderPath: Path, parentCategory: Category, catalog: Catalog): Promise<void> {
-		const indexPath = folderPath.join(new Path(CATEGORY_ROOT_FILENAME));
-		const hasIndex = await this._fp.exists(indexPath);
-
-		if (!hasIndex && !catalog.props.optionalCategoryIndex)
-			return await this._readCategoryItems(folderPath, parentCategory, catalog);
-
-		if (!hasIndex) {
-			const hasArticles = await this._search(folderPath, /\.md$/, 3);
-			if (!hasArticles) return;
-		}
-
-		const category = await this.makeCategory(folderPath, parentCategory, catalog, hasIndex ? indexPath : null);
-
-		if (!hasIndex) category.props.shouldBeCreated = true;
-
-		const passFilter = await this.events.emit("item-filter", {
-			fs: this,
-			catalogProps: catalog.props,
-			parent: parentCategory,
-			item: category,
-		});
-
-		if (!passFilter) return;
-
-		const passCategoryFilter = await this.events.emit("category-filter", {
-			fs: this,
-			catalogProps: catalog.props,
-			parent: parentCategory,
-			item: category,
-		});
-
-		if (passCategoryFilter) {
-			parentCategory.items.push(category);
-			return;
-		}
-
-		const orders = parentCategory.items.map((i) => i.order);
-
-		category.items.reduce((prev, item) => {
-			item.props.order = roundedOrderAfter(orders, prev);
-			return item.props.order;
-		}, category.order);
-
-		parentCategory.items.push(...category.items);
-	}
-
-	/**
-	 * @deprecated Replaced by native `_hydrateCategoryChildren` under `feature("native-fs")`.
-	 */
-	private async _readCategoryItems(folderPath: Path, category: Category, catalog: Catalog) {
-		const files = await this._fp.getItems(folderPath);
-
-		const mdFiles = files.filter((f) => {
-			return !f.isDirectory() && f.name.match(/\.md$/) && !FileStructure.isCategory(f.name);
-		});
-
-		const directories = files.filter((f) => f.isDirectory() && !FS_EXCLUDE_FILENAMES.includes(f.name));
-
-		const articlePaths = await this._healCollisionsJs(mdFiles, directories, folderPath, catalog);
-
-		const articles = await articlePaths.mapAsync(async (articlePath) => {
-			const article = await this._makeArticle(articlePath, category, catalog);
-			if (!article) return null;
-
-			const filter = await this.events.emit("item-filter", {
-				fs: this,
-				catalogProps: catalog.props,
-				parent: category,
-				item: article,
-			});
-
-			return filter ? article : null;
-		}, 10);
-
-		category.items.push(...articles.filter((article) => article !== null));
-
-		for (const f of directories) await this._readCategory(f.path, category, catalog);
-		await category.sortItems("no-sort");
-	}
-
-	/** Resolves article/category name collisions inside one directory; returns article paths to hydrate. */
-	private async _healCollisionsJs(
-		mdFiles: FileInfo[],
-		directories: FileInfo[],
-		folderPath: Path,
-		catalog: Catalog,
-	): Promise<Path[]> {
-		const dirNames = new Set(directories.map((d) => d.name));
-		const out: Path[] = [];
-		for (const f of mdFiles) {
-			const stem = f.name.replace(/\.md$/, "");
-			if (!dirNames.has(stem)) {
-				out.push(f.path);
-				continue;
-			}
-
-			const indexPath = folderPath.join(new Path([stem, CATEGORY_ROOT_FILENAME]));
-			if (!(await this._fp.exists(indexPath)) || !this._canHealCollisions(catalog.basePath)) {
-				out.push(f.path);
-				continue;
-			}
-
-			const healed = await this._healArticleCategoryCollision(f.path, indexPath, catalog);
-			if (healed.action === "rename") out.push(healed.newArticlePath);
-		}
-		return out;
-	}
-
-	/**
-	 * @deprecated Replaced by native `_hydrateArticle` under `feature("native-fs")`.
-	 */
-	private async _makeArticle(path: Path, parentCategory: Category, catalog: Catalog): Promise<Article> {
-		const { props, content } = this.parseMarkdown(await this._fp.read(path));
-		const articleCodeInCategory = parentCategory.folderPath.subDirectory(path).name;
-
-		const logicPath = Path.join(parentCategory.logicPath, articleCodeInCategory);
-		const stat = await this._fp.getStat(path);
-
-		const mutable = { content, props };
-		await this.events.emit("item-read", { catalog, mutable });
-
-		const article = this._createArticleByProps(
-			mutable.props,
-			parentCategory,
-			path,
-			logicPath,
-			mutable.content,
-			stat.mtimeMs,
-			catalog,
-		);
-
-		return article;
-	}
-
-	private async _createArticleByProps(
-		props: ArticleProps,
-		parent: Category,
-		path: Path,
-		logicPath: string,
-		content: string,
-		lastModified?: number,
-		catalog?: Catalog,
-	): Promise<Article> {
-		const mutable = { content, props };
-		await this.events.emit("item-read", { catalog, mutable });
-
-		const initProps = {
-			ref: this._fp.getItemRef(path),
-			parent,
-			fs: this,
-			lastModified: lastModified || 0,
-			content: mutable.content,
-			logicPath,
-		};
-
-		const mutableItem = { item: new Article({ ...initProps, props: mutable.props }) };
-		this.events.emitSync("before-item-create", { catalog, mutableItem });
-
-		return mutableItem.item;
-	}
-
-	@trace({ level: Level.Internal })
-	private async _search(root: Path, search: RegExp, depth = 5): Promise<Path> {
-		const queue = [];
-		const explored = new Set<string>();
-		let path: Path;
-
-		path = await this._explore(search, root, queue, explored, 0);
-		while (queue.length > 0 && !path) {
-			const node = queue.shift();
-			if (node.depth >= depth) continue;
-			path = await this._explore(search, node.path, queue, explored, node.depth);
-		}
-		return path;
-	}
-
-	private async _explore(
-		search: RegExp,
-		target: Path,
-		queue: { path: Path; depth: number }[],
-		explored: Set<string>,
-		depth: number,
-		collectAll = false,
-	): Promise<Path> {
-		if (explored.has(target.value)) return;
-		explored.add(target.value);
-
-		const dirs = await this._fp.readdir(target).catch(() => []);
-		if (!dirs) return;
-
-		for (const entry of dirs.filter((filename) => !FS_EXCLUDE_FILENAMES.includes(filename))) {
-			const path = target.join(new Path(entry));
-			if (explored.has(path.value)) continue;
-
-			const stat = await this._fp.getStat(path).catch(() => undefined);
-			if (!stat) {
-				if (collectAll) continue;
-				return;
-			}
-
-			if (stat.isDirectory()) {
-				queue.push({ path, depth: depth + 1 });
-				continue;
-			}
-
-			if (stat.isFile() && search.test(entry)) {
-				return path;
-			}
-		}
-	}
-
 	private async _parseYaml(path: Path): Promise<CatalogProps> {
-		let props: object;
 		try {
-			props = (yaml.load(await this._fp.read(path)) as object) ?? {};
-			if (typeof props !== "object") throw "Wrong format";
+			// A sequence is valid YAML and still not props — same rule both backends apply.
+			const props = yaml.load(await this._fp.read(path));
+			return props && typeof props === "object" && !Array.isArray(props) ? props : {};
 		} catch (e) {
 			console.error("yaml invalid", e);
-			props = {};
+			return {};
 		}
-		return props;
 	}
 
 	private _defaultProps(path: Path): CatalogProps {
@@ -1075,17 +728,10 @@ export default class FileStructure {
 		const p = Object.fromEntries(Object.entries(props).filter(([, v]) => !!v));
 		delete p.welcome;
 		if (p.lang === resolveLanguage()) delete p.lang;
-		// Keep frontmatter keys in a stable, conventional order regardless of how props were
-		// mutated. setOrder/setOrderAfter/setLastPosition assign `order` as a brand-new key on
-		// items that had none yet, which JS appends last; without normalization a save would
-		// leave `order` at the bottom (or, hoisted alone, push `title` off the top). Emit the
-		// lead keys as `title`, `description`, `order`, then everything else in insertion order
-		// (see FileStructure.unit.test.ts). Positional only — parsing is order-independent.
-		const LEAD_KEYS = ["title", "description", "order"];
-		const normalized = Object.fromEntries([
-			...LEAD_KEYS.filter((k) => k in p).map((k) => [k, p[k]]),
-			...Object.entries(p).filter(([k]) => !LEAD_KEYS.includes(k)),
-		]);
-		return yaml.dump(normalized, { quotingType: '"' });
+		// Keys keep the position they were read in — no reordering. The scan hands props over in
+		// file order, so rewriting an untouched article reproduces its frontmatter byte for byte
+		// instead of showing up as a spurious diff (gram-ax/gramax#879). A prop that is genuinely
+		// new lands last, which is where JS puts a freshly assigned key.
+		return yaml.dump(p, { quotingType: '"' });
 	}
 }

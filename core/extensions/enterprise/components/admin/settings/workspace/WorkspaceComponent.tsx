@@ -1,14 +1,13 @@
 import useCheck from "@core-ui/hooks/useCheck";
 import { useSettings } from "@ext/enterprise/components/admin/contexts/SettingsContext";
 import { WorkspaceTemplateUploads } from "@ext/enterprise/components/admin/settings/workspace/components/WorkspaceTemplateUploads";
-import { useWorkspaceSections } from "@ext/enterprise/components/admin/settings/workspace/hooks/useWorkspaceSections";
 import { useWorkspaceSettings } from "@ext/enterprise/components/admin/settings/workspace/hooks/useWorkspaceSettings";
 import { Page } from "@ext/enterprise/types/Page";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useTabGuard } from "../../hooks/useTabGuard";
 import { SettingsPageLayout } from "../../ui-kit/SettingsPageLayout";
+import { WorkspaceLfs } from "./components/lfs/WorkspaceLfs";
 import { WorkspaceRepositories } from "./components/repositories/WorkspaceRepositories";
-import { WorkspaceSections } from "./components/sections/WorkspaceSections";
 import { WorkspaceInfoDefault } from "./components/WorkspaceInfo";
 import { WorkspaceStyling } from "./components/WorkspaceStyling";
 
@@ -20,13 +19,6 @@ const useWorkspaceComponentCommon = () => {
 		useWorkspaceSettings();
 
 	const isEqual = useCheck(workspaceSettings, localSettings);
-	const { hasSectionsOrderChanged, setOriginalSectionsOrder } = useWorkspaceSections(localSettings, setLocalSettings);
-
-	useEffect(() => {
-		if (workspaceSettings) {
-			setOriginalSectionsOrder(Object.keys(workspaceSettings.sections || {}).join(","));
-		}
-	}, [workspaceSettings, setOriginalSectionsOrder]);
 
 	const isWorkspaceInitialLoading = isInitialLoading("workspace");
 
@@ -36,19 +28,15 @@ const useWorkspaceComponentCommon = () => {
 			if (isWorkspaceInitialLoading || !workspaceSettings) {
 				return false;
 			}
-			return !isEqual || hasSectionsOrderChanged();
+			return !isEqual;
 		},
 		onSave: handleSave,
 		onDiscard: () => {
-			if (workspaceSettings) {
-				setLocalSettings(workspaceSettings);
-				setOriginalSectionsOrder(Object.keys(workspaceSettings.sections || {}).join(","));
-			}
+			if (workspaceSettings) setLocalSettings(workspaceSettings);
 		},
 	});
 
-	const isSaveDisabled =
-		!localSettings.name || !localSettings.git.source.url || (isEqual && !hasSectionsOrderChanged());
+	const isSaveDisabled = !localSettings.name || !localSettings.git.source.url || isEqual;
 
 	return {
 		ensureLoaded,
@@ -87,14 +75,6 @@ const WorkspaceComponent = () => {
 		[settings?.resources],
 	);
 
-	const sectionResources = useMemo(
-		() =>
-			selectResources
-				?.map((resource) => resource.split("/").pop() || "")
-				.filter((id, index, self) => self.indexOf(id) === index) ?? [],
-		[selectResources],
-	);
-
 	return (
 		<SettingsPageLayout
 			contentClassName="space-y-8"
@@ -114,11 +94,7 @@ const WorkspaceComponent = () => {
 				selectResources={selectResources ?? []}
 				setLocalSettings={setLocalSettings}
 			/>
-			<WorkspaceSections
-				localSettings={localSettings}
-				sectionResources={sectionResources ?? []}
-				setLocalSettings={setLocalSettings}
-			/>
+			<WorkspaceLfs localSettings={localSettings} setLocalSettings={setLocalSettings} />
 			<WorkspaceStyling localSettings={localSettings} setLocalSettings={setLocalSettings} />
 			<WorkspaceTemplateUploads localSettings={localSettings} setLocalSettings={setLocalSettings} />
 		</SettingsPageLayout>

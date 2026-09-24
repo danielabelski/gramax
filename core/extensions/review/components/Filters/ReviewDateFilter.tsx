@@ -5,6 +5,7 @@ import DateUtils from "@core-ui/utils/dateUtils";
 import t from "@ext/localization/locale/translate";
 import { Calendar } from "@ui-kit/Calendar";
 import { Icon } from "@ui-kit/Icon";
+import { Label } from "@ui-kit/Label";
 import { Popover, PopoverContent, PopoverTriggerButton } from "@ui-kit/Popover";
 import { ToggleGroup, ToggleGroupItem } from "@ui-kit/ToggleGroup";
 import { useCallback, useState } from "react";
@@ -44,83 +45,61 @@ export const ReviewDateFilter = ({ value, onChange }: ReviewDateFilterProps) => 
 		[onChange],
 	);
 
-	const formatDate = (date: Date) => date?.toLocaleDateString() ?? "";
-	const presets = DateUtils.getDatePresets();
+	const formatDate = (date: Date) =>
+		date?.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit", year: "2-digit" }) ?? "";
+	const presets = DateUtils.getDatePresets().filter((preset) => preset !== "all-time");
 
 	return (
-		<div className="space-y-2">
-			<div className="flex items-center justify-between">
-				<span className="text-xs font-normal uppercase text-muted tracking-wide">
-					{t("editor.modes.filters.date.title")}
-				</span>
+		<div className="space-y-1.5">
+			<div>
+				<Label className="text-xs text-muted ml-2">{t("editor.modes.filters.date.title")}</Label>
+				<ToggleGroup
+					className="justify-start gap-1"
+					onValueChange={handlePreset}
+					type="single"
+					value={activePreset}
+					variant="ghost"
+				>
+					{presets.map((preset) => (
+						<ToggleGroupItem
+							className="h-7 whitespace-nowrap rounded-full border border-primary-border bg-secondary-bg px-2.5 text-sm font-normal text-primary-fg hover:bg-status-neutral-bg-hover data-[state=on]:border-transparent data-[state=on]:bg-status-neutral data-[state=on]:text-primary-bg data-[state=on]:hover:bg-status-neutral-hover"
+							key={preset}
+							size="sm"
+							value={preset}
+						>
+							{t(`editor.modes.filters.date.presets.${preset}`)}
+						</ToggleGroupItem>
+					))}
+				</ToggleGroup>
 			</div>
-			<ToggleGroup
-				className="gap-0 rounded-lg border border-secondary-border shadow-soft-sm"
-				onValueChange={handlePreset}
-				type="single"
-				value={activePreset}
-				variant="ghost"
-			>
-				{presets.map((preset, index) => (
-					<ToggleGroupItem
-						className={cn(
-							"text-xs font-normal whitespace-nowrap rounded-none",
-							index === 0 && "rounded-none rounded-l-md",
-							index === presets.length - 1 && "rounded-none rounded-r-md",
-						)}
-						key={preset}
-						size="sm"
-						value={preset}
-					>
-						{t(`editor.modes.filters.date.presets.${preset}`)}
-					</ToggleGroupItem>
-				))}
-			</ToggleGroup>
-			<div className="flex gap-2 items-center">
-				<Popover>
-					<PopoverTriggerButton asChild className="flex-1 font-normal" size="sm">
-						<Icon className="text-muted shrink-0" icon="calendar" />
-						{localValue?.from ? (
-							<span className="text-muted">{formatDate(localValue.from)}</span>
-						) : (
-							<span className="text-xs text-muted mr-1">
-								{t("editor.modes.filters.date.placeholder")}
-							</span>
-						)}
-					</PopoverTriggerButton>
-					<PopoverContent className="p-0">
-						<Calendar
-							className="border-0 shadow-none bg-transparent"
-							defaultMonth={localValue?.from ?? new Date()}
-							mode="range"
-							onSelect={handleCalendarSelect}
-							selected={localValue}
-						/>
-					</PopoverContent>
-				</Popover>
-				<Icon className="text-muted" icon="move-right" />
-				<Popover>
-					<PopoverTriggerButton asChild className="flex-1 font-normal" size="sm">
-						<Icon className="text-muted shrink-0" icon="calendar" />
-						{localValue?.to ? (
-							<span className="text-muted">{formatDate(localValue.to)}</span>
-						) : (
-							<span className="text-xs text-muted mr-1">
-								{t("editor.modes.filters.date.placeholder")}
-							</span>
-						)}
-					</PopoverTriggerButton>
-					<PopoverContent className="p-0">
-						<Calendar
-							className="border-0 shadow-none bg-transparent"
-							defaultMonth={localValue?.to ?? new Date()}
-							mode="range"
-							onSelect={handleCalendarSelect}
-							selected={localValue}
-						/>
-					</PopoverContent>
-				</Popover>
-			</div>
+			<Popover>
+				<PopoverTriggerButton
+					className={cn(
+						"w-full justify-start h-auto font-normal !shadow-none hover:!shadow-none active:!shadow-none focus:!shadow-none focus-visible:!shadow-none",
+						"invalid:!shadow-none invalid:hover:!shadow-none invalid:focus:!shadow-none",
+						"aria-[invalid=true]:!shadow-none aria-[invalid=true]:hover:!shadow-none aria-[invalid=true]:focus:!shadow-none",
+						"read-only:!shadow-none disabled:!shadow-none",
+					)}
+					containerClassName="w-full"
+					size="sm"
+				>
+					<span className="flex-1 text-left text-sm text-muted">
+						{localValue?.from && localValue?.to
+							? `${formatDate(localValue.from)} — ${formatDate(localValue.to)}`
+							: t("editor.modes.filters.date.range-placeholder")}
+					</span>
+					<Icon className="shrink-0 text-muted" icon="calendar" />
+				</PopoverTriggerButton>
+				<PopoverContent className="p-0">
+					<Calendar
+						className="border-0 bg-transparent shadow-none"
+						defaultMonth={localValue?.from ?? new Date()}
+						mode="range"
+						onSelect={handleCalendarSelect}
+						selected={localValue}
+					/>
+				</PopoverContent>
+			</Popover>
 		</div>
 	);
 };

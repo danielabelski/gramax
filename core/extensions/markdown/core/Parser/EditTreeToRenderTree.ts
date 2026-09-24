@@ -72,6 +72,27 @@ const noteTitleCollapseTransformer = (node: JSONContent): JSONContent => {
 	return { ...node, attrs: { ...(node.attrs ?? {}), title }, content: node.content.slice(1) };
 };
 
+// Replaces soft_break with the space it renders as and merges it into neighbour
+// text nodes with the same marks, so the render tree stays exactly the same as
+// when softbreak was turned into a space at parse time.
+const softBreakTransformer = (node: JSONContent): JSONContent => {
+	if (!node.content?.some((child) => child.type === "soft_break")) return node;
+
+	const marksKey = (child: JSONContent) => JSON.stringify(child.marks ?? []);
+	const content: JSONContent[] = [];
+	for (const child of node.content) {
+		const current = child.type === "soft_break" ? { type: "text", text: " ", marks: child.marks } : child;
+		const last = content[content.length - 1];
+		if (last?.type === "text" && current.type === "text" && marksKey(last) === marksKey(current)) {
+			content[content.length - 1] = { ...last, text: last.text + current.text };
+		} else {
+			content.push(current);
+		}
+	}
+
+	return { ...node, content };
+};
+
 const listTransformer = (node: JSONContent): JSONContent => {
 	if (node.type !== "bulletList" && node.type !== "orderedList" && node.type !== "taskList") return node;
 
@@ -180,6 +201,7 @@ const editTreeToRenderTree = (editTree: JSONContent, editSchema: Schema): Render
 		}
 
 		const nodeHandlers = [
+			softBreakTransformer,
 			diagramsTransformer,
 			listTransformer,
 			HtmlTagComponentEditTreeToRenderTree,

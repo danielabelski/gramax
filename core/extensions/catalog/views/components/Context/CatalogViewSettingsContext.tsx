@@ -15,6 +15,7 @@ export interface CatalogViewSettingsContextValue {
 	editable: boolean;
 	editingId: string;
 	isEditingOrSaving: boolean;
+	showFooter: boolean;
 	onLoadMore?: () => void;
 	onEditClick?: (view: CatalogView) => void;
 	onUpdateDocportalVisible?: (view: CatalogView, checked: boolean) => void;

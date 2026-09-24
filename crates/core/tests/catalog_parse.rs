@@ -407,3 +407,67 @@ fn sibling_empty_dropped_sibling_with_articles_kept(fixture: Fixture) {
 		.collect();
 	assert_eq!(dirs, vec!["with-content".to_string()]);
 }
+// Frontmatter key order -------------------------------------------------------
+//
+// Gramax rewrites an article's frontmatter whenever props change, and the writer emits keys in
+// the order the scan handed them over. If the scan reorders keys, a no-op save rewrites the file
+// and shows up as a spurious diff (gram-ax/gramax#879: `order` and `title` swapping places).
+
+fn front_matter_keys(node: &NodeDto) -> Vec<&str> {
+	let front_matter = match node {
+		NodeDto::Article { front_matter, .. } => front_matter,
+		NodeDto::Category { front_matter, .. } => front_matter,
+	};
+	front_matter.as_object().unwrap().keys().map(String::as_str).collect()
+}
+
+#[rstest]
+fn article_frontmatter_keeps_file_key_order(fixture: Fixture) {
+	fixture.file("cat/a.md", "---\norder: 1\ntitle: A\ndescription: D\n---\nbody");
+
+	let tree = scan(&fixture, "cat", None);
+	assert_eq!(front_matter_keys(&tree.children[0]), vec!["order", "title", "description"]);
+}
+
+#[rstest]
+fn article_frontmatter_key_order_is_not_alphabetical(fixture: Fixture) {
+	fixture.file("cat/a.md", "---\nzeta: 1\nalpha: 2\n---\nbody");
+
+	let tree = scan(&fixture, "cat", None);
+	assert_eq!(front_matter_keys(&tree.children[0]), vec!["zeta", "alpha"]);
+}
+
+#[rstest]
+fn category_index_frontmatter_keeps_file_key_order(fixture: Fixture) {
+	fixture.file("cat/sub/category.yaml", "---\norder: 1\ntitle: Sub\n---\n");
+	fixture.file("cat/sub/a.md", "");
+
+	let tree = scan(&fixture, "cat", None);
+	assert_eq!(front_matter_keys(&tree.children[0]), vec!["order", "title"]);
+}
+
+#[rstest]
+fn docroot_props_survive_a_byte_order_mark(fixture: Fixture) {
+	fixture.file("cat/docroot.yaml", "\u{feff}order: 1\ntitle: Cat\n");
+
+	let tree = scan(&fixture, "cat", Some("docroot.yaml"));
+	let keys: Vec<&str> = tree.catalog_props.as_object().unwrap().keys().map(String::as_str).collect();
+	assert_eq!(keys, vec!["order", "title"]);
+}
+
+#[rstest]
+fn article_frontmatter_survives_a_byte_order_mark(fixture: Fixture) {
+	fixture.file("cat/a.md", "\u{feff}---\norder: 1\ntitle: A\n---\nbody");
+
+	let tree = scan(&fixture, "cat", None);
+	assert_eq!(front_matter_keys(&tree.children[0]), vec!["order", "title"]);
+}
+
+#[rstest]
+fn docroot_props_keep_file_key_order(fixture: Fixture) {
+	fixture.file("cat/docroot.yaml", "order: 1\ntitle: Cat\nlanguage: ru\n");
+
+	let tree = scan(&fixture, "cat", Some("docroot.yaml"));
+	let keys: Vec<&str> = tree.catalog_props.as_object().unwrap().keys().map(String::as_str).collect();
+	assert_eq!(keys, vec!["order", "title", "language"]);
+}

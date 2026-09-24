@@ -1,3 +1,8 @@
+/**
+ * biome-ignore-all lint/style/useNamingConvention: these member names predate the rule, and the only reason
+ * this file is touched is the header height below — renaming its internals belongs to a refactor of the
+ * print paginators, not to a fix.
+ */
 import { RowGroupPaginator } from "@ext/markdown/elements/table/print/RowGroupPaginator";
 import { RowPaginator } from "@ext/markdown/elements/table/print/RowPaginator";
 import type { TablePaginatorInterface } from "@ext/markdown/elements/table/print/TablePaginator.types";
@@ -139,8 +144,16 @@ export class TablePaginator
 
 	private getRepeatableThead() {
 		const nodeDimension = Paginator.paginationInfo.nodeDimension;
-		const thead = this.table.querySelector("thead");
-		if (thead) return thead.cloneNode(true) as HTMLTableSectionElement;
+		const thead = this.table.querySelector<HTMLTableSectionElement>("thead");
+		if (thead) {
+			// The synthesized headers below record their height because every page has to budget for the header
+			// it repeats; a real <thead> needs the same and had none, so it was budgeted as zero. Article tables
+			// never render one -- Table.tsx builds colgroup + tbody -- so the first tables to take this branch
+			// are the Markdown ones inside an OpenAPI description, where <thead> is always there.
+			const repeated = thead.cloneNode(true) as HTMLTableSectionElement;
+			repeated.dataset._height = `${nodeDimension?.get(thead)?.height ?? 0}`;
+			return repeated;
+		}
 
 		const headerAttr = (this.table.getAttribute("data-header") || "").toLowerCase().trim();
 

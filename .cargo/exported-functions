@@ -30,6 +30,8 @@ _reset
 _restore
 _stash
 _stash_apply
+_stash_restore
+_stash_list
 _stash_delete
 _status
 _copy
@@ -60,7 +62,8 @@ _set_head
 _list_merge_requests
 _create_or_update_merge_request
 _get_draft_merge_request
-_get_all_commit_authors
+_get_commit_authors
+_get_commit_range
 _pull_lfs_objects
 _get_config_val
 _set_config_val
@@ -75,3 +78,4 @@ _storage_stats
 _delete_empty_dirs
 _scan_workspace
 _scan_catalog
+_otel_set_level

@@ -1,6 +1,5 @@
+import { useArticleWidthStyle } from "@components/Layouts/CatalogLayout/ArticleLayout/useArticleDimensions";
 import ShadowBox from "@components/WidthWrapper/ShadowBox";
-import SidebarsIsOpenService from "@core-ui/ContextServices/Sidebars/SidebarsIsOpenContext";
-import SidebarsIsPinService from "@core-ui/ContextServices/Sidebars/SidebarsIsPin";
 import useShowMainLangContentPreview from "@core-ui/hooks/useShowMainLangContentPreview";
 import { cn } from "@core-ui/utils/cn";
 import { useIsDoublePanel } from "@ext/git/core/Diff/components/store/DiffViewModeStore";
@@ -27,6 +26,7 @@ export interface WidthWrapperProps {
 }
 
 const WidthWrapper = (props: WidthWrapperProps) => {
+	const articleWidthStyle = useArticleWidthStyle();
 	const {
 		children,
 		"data-wrapper": dataWrapper,
@@ -42,55 +42,52 @@ const WidthWrapper = (props: WidthWrapperProps) => {
 	const isDoublePanel = useIsDoublePanel();
 	const isDiffView = useIsDiffView();
 	const disableWrapper = disableWrapperProp || isShowMainLangContentPreview || (isDiffView && isDoublePanel);
+	const isTable = Boolean(props.tableRef);
 
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
-	const isPin = SidebarsIsPinService.value.left;
-	const leftNavigation = SidebarsIsOpenService?.transitionEndIsLeftOpen;
+	const measureFrameRef = useRef<number | null>(null);
 
-	const setWidth = useCallback(() => {
+	const measure = useCallback(() => {
 		const scroll = scrollContainerRef.current;
 
 		if (scroll?.firstElementChild) {
 			const containerRect = scroll.getBoundingClientRect();
 			const childRect = scroll.firstElementChild.getBoundingClientRect();
+			const height = scroll.clientHeight;
 
 			setLeftWidth(containerRect.left - childRect.left);
 			setRightWidth(childRect.right - containerRect.right);
+			setHeight(height);
 		}
 	}, []);
 
-	const resizeWrapper = useCallback(() => {
-		const scrollContainer = scrollContainerRef.current;
-		if (!scrollContainer) return;
+	const scheduleMeasure = useCallback(() => {
+		if (measureFrameRef.current !== null) return;
+		measureFrameRef.current = requestAnimationFrame(() => {
+			measureFrameRef.current = null;
+			measure();
+		});
+	}, [measure]);
 
-		setHeight(scrollContainer.clientHeight);
-	}, []);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	useLayoutEffect(() => {
-		if (!scrollContainerRef.current) return;
+		const scroll = scrollContainerRef.current;
+		if (!scroll) return;
 
-		const handleResize = () => {
-			setWidth();
-			resizeWrapper();
-		};
-
-		const observer = new ResizeObserver(handleResize);
-		observer.observe(scrollContainerRef.current.firstElementChild);
-
-		window.addEventListener("resize", handleResize);
+		const observer = new ResizeObserver(scheduleMeasure);
+		observer.observe(scroll);
+		if (scroll.firstElementChild) observer.observe(scroll.firstElementChild);
+		window.addEventListener("resize", scheduleMeasure);
+		scheduleMeasure();
 
 		return () => {
 			observer.disconnect();
-			window.removeEventListener("resize", handleResize);
+			window.removeEventListener("resize", scheduleMeasure);
+			if (measureFrameRef.current !== null) {
+				cancelAnimationFrame(measureFrameRef.current);
+				measureFrameRef.current = null;
+			}
 		};
-	}, [setWidth, resizeWrapper, scrollContainerRef.current]);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
-	useLayoutEffect(() => {
-		resizeWrapper();
-		setWidth();
-	}, [setWidth, isPin, leftNavigation]);
+	}, [scheduleMeasure]);
 
 	return (
 		<div className={cn("width-wrapper-container", "flex justify-center", "print:justify-start print:ml-0")}>
@@ -99,13 +96,14 @@ const WidthWrapper = (props: WidthWrapperProps) => {
 					"width-wrapper",
 					"relative z-0",
 					"max-w-[max(calc(var(--article-content-wrapper-width)+3em),100%)]",
-					"[&:has(.scrollableContent>div[data-table-wrapper])]:pb-[calc(var(--padding-top-bottom)-var(--vertical-top-offset))]",
-					"[&:has(.scrollableContent>div[data-table-wrapper])_.scrollableContent>div[data-table-wrapper]]:pb-[var(--vertical-top-offset)]",
+					isTable && "pb-[calc(var(--padding-top-bottom)-var(--vertical-top-offset))]",
 					disableWrapper && "w-full",
 				)}
+				data-left-shadow-visible={leftWidth > 0}
 				data-wrapper={dataWrapper}
 				style={
 					{
+						...articleWidthStyle,
 						"--padding-top-bottom": PADDING_TOP_BOTTOM,
 						"--vertical-top-offset": VERTICAL_TOP_OFFSET,
 						"--cell-min-width": CELL_MIN_WIDTH,
@@ -116,6 +114,7 @@ const WidthWrapper = (props: WidthWrapperProps) => {
 					className={cn(
 						"scrollableContent",
 						"overflow-x-auto overflow-y-hidden relative",
+						isTable && "[&>div[data-table-wrapper]]:pb-[var(--vertical-top-offset)]",
 
 						// ColGroup sets --table-width when every column has an explicit width
 						"[&.scrollableContent_table]:w-[var(--table-width,max-content)]",
@@ -133,7 +132,7 @@ const WidthWrapper = (props: WidthWrapperProps) => {
 						"print:[&_table_td]:page-break-inside-avoid",
 						"print:[&_table_colgroup]:hidden",
 					)}
-					onScroll={setWidth}
+					onScroll={scheduleMeasure}
 					ref={scrollContainerRef}
 				>
 					{children}

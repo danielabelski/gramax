@@ -7,7 +7,7 @@ import type IPermission from "../Permission/IPermission";
 import type UserInfo from "./UserInfo";
 import type UserJSONData from "./UserJSONData";
 
-export type UserType = "base" | "enterprise" | "ticket";
+export type UserType = "base" | "enterprise" | "ticket" | "ges-cloud";
 
 export default class User {
 	constructor(

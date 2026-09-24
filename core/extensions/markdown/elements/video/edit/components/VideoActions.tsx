@@ -33,9 +33,13 @@ const VideoActions = (props: VideoActionsProps): ReactElement => {
 				tooltipText={t("editor.video.link")}
 			/>
 			{node.attrs.path && (
-				<a href={node.attrs.path} rel="noreferrer" target="_blank">
-					<ActionButton icon="external-link" tooltipText={t("goto-original")} />
-				</a>
+				<ActionButton
+					href={node.attrs.path}
+					icon="external-link"
+					rel="noreferrer"
+					target="_blank"
+					tooltipText={t("goto-original")}
+				/>
 			)}
 			<ActionButton icon="captions" onClick={addSignature} tooltipText={t("signature")} />
 		</>

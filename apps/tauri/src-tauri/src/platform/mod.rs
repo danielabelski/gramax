@@ -7,3 +7,7 @@ pub(crate) use mobile::*;
 mod desktop;
 #[cfg(desktop)]
 pub(crate) use desktop::*;
+
+#[cfg(target_os = "macos")]
+#[doc(hidden)]
+pub use desktop::macos_print_test_support;

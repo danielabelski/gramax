@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { articleActionsButton, navItem } from "@utils/catalogTree";
 import { catalogTest } from "@web/fixtures/catalog.fixture";
 import { notificationsTest } from "@web/tests/features/notifications/notifications.fixture";
 
@@ -15,10 +16,11 @@ catalogTest.use({
 });
 
 test.describe("Notification Settings", () => {
-	catalogTest("button is hidden without enterprise", async ({ sharedPage }) => {
-		const articleItem = sharedPage.locator('[data-qa="catalog-navigation-article-link-level-1"]').first();
+	catalogTest("button is hidden without enterprise", async ({ sharedPage, catalogPage }) => {
+		await catalogPage.waitForLoad();
+		const articleItem = navItem(sharedPage, "Test Article");
 		await articleItem.hover();
-		await articleItem.getByTestId("article-actions").click();
+		await articleActionsButton(sharedPage, "Test Article").click();
 		const dropdownContent = sharedPage.getByTestId("dropdown-content");
 		await expect(dropdownContent).toBeVisible();
 		await expect(dropdownContent.getByRole("menuitem", { name: "Edit notifications" })).toBeHidden();

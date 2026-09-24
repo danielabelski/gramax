@@ -5,7 +5,7 @@ description: Use when user asks to lint with Biome, check lint warnings introduc
 
 # Biome — lint the MR diff
 
-Biome v2.5.1. Config: `gramax/biome.jsonc` (`defaultBranch: develop`).
+Biome v2.5.12. Config: `gramax/biome.jsonc` (`defaultBranch: develop`).
 
 ## What `lint:ref` does
 

@@ -114,7 +114,11 @@ abstract class ArticleViewService {
 	}
 
 	static setDefaultView() {
-		if (ArticleViewService._isDefaultView) return;
+		if (ArticleViewService._isDefaultView) {
+			SetUseArticleDefaultStyles(true);
+			SetAdditionalStyles("");
+			return;
+		}
 
 		ArticleViewService.setView(ArticlePage);
 		ArticleViewService._isDefaultView = true;

@@ -5,7 +5,9 @@ import type FileProvider from "@core/FileProvider/model/FileProvider";
 import Path from "@core/FileProvider/Path/Path";
 import type { Article } from "@core/FileStructue/Article/Article";
 import type { Catalog } from "@core/FileStructue/Catalog/Catalog";
+import type { Category } from "@core/FileStructue/Category/Category";
 import ResourceUpdater from "@core/Resource/ResourceUpdater";
+import { addExternalItems } from "@ext/localization/core/addExternalItems";
 import type { Workspace } from "@ext/workspace/Workspace";
 import { resolve } from "path";
 
@@ -19,6 +21,30 @@ const getMakeResourceUpdater = async () => {
 	const ctx = await app.contextFactory.fromWeb({ language: "ru" });
 	return (catalog: Catalog) => new ResourceUpdater(ctx, catalog, app.parser, app.parserContextFactory, app.formatter);
 };
+
+// The slug field of the props dialog: only `fileName` changes, every other prop is left out.
+const rename = async (catalog: Catalog, path: string, fileName: string): Promise<Article> => {
+	const article = catalog.findItemByItemPath<Article>(p(path));
+	const makeResourceUpdater = await getMakeResourceUpdater();
+	await article.updateProps(
+		{ logicPath: article.logicPath, fileName } as never,
+		makeResourceUpdater(catalog),
+		catalog,
+	);
+	return article;
+};
+
+// Full props dialog submit. The JSON round trip is not decoration: SitePresenter serializes
+// the props into the response, usePropsEditorAcitions posts them back, and only then does
+// Item.updateProps see them — so a `moved` that is not a string on disk arrives here as one.
+const submitProps = async (catalog: Catalog, path: string, patch: Record<string, unknown>): Promise<void> => {
+	const article = catalog.findItemByItemPath<Article>(p(path));
+	const makeResourceUpdater = await getMakeResourceUpdater();
+	const clientProps = JSON.parse(JSON.stringify({ ...article.props, logicPath: article.logicPath, ...patch }));
+	await article.updateProps(clientProps, makeResourceUpdater(catalog), catalog);
+};
+
+const kinds = (catalog: Catalog, kind: string) => catalog.aliases.diagnostics().filter((d) => d.kind === kind);
 
 describe("Alias redirects", () => {
 	beforeAll(async () => {
@@ -37,6 +63,52 @@ describe("Alias redirects", () => {
 		await dfp.write(p("ml/setup.md"), "---\ntitle: Setup\naliases:\n  - install\n---\n\nru\n");
 		await dfp.write(p("ml/en/_index.md"), "");
 		await dfp.write(p("ml/en/setup.md"), "---\ntitle: Setup EN\n---\n\nen\n");
+
+		// `sh` and `mv` start clean: the auto aliases under test are written by the product
+		// itself during the tests, which is the whole point — the shadowing must not arise
+		// from a sequence of ordinary renames and moves.
+		await dfp.write(p("sh/.doc-root.yaml"), "");
+		await dfp.write(p("sh/aaa.md"), "# aaa\n\nbody\n");
+		await dfp.write(p("sh/other.md"), "# other\n\nbody\n");
+		await dfp.write(p("sh/new-article-9.md"), "# fresh\n\nbody\n");
+
+		await dfp.write(p("mv/.doc-root.yaml"), "");
+		await dfp.write(p("mv/x.md"), "# x\n\nbody\n");
+		await dfp.write(p("mv/guide/_index.md"), "---\ntitle: guide\n---\n\nbody\n");
+		await dfp.write(p("mv/guide/y.md"), "# y\n\nbody\n");
+
+		// `lk` is already in the broken state a pre-fix Gramax left on disk: the auto alias
+		// `aaa` on `bbb` points at a path where a real article lives.
+		await dfp.write(p("lk/.doc-root.yaml"), "");
+		await dfp.write(p("lk/aaa.md"), "# aaa\n\nbody\n");
+		await dfp.write(
+			p("lk/bbb.md"),
+			'---\ntitle: bbb\naliases:\n  - path: aaa\n    moved: "2026-01-01T00:00:00Z"\n---\n\nbody\n',
+		);
+
+		// `bm` carries an unquoted `moved:` — gray-matter parses that into a Date, not a string.
+		await dfp.write(
+			p("bm/page.md"),
+			"---\ntitle: Page\naliases:\n  - path: legacy/page\n    moved: 2026-01-01T00:00:00Z\n---\n\nbody\n",
+		);
+		await dfp.write(p("bm/.doc-root.yaml"), "");
+
+		// `dp` is already in a state the write path forbids: two articles both claim the manual
+		// alias `shared/alias`. A pre-fix Gramax could reach this through an import or a merge —
+		// editing either article's props must not crash on the standing duplicate (gh#934).
+		await dfp.write(p("dp/.doc-root.yaml"), "");
+		await dfp.write(p("dp/one.md"), "---\ntitle: One\naliases:\n  - shared/alias\n---\n\nbody\n");
+		await dfp.write(p("dp/two.md"), "---\ntitle: Two\naliases:\n  - shared/alias\n---\n\nbody\n");
+		await dfp.write(p("dp/three.md"), "---\ntitle: Three\naliases:\n  - taken/alias\n---\n\nbody\n");
+
+		// `tr` has an aliased ru article and an empty `en` language folder, so the untranslated
+		// stub for `setup` is built by addExternalItems during the test.
+		await dfp.write(p("tr/.doc-root.yaml"), "language: ru\nsupportedLanguages:\n  - ru\n  - en");
+		await dfp.write(
+			p("tr/setup.md"),
+			'---\ntitle: Setup\naliases:\n  - path: install\n    moved: "2026-01-01T00:00:00Z"\n---\n\nru\n',
+		);
+		await dfp.write(p("tr/en/_index.md"), "");
 
 		app = await getApp();
 		fp = app.wm.current().getFileProvider();
@@ -149,5 +221,125 @@ describe("Alias redirects", () => {
 		const enRoot = catalog.findArticle(`${mainRoot}/en`, []);
 		const en = catalog.aliases.findArticle(`${mainRoot}/en/install`, [], enRoot as never);
 		expect(en?.logicPath).toBe(`${mainRoot}/en/setup`);
+	});
+
+	// Every diagnostic below is one the product used to create by itself out of ordinary user
+	// actions — a rename, a drag-and-drop, adding a language. None of them may appear in the
+	// healthcheck panel unless the user hand-wrote the frontmatter that causes it.
+	describe("Aliases the product must not break by itself", () => {
+		test("renaming another article onto an auto alias clears that alias (new article included)", async () => {
+			// `new-article-9` records no alias of its own when renamed, but it still comes to
+			// occupy `aaa` — so releasing the destination cannot hang off the alias-recording flag
+			const catalog = await workspace.getContextlessCatalog("sh");
+
+			await rename(catalog, "sh/aaa.md", "bbb");
+			expect(await fp.read(p("sh/bbb.md"))).toContain("path: aaa");
+
+			await rename(catalog, "sh/new-article-9.md", "aaa");
+
+			expect(await fp.read(p("sh/bbb.md"))).not.toContain("aliases");
+			expect(await fp.read(p("sh/aaa.md"))).not.toContain("aliases");
+			expect(kinds(catalog, "shadowed-by-real")).toEqual([]);
+		});
+
+		test("a normal rename onto an auto alias clears it and keeps its own alias", async () => {
+			const catalog = await workspace.getContextlessCatalog("sh");
+
+			await rename(catalog, "sh/bbb.md", "ddd");
+			expect(await fp.read(p("sh/ddd.md"))).toContain("path: bbb");
+
+			await rename(catalog, "sh/other.md", "bbb");
+
+			// `ddd` loses the now-shadowed claim on `bbb`; `bbb` keeps the fresh claim on `other`
+			expect(await fp.read(p("sh/ddd.md"))).not.toContain("aliases");
+			expect(await fp.read(p("sh/bbb.md"))).toContain("path: other");
+			expect(kinds(catalog, "shadowed-by-real")).toEqual([]);
+		});
+
+		test("DnD-moving an article onto an auto alias clears that alias", async () => {
+			const catalog = await workspace.getContextlessCatalog("mv");
+			const makeResourceUpdater = await getMakeResourceUpdater();
+
+			const x = catalog.findItemByItemPath(p("mv/x.md"));
+			await catalog.moveItem(
+				x.ref,
+				{ path: p("mv/guide/x.md"), storageId: x.ref.storageId },
+				makeResourceUpdater,
+				[],
+			);
+			expect(await fp.read(p("mv/guide/x.md"))).toContain("path: x");
+
+			const y = catalog.findItemByItemPath(p("mv/guide/y.md"));
+			await catalog.moveItem(y.ref, { path: p("mv/x.md"), storageId: y.ref.storageId }, makeResourceUpdater, []);
+
+			expect(await fp.read(p("mv/guide/x.md"))).not.toContain("aliases");
+			expect(kinds(catalog, "shadowed-by-real")).toEqual([]);
+		});
+
+		test("a props save on an article whose auto alias is already shadowed is not blocked", async () => {
+			// The blocker users actually hit: assertFree rejects the alias the product wrote,
+			// so title and description could not be saved until the alias was deleted by hand
+			const catalog = await workspace.getContextlessCatalog("lk");
+
+			await submitProps(catalog, "lk/bbb.md", { description: "edited" });
+
+			const raw = await fp.read(p("lk/bbb.md"));
+			expect(raw).toContain("description: edited");
+			expect(raw).not.toContain("aliases");
+		});
+
+		test("a props save on an article that shares a manual alias with another is not blocked (gh#934)", async () => {
+			// Both `one` and `two` claim `shared/alias`. Editing one article's description resubmits
+			// its unchanged alias list; re-validating the alias it already holds used to throw
+			// "already used by 'two'", so the props could not be saved despite the edit touching
+			// no alias — while the change was applied anyway, making the error a false alarm.
+			const catalog = await workspace.getContextlessCatalog("dp");
+
+			await submitProps(catalog, "dp/one.md", { description: "edited" });
+
+			const raw = await fp.read(p("dp/one.md"));
+			expect(raw).toContain("description: edited");
+			expect(raw).toContain("shared/alias");
+		});
+
+		test("adding a brand-new alias another article already claims is still rejected (gh#934)", async () => {
+			// `three` owns `taken/alias`; `one` does not. Introducing it on `one` is a genuine new
+			// conflict — the grandfather rule must not swallow it.
+			const catalog = await workspace.getContextlessCatalog("dp");
+
+			await expect(
+				submitProps(catalog, "dp/one.md", { aliases: ["shared/alias", "taken/alias"] }),
+			).rejects.toThrow("already used by 'three'");
+		});
+
+		test("a props save canonicalises a non-string moved instead of writing a broken one", async () => {
+			const catalog = await workspace.getContextlessCatalog("bm");
+
+			await submitProps(catalog, "bm/page.md", { description: "edited" });
+
+			const raw = await fp.read(p("bm/page.md"));
+			expect(raw).toContain('moved: "2026-01-01T00:00:00Z"');
+			expect(raw).not.toContain(".000Z");
+			expect(kinds(catalog, "broken-moved")).toEqual([]);
+		});
+
+		test("an untranslated stub does not clone the owner's aliases", async () => {
+			const catalog = await workspace.getContextlessCatalog("tr");
+			const root = catalog.getRootCategory();
+			const en = catalog.findArticle(`${root.logicPath}/en`, []) as never as Category;
+
+			await addExternalItems(
+				root,
+				en,
+				root.folderPath,
+				en.folderPath,
+				workspace.getFileStructure(),
+				catalog.props.supportedLanguages,
+			);
+
+			expect(await fp.read(p("tr/en/setup.md"))).not.toContain("aliases");
+			await catalog.update();
+			expect(kinds(catalog, "duplicate")).toEqual([]);
+		});
 	});
 });

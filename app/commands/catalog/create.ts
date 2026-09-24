@@ -3,6 +3,7 @@ import { AuthorizeMiddleware } from "@core/Api/middleware/AuthorizeMiddleware";
 import { DesktopModeMiddleware } from "@core/Api/middleware/DesktopModeMiddleware";
 import ReloadConfirmMiddleware from "@core/Api/middleware/ReloadConfirmMiddleware";
 import type Context from "@core/Context/Context";
+import { seedAutoLfsProps } from "@core/GitLfs/logic/workspaceManagedLfs";
 import type { ClientCatalogProps } from "@core/SitePresenter/SitePresenter";
 import type CatalogEditProps from "@ext/catalog/actions/propsEditor/model/CatalogEditProps";
 import { Command } from "../../types/Command";
@@ -24,7 +25,7 @@ const create: Command<{ props: CatalogEditProps; ctx: Context }, ClientCatalogPr
 
 		if (hasSiblingCatalog) return;
 		const fs = workspace.getFileStructure();
-		const catalog = await fs.createCatalog(props);
+		const catalog = await fs.createCatalog({ ...props, lfs: await seedAutoLfsProps(workspace) });
 		if (!catalog) return null;
 		await workspace.addCatalog(catalog);
 		await this._commands.article.create.do({ ctx, catalogName: catalog.name });

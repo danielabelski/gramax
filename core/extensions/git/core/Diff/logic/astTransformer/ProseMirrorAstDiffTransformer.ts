@@ -20,8 +20,8 @@ export default class ProsemirrorAstDiffTransformer extends AstDiffTransformer {
 	private _oldMatrix: number[][] = [];
 	private _newMatrix: number[][] = [];
 
-	protected declare _oldAst: Node;
-	protected declare _newAst: Node;
+	declare protected _oldAst: Node;
+	declare protected _newAst: Node;
 
 	private _oldStrings: string[] = [];
 	private _newStrings: string[] = [];

@@ -45,20 +45,27 @@ impl<R: Runtime> Updater<R> {
 			return Ok(());
 		}
 
+		// No updater means the app started from a path tauri will not update in place — a symlinked
+		// binary, `/tmp` on macOS among them. Nothing to check against, and the menu item stays enabled.
+		let Ok(updater) = self.app.updater() else {
+			info!(target: TAG, "updater is unavailable in this session; skip check");
+			return Ok(());
+		};
+
 		self.set_menu_enabled(menu_item.as_ref(), false)?;
-		let result = self.app.updater().check(true).await;
+		let result = updater.check(true).await;
 		self.set_menu_enabled(menu_item.as_ref(), true)?;
 
 		match result {
 			Ok(_) => {
-				if !self.app.updater().is_ready() {
+				if !updater.is_ready() {
 					self.show_dialog(MessageDialogKind::Info, t!("updates.you-have-actual-ver.title"), t!("updates.you-have-actual-ver.body"), MessageDialogButtons::Ok);
 					return Ok(());
 				}
 
 				let accepted = self.show_dialog(MessageDialogKind::Info, t!("updates.new-version.title"), t!("updates.new-version.body"), MessageDialogButtons::OkCancel);
 				if accepted {
-					if let Err(err) = self.app.updater().install() {
+					if let Err(err) = updater.install() {
 						tracing::Span::current().set_status(Status::Error { description: Cow::Owned(err.to_string()) });
 						if matches!(err, crate::updater::error::UpdaterError::RunFromDmg) {
 							self.show_dialog(MessageDialogKind::Error, t!("updates.dmg-install-error.title"), t!("updates.dmg-install-error.body"), MessageDialogButtons::Ok);

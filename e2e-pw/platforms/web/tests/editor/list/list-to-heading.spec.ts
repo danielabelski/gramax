@@ -14,7 +14,7 @@ editorTest.describe("List item to heading", () => {
 			if (action === "hotkey") await editor.press("ControlOrMeta+Alt+2");
 			else {
 				await editor.clickToolbar("headers");
-				await sharedPage.getByRole("menuitem", { name: "Heading 2" }).click();
+				await sharedPage.locator('[data-heading-level="2"]').click();
 			}
 			await editor.assertMarkdown("## text");
 		});

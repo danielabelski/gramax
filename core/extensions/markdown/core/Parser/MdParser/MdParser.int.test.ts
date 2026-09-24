@@ -927,4 +927,16 @@ describe("MdParser корректно парсит", () => {
 		expect(result).toEqual(str);
 		expect(elapsed).toBeLessThan(1000);
 	});
+
+	test("определяет нужные препроцессоры без повторных includes по строке", async () => {
+		const mdParser = await getMdParser();
+		const content = "Обычный markdown без специального синтаксиса";
+		class ContentWithoutIncludes extends String {
+			override includes(): boolean {
+				throw new Error("preParse must scan content once");
+			}
+		}
+
+		expect(mdParser.preParse(new ContentWithoutIncludes(content) as unknown as string)).toBe(content);
+	});
 });

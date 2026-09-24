@@ -1,10 +1,12 @@
 #!/bin/bash
 
 KEEP_SERVICES=false
+DELETE_PLUGINS=false
 
 for arg in "$@"; do
     case "$arg" in
         --keep-services) KEEP_SERVICES=true ;;
+        --delete-plugins) DELETE_PLUGINS=true ;;
     esac
 done
 
@@ -22,6 +24,10 @@ files_to_delete=(
 
 if [ "$KEEP_SERVICES" = false ]; then
     files_to_delete+=("./services")
+fi
+
+if [ "$DELETE_PLUGINS" = true ]; then
+    files_to_delete+=("./plugins")
 fi
 
 files_to_delete+=($(find . -name '*.npmrc'))

@@ -1,33 +1,36 @@
-import NavigationTabsService from "@components/Layouts/LeftNavigationTabs/NavigationTabsService";
-import { LeftNavigationTab } from "@components/Layouts/StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
 import FetchService from "@core-ui/ApiServices/FetchService";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/ButtonStateService";
+import ModalToOpenService from "@core-ui/ContextServices/ModalToOpenService/ModalToOpenService";
+import ModalToOpen from "@core-ui/ContextServices/ModalToOpenService/model/ModalsToOpen";
 import { RequestStatus, useApi } from "@core-ui/hooks/useApi";
 import useMediaQuery from "@core-ui/hooks/useMediaQuery";
-import { cn } from "@core-ui/utils/cn";
 import { cssMedia } from "@core-ui/utils/cssUtils";
+import BaseRightExtensions from "@ext/articleProvider/components/BaseRightExtensions";
 import type { ProviderItemProps } from "@ext/articleProvider/models/types";
 import t from "@ext/localization/locale/translate";
+import type { FragmentAlreadyUseWarnProps } from "@ext/markdown/elements/fragment/edit/components/FragmentAlreadyUseWarn";
+import { FRAGMENTS_PANEL_ID } from "@ext/markdown/elements/fragment/edit/components/FragmentsPanel/types/constants";
+import FragmentUpdateService from "@ext/markdown/elements/fragment/edit/components/FragmentUpdateService";
 import FragmentService from "@ext/markdown/elements/fragment/edit/components/Tab/FragmentService";
+import FragmentUsages from "@ext/markdown/elements/fragment/edit/components/Tab/FragmentUsages";
 import type { FragmentRenderData } from "@ext/markdown/elements/fragment/edit/model/types";
 import type { Editor } from "@tiptap/core";
 import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-	CommandSeparator,
-} from "@ui-kit/Command";
-import { DropdownMenuSub, DropdownMenuSubTrigger } from "@ui-kit/Dropdown";
+	DropdownEmpty,
+	DropdownMenuItem,
+	DropdownMenuSearchItem,
+	DropdownMenuSeparator,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	useSearchableMenu,
+} from "@ui-kit/Dropdown";
+import { usePanelToggle } from "@ui-kit/FloatingPanel";
 import { Icon } from "@ui-kit/Icon";
 import { Loader } from "@ui-kit/Loader";
-import { MenuItemIconButton } from "@ui-kit/MenuItem";
-import { ToolbarDropdownMenuSubContent } from "@ui-kit/Toolbar";
 import { TextOverflowTooltip } from "@ui-kit/Tooltip";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 interface FragmentsButtonProps {
 	editor: Editor;
@@ -36,11 +39,24 @@ interface FragmentsButtonProps {
 const FragmentsButton = ({ editor }: FragmentsButtonProps) => {
 	const apiUrlCreator = ApiUrlCreatorService.value;
 	const [fragmentsList, setFragmentsList] = useState<ProviderItemProps[]>([]);
+	const reopenFragmentIdRef = useRef<string>(null);
+	const { selectedID } = FragmentService.value;
+	const panelTriggerRef = useRef<HTMLDivElement>(null);
+	const { toggle: toggleFragmentsPanel } = usePanelToggle(FRAGMENTS_PANEL_ID, panelTriggerRef);
 	const isMobile = useMediaQuery(cssMedia.JSnarrow);
 
 	const { call: getFragments, status } = useApi<ProviderItemProps[]>({
 		url: (api) => api.getArticleListInGramaxDir("fragment"),
-		onDone: (data) => setFragmentsList(data),
+		onDone: (data) => {
+			setFragmentsList(data);
+			FragmentService.setItems(data);
+
+			const fragmentId = reopenFragmentIdRef.current;
+			if (!fragmentId) return;
+			reopenFragmentIdRef.current = null;
+			const fragment = data.find((item) => item.id === fragmentId);
+			if (fragment) FragmentService.openItem(fragment);
+		},
 		parse: "json",
 	});
 
@@ -58,96 +74,154 @@ const FragmentsButton = ({ editor }: FragmentsButtonProps) => {
 
 	const { disabled } = ButtonStateService.useCurrentAction({ action: "fragment" });
 
-	const openFragmentTab = useCallback(() => {
-		NavigationTabsService.setTop(LeftNavigationTab.Fragments);
-	}, []);
-
 	const onEditClick = useCallback((fragment: ProviderItemProps) => {
 		FragmentService.openItem(fragment);
 	}, []);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: it's ok
-	const addNewFragment = useCallback(async () => {
-		openFragmentTab();
-		const newFragment = await FragmentService.addNewFragment(apiUrlCreator);
-		FragmentService.openItem(newFragment);
-	}, [apiUrlCreator, openFragmentTab]);
+	const onDelete = useCallback(
+		(id: string) => {
+			if (selectedID === id) {
+				void FetchService.fetch(apiUrlCreator.clearArticlesContentWithFragment(id));
+				FragmentService.closeItem();
+			}
+
+			setFragmentsList((items) => {
+				const nextItems = items.filter((item) => item.id !== id);
+				FragmentService.setItems(nextItems);
+				return nextItems;
+			});
+			FragmentUpdateService.clearContent(id);
+		},
+		[selectedID],
+	);
+
+	const onMarkdownChange = useCallback(
+		async (id: string) => {
+			await FragmentUpdateService.updateContent(id, apiUrlCreator);
+			if (selectedID === id) {
+				reopenFragmentIdRef.current = id;
+				FragmentService.closeItem();
+			}
+			getFragments();
+		},
+		[selectedID, getFragments],
+	);
+
+	const preDelete = useCallback(async (id: string) => {
+		return new Promise<boolean>((resolve) => {
+			ModalToOpenService.setValue<FragmentAlreadyUseWarnProps>(ModalToOpen.FragmentAlreadyUseWarn, {
+				fragmentId: id,
+				onClose: () => {
+					resolve(false);
+					ModalToOpenService.resetValue();
+				},
+				onSubmit: () => {
+					resolve(true);
+					ModalToOpenService.resetValue();
+				},
+			});
+		});
+	}, []);
+	const { search, setSearch, contentRef, inputRef, handleContentKeyDown, handleInputKeyDown, filterItems } =
+		useSearchableMenu();
 
 	const onOpenChange = useCallback(
 		(open: boolean) => {
-			if (open && status !== RequestStatus.Loading) getFragments();
+			if (!open) return setSearch("");
+			if (status !== RequestStatus.Loading) getFragments();
 		},
-		[getFragments, status],
+		[getFragments, status, setSearch],
+	);
+
+	const filteredFragments = useMemo(
+		() => filterItems(fragmentsList.map((fragment) => ({ ...fragment, label: fragment.title }))),
+		[fragmentsList, filterItems],
 	);
 
 	const isReady = status === RequestStatus.Ready;
 	const hasFragments = fragmentsList.length > 0;
-	const showList = !isReady || hasFragments;
 
 	return (
 		<DropdownMenuSub onOpenChange={onOpenChange}>
 			<DropdownMenuSubTrigger disabled={disabled}>
-				<div className="flex items-center gap-2" data-qa="qa-fragments">
+				<div className="flex items-center gap-2" data-qa="qa-fragments" data-testid="fragments-menu">
 					<Icon icon="square-dashed-bottom" />
 					{t("fragments")}
 				</div>
 			</DropdownMenuSubTrigger>
-			<ToolbarDropdownMenuSubContent
+			<DropdownMenuSubContent
 				alignOffset={!isMobile ? -18 : 0}
-				className={cn(!isMobile && (showList ? "px-3 py-3 pl-2" : "px-3 py-3"))}
-				contentClassName="p-0 lg:shadow-hard-base"
+				className="max-w-[min(20rem,var(--radix-dropdown-menu-content-available-width,100%))]"
+				onKeyDown={handleContentKeyDown}
+				ref={contentRef}
 				sideOffset={!isMobile ? 2 : 6}
-				style={{
-					maxWidth: "calc(min(14rem, var(--radix-dropdown-menu-content-available-width, 100%)))",
-				}}
 			>
-				<Command>
-					{fragmentsList?.length > 5 && (
-						<CommandInput autoFocus placeholder={`${t("find2")} ${t("fragment").toLowerCase()}`} />
-					)}
-					{showList && (
-						<CommandList>
-							<CommandEmpty>{t("list.no-results-found")}</CommandEmpty>
-							<CommandGroup>
-								{isReady ? (
-									fragmentsList.map((fragment) => (
-										<CommandItem key={fragment.id} onSelect={() => void onItemSelect(fragment)}>
-											<div className="flex flex-row items-center gap-2 overflow-hidden w-full">
-												<div className="min-w-0 flex-1">
-													<TextOverflowTooltip className="block w-full">
-														{fragment.title}
-													</TextOverflowTooltip>
-												</div>
-												<MenuItemIconButton
-													className="ml-auto flex-shrink-0 hover:!bg-white [&:hover_svg]:!text-black"
-													icon="pen"
-													onClick={() => onEditClick(fragment)}
-												/>
-											</div>
-										</CommandItem>
-									))
-								) : (
-									<CommandItem disabled>
-										<div className="flex items-center gap-2">
-											<Loader size="sm" />
-											{t("loading")}
-										</div>
-									</CommandItem>
-								)}
-							</CommandGroup>
-						</CommandList>
-					)}
-					{hasFragments && <CommandSeparator className="mt-1 mb-1" />}
-					<CommandGroup>
-						<CommandItem onSelect={addNewFragment}>
+				<DropdownMenuSearchItem
+					onChange={(e) => setSearch(e.target.value)}
+					onClick={(e) => e.stopPropagation()}
+					onKeyDown={handleInputKeyDown}
+					placeholder={`${t("find2")} ${t("fragment").toLowerCase()}`}
+					ref={inputRef}
+					value={search}
+				/>
+				<DropdownMenuSeparator />
+				<div className="flex-1 max-h-44 overflow-y-auto">
+					{!isReady ? (
+						<DropdownMenuItem disabled>
 							<div className="flex items-center gap-2">
-								<Icon icon="plus" />
-								{t("add")}
+								<Loader size="sm" />
+								{t("loading")}
 							</div>
-						</CommandItem>
-					</CommandGroup>
-				</Command>
-			</ToolbarDropdownMenuSubContent>
+						</DropdownMenuItem>
+					) : (
+						hasFragments &&
+						(filteredFragments.length === 0 ? (
+							<DropdownEmpty>{t("list.no-results-found")}</DropdownEmpty>
+						) : (
+							filteredFragments.map((fragment) => (
+								<DropdownMenuItem
+									key={fragment.id}
+									onSelect={() => void onItemSelect(fragment)}
+									textValue={fragment.title}
+								>
+									<TextOverflowTooltip className="block w-full min-w-0 flex-1">
+										{fragment.title}
+									</TextOverflowTooltip>
+									<BaseRightExtensions
+										id={fragment.id}
+										items={(id) => (
+											<FragmentUsages
+												fragmentId={id}
+												isSubmenu
+												trigger={
+													<>
+														<Icon icon="file-symlink" />
+														{t("view-usage")}
+													</>
+												}
+											/>
+										)}
+										onDelete={onDelete}
+										onEdit={() => onEditClick(fragment)}
+										onMarkdownChange={onMarkdownChange}
+										preDelete={preDelete}
+										providerType="fragment"
+									/>
+								</DropdownMenuItem>
+							))
+						))
+					)}
+				</div>
+				<div className="mt-auto">
+					{hasFragments && <DropdownMenuSeparator />}
+					<DropdownMenuItem onSelect={toggleFragmentsPanel} textValue="manage-fragments">
+						<div className="flex items-center gap-2" data-testid="manage-fragments" ref={panelTriggerRef}>
+							<Icon icon="settings" />
+							{t("fragments-panel-manage")}
+						</div>
+					</DropdownMenuItem>
+				</div>
+			</DropdownMenuSubContent>
 		</DropdownMenuSub>
 	);
 };

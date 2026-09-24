@@ -9,6 +9,7 @@ import {
 import type GitSourceData from "@gramax/core/extensions/git/core/model/GitSourceData.schema";
 import { type Page, test, type WebContext } from "@playwright/test";
 import "@utils/async";
+import { gotoWhenReady } from "@utils/navigation";
 import { getSourceDataFromEnv } from "@utils/source";
 
 export interface WorkerBaseFixture {
@@ -47,7 +48,7 @@ export const baseTest = test.extend<TestBaseFixture, WorkerBaseFixture>({
 
 			await preparePage({ page, source, user, baseURL });
 
-			await page.goto(startUrl, { waitUntil: "domcontentloaded" });
+			await gotoWhenReady(page, startUrl);
 
 			await use(page);
 
@@ -66,7 +67,7 @@ export const baseTest = test.extend<TestBaseFixture, WorkerBaseFixture>({
 	reset: [
 		async ({ sharedPage, basePage, startUrl, isolated }, use) => {
 			if (!isolated) {
-				await sharedPage.goto(startUrl, { waitUntil: "domcontentloaded" });
+				await gotoWhenReady(sharedPage, startUrl);
 				await basePage.waitForLoad();
 				await use(null);
 				return;

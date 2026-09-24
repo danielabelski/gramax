@@ -1,6 +1,10 @@
-import { cn } from "@core-ui/utils/cn";
 import { MenuItem } from "@ui-kit/MenuItem";
 import { forwardRef, type HTMLAttributes, useCallback } from "react";
+import { tv } from "tailwind-variants";
+
+const emojiPickerItemStyles = tv({
+	base: "p-1 h-7 w-7 justify-center leading-none text-xl",
+});
 
 interface EmojiPickerItemProps extends Omit<HTMLAttributes<HTMLDivElement>, "onClick"> {
 	emoji: string;
@@ -14,12 +18,7 @@ export const EmojiPickerItem = forwardRef<HTMLDivElement, EmojiPickerItemProps>(
 		}, [emoji, onClick]);
 
 		return (
-			<MenuItem
-				{...props}
-				className={cn("p-1 h-7 w-7 justify-center leading-none text-xl", className)}
-				onClick={handleClick}
-				ref={ref}
-			>
+			<MenuItem {...props} className={emojiPickerItemStyles({ className })} onClick={handleClick} ref={ref}>
 				{emoji}
 			</MenuItem>
 		);

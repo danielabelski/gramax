@@ -21,6 +21,7 @@ export type PageParams = {
 	[Page.VIEW_METRICS]: undefined;
 	[Page.SEARCH_METRICS]: undefined;
 	[Page.ACCESS_TOKENS]: undefined;
+	[Page.LICENSE]: undefined;
 };
 
 const getDefaultPageParams = (): Partial<PageParams> => ({

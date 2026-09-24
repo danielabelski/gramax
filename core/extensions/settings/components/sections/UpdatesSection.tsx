@@ -3,11 +3,12 @@ import resolveModule from "@app/resolveModule/frontend";
 import Divider from "@components/Atoms/Divider";
 import { SectionContainer } from "@ext/catalog/actions/propsEditor/components/Sections/SectionContainer";
 import t from "@ext/localization/locale/translate";
+import SectionHeader from "@ext/settings/components/SectionHeader";
 import { useSetting } from "@ext/settings/logic/hooks";
 import { markUpdateCheck, UpdateCheckFrequency } from "@ext/settings/logic/updateCheckPolicy";
 import { Button } from "@ui-kit/Button";
+import { Field } from "@ui-kit/Field";
 import { Icon } from "@ui-kit/Icon";
-import { Label } from "@ui-kit/Label";
 import { Loader } from "@ui-kit/Loader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui-kit/Select";
 import { useCallback, useState } from "react";
@@ -60,15 +61,12 @@ const UpdatesSection = ({ onClose }: { onClose?: () => void }) => {
 		setCheckStatus("checking");
 		setCheckErrorDetails(null);
 		try {
-			const result = await resolveModule("updateCheck")(false);
+			// Settles as soon as an update is found; the download continues in the background.
+			const result = await resolveModule("updateCheck")(false, true);
 			markUpdateCheck();
 			setCheckStatus(result);
-			// The update is already downloaded by now, so accepting it installs and restarts the app.
-			// Close the settings first — otherwise the update toast stays hidden behind the modal.
-			if (result === "update-found") {
-				onClose?.();
-				resolveModule("updateAccept")();
-			}
+			// The update toast lets the user decide when to install; close the settings so it is not hidden behind the modal.
+			if (result === "update-found") onClose?.();
 		} catch (e) {
 			setCheckErrorDetails(formatCheckError(e));
 			setCheckStatus("check-error");
@@ -91,30 +89,42 @@ const UpdatesSection = ({ onClose }: { onClose?: () => void }) => {
 	const statusText = checkStatusText(checkStatus);
 
 	return (
-		<SectionContainer stackClassName="space-y-6">
-			<div className="flex flex-col gap-2">
-				<Label>{t("app-settings.updates.frequency.title")}</Label>
-				<Select onValueChange={onFrequencyChange} value={frequency}>
-					<SelectTrigger>
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value={UpdateCheckFrequency.EveryLaunch}>
-							{t("app-settings.updates.frequency.every-launch")}
-						</SelectItem>
-						<SelectItem value={UpdateCheckFrequency.Daily}>
-							{t("app-settings.updates.frequency.daily")}
-						</SelectItem>
-						<SelectItem value={UpdateCheckFrequency.Weekly}>
-							{t("app-settings.updates.frequency.weekly")}
-						</SelectItem>
-						<SelectItem value={UpdateCheckFrequency.Never}>
-							{t("app-settings.updates.frequency.never")}
-						</SelectItem>
-					</SelectContent>
-				</Select>
-				<p className="text-sm text-muted">{t("app-settings.updates.frequency.description")}</p>
-			</div>
+		<SectionContainer
+			header={
+				<SectionHeader
+					description={t("app-settings.sections.updates.description")}
+					title={t("app-settings.sections.updates.title")}
+				/>
+			}
+			stackClassName="space-y-6"
+		>
+			<Field
+				control={() => (
+					<Select onValueChange={onFrequencyChange} value={frequency}>
+						<SelectTrigger>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value={UpdateCheckFrequency.EveryLaunch}>
+								{t("app-settings.updates.frequency.every-launch")}
+							</SelectItem>
+							<SelectItem value={UpdateCheckFrequency.Daily}>
+								{t("app-settings.updates.frequency.daily")}
+							</SelectItem>
+							<SelectItem value={UpdateCheckFrequency.Weekly}>
+								{t("app-settings.updates.frequency.weekly")}
+							</SelectItem>
+							<SelectItem value={UpdateCheckFrequency.Never}>
+								{t("app-settings.updates.frequency.never")}
+							</SelectItem>
+						</SelectContent>
+					</Select>
+				)}
+				description={t("app-settings.updates.frequency.description")}
+				labelClassName="w-[30%] shrink-0"
+				layout="horizontal"
+				title={t("app-settings.updates.frequency.title")}
+			/>
 			<div className="flex flex-col gap-2">
 				<div className="flex items-center gap-3">
 					<Button

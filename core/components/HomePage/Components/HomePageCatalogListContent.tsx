@@ -8,7 +8,12 @@ export const HomePageCatalogListContent = ({ data }: { data: HomePageData }) => 
 
 	return catalogCount ? (
 		<FavoriteCatalogLinkService.Init value={data.catalogsLinks}>
-			<Groups breadcrumb={data.breadcrumb} className="groups" group={data.group} section={data.section} />
+			<Groups
+				className="groups"
+				hasPersonalOverride={data.hasPersonalOverride}
+				rootSections={data.rootSections}
+				views={data.views}
+			/>
 		</FavoriteCatalogLinkService.Init>
 	) : (
 		<NoneGroups />

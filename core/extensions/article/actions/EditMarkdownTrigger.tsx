@@ -1,9 +1,9 @@
-import Icon from "@components/Atoms/Icon";
 import ModalToOpenService from "@core-ui/ContextServices/ModalToOpenService/ModalToOpenService";
 import ModalToOpen from "@core-ui/ContextServices/ModalToOpenService/model/ModalsToOpen";
 import { cn } from "@core-ui/utils/cn";
 import t from "@ext/localization/locale/translate";
 import { DropdownMenuItem } from "@ui-kit/Dropdown";
+import { Icon } from "@ui-kit/Icon";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 import type { ComponentProps } from "react";
 import type EditMarkdown from "./EditMarkdown";
@@ -40,7 +40,7 @@ const EditMarkdownTrigger = ({ loadContent, saveContent, isCurrentItem, isTempla
 
 	const dropdownItem = (
 		<DropdownMenuItem disabled={disabled} onSelect={onSelect}>
-			<Icon code="file-pen" />
+			<Icon icon="file-pen" />
 			{t("article.edit-markdown")}
 		</DropdownMenuItem>
 	);

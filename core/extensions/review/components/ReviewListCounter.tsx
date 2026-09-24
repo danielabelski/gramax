@@ -1,5 +1,6 @@
 import { cn } from "@core-ui/utils/cn";
 import t from "@ext/localization/locale/translate";
+import { Counter } from "@ui-kit/Counter";
 import { Indicator } from "@ui-kit/Indicator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 
@@ -19,12 +20,7 @@ export const ReviewListCounter = ({ count, unreadCount, indicator = true, classN
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
-				<div
-					className={cn(
-						"flex items-center gap-1 cursor-default ml-2 text-[var(--color-merge-request-text)] font-medium",
-						className,
-					)}
-				>
+				<div className={cn("flex items-center gap-1 cursor-default ml-2 font-medium shrink-0", className)}>
 					{unreadCount > 0 && (
 						<>
 							{indicator && <Indicator className="bg-status-error rounded-full mr-0.5" size="xs" />}
@@ -32,7 +28,9 @@ export const ReviewListCounter = ({ count, unreadCount, indicator = true, classN
 							<span className="text-xs">/</span>
 						</>
 					)}
-					<span className="text-xs">{count}</span>
+					<Counter className="rounded-full" size="xs" variant="secondary">
+						{count}
+					</Counter>
 				</div>
 			</TooltipTrigger>
 			<TooltipContent>{tooltipText}</TooltipContent>

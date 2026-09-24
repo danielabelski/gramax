@@ -1,12 +1,15 @@
 import { ResponseKind } from "@app/types/ResponseKind";
+import type Context from "@core/Context/Context";
 import type { AgentBrowserSessionMeta } from "@ext/agent/browser/browserHost";
 import type { AgentEvent } from "@ext/agent/core/events";
 import type { AgentUsage } from "@ext/agent/core/session";
+import type { ProviderItemProps } from "@ext/articleProvider/models/types";
+import type { ItemLink } from "@ext/navigation/NavigationLinks";
 import assert from "assert";
 import { Command } from "../../../types/Command";
 
 const sessionState: Command<
-	{ sessionId: string; openCatalogName: string | null; openItemPath: string | null },
+	{ ctx: Context; sessionId: string; openCatalogName: string | null; openItemPath: string | null },
 	{
 		id: string;
 		title: string;
@@ -17,6 +20,8 @@ const sessionState: Command<
 		lastError: string | null;
 		events: AgentEvent[];
 		usage: AgentUsage;
+		itemLinks: ItemLink[] | null;
+		skills: ProviderItemProps[] | null;
 		browser: AgentBrowserSessionMeta;
 	}
 > = Command.create({
@@ -24,11 +29,25 @@ const sessionState: Command<
 
 	kind: ResponseKind.json,
 
-	async do({ sessionId, openItemPath, openCatalogName }) {
+	async do({ ctx, sessionId, openItemPath, openCatalogName }) {
 		const s = this._app.agentManager.sessions.get(sessionId);
 		assert(s, "agent/session/state: session_not_found");
 		s.openCatalogName = openCatalogName;
 		s.openItemPath = openItemPath;
+
+		let itemLinks: ItemLink[] | null = null;
+		let skills: ProviderItemProps[] | null = null;
+		if (s.catalogMutated && openCatalogName) {
+			const catalog = await this._app.wm.current().getContextlessCatalog(openCatalogName);
+			if (catalog) {
+				itemLinks = await this._app.sitePresenterFactory
+					.fromContext(ctx)
+					.getCatalogNav(catalog, openItemPath ?? "");
+				skills = await catalog.customProviders.agentResourcesProvider.getItems<ProviderItemProps>();
+				s.catalogMutated = false;
+			}
+		}
+
 		return {
 			id: s.id,
 			title: s.title,
@@ -39,12 +58,15 @@ const sessionState: Command<
 			lastError: s.lastError,
 			events: s.events,
 			usage: s.usage,
+			itemLinks,
+			skills,
 			browser: s.browser,
 		};
 	},
 
-	params(_ctx, q) {
+	params(ctx, q) {
 		return {
+			ctx,
 			sessionId: String(q.sessionId ?? ""),
 			openCatalogName: q.openCatalogName ? String(q.openCatalogName) : null,
 			openItemPath: q.openItemPath ? String(q.openItemPath) : null,

@@ -3,7 +3,7 @@ import { expect, type Page } from "playwright/test";
 
 export const VIEW_ID = "K6gH5";
 
-const getViewsTrigger = (page: Page) => page.locator('.article-right-sidebar [aria-haspopup="dialog"]');
+const getViewsTrigger = (page: Page) => page.locator('[data-testid="catalog-view-trigger"]:visible');
 
 const openViewsPopover = async (page: Page) => {
 	const trigger = getViewsTrigger(page);
@@ -32,7 +32,7 @@ export const viewTest = catalogTest.extend<ViewFixture>({
 	closeViewsPopover: async ({ sharedPage }, use) => {
 		await use(async () => {
 			await sharedPage.keyboard.press("Escape");
-			await expect(getViewsTrigger(sharedPage)).toHaveAttribute("data-state", "closed");
+			await expect(getViewsTrigger(sharedPage)).toHaveAttribute("aria-expanded", "false");
 		});
 	},
 

@@ -54,7 +54,7 @@ export class Dropdown {
 		content?: Locator,
 		item?: Locator,
 	) {
-		this._content = content ?? this._page.getByTestId("dropdown-content");
+		this._content = content ?? this._page.locator('[data-testid="dropdown-content"]:visible');
 		this._item = item ?? this._page.getByTestId("dropdown-item");
 	}
 
@@ -93,10 +93,13 @@ export class Dropdown {
 	}
 
 	async findItemByTitle(title: string): Promise<DropdownItem> {
-		const items = await this.getItems();
-		const item = items.find((item) => item.title === title);
-		expect(item, `Search ${this._name()} for ${title}`).toBeDefined();
-		return item!;
+		let item: DropdownItem | undefined;
+		await expect(async () => {
+			const items = await this.getItems();
+			item = items.find((candidate) => candidate.title === title);
+			expect(item, `Search ${this._name()} for ${title}`).toBeDefined();
+		}).toPass();
+		return item as DropdownItem;
 	}
 
 	async isOpen(): Promise<boolean> {

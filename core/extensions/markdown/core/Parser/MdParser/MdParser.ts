@@ -4,6 +4,23 @@ export interface MdParserOptions {
 	tags: { [name: string]: Schema };
 }
 
+enum PreParseSyntax {
+	Pre = 1 << 0,
+	Comment = 1 << 1,
+	Table = 1 << 2,
+	Include = 1 << 3,
+	Id = 1 << 4,
+	Dash = 1 << 5,
+	Square = 1 << 6,
+	Property = 1 << 7,
+	Formula = 1 << 8,
+	Br = 1 << 9,
+	Kbd = 1 << 10,
+	Html = 1 << 11,
+}
+
+const allPreParseSyntax = (1 << 12) - 1;
+
 export default class MdParser {
 	private _tags: { [name: string]: Schema };
 	private _escapeDoubleQuotesRegExp: RegExp;
@@ -20,6 +37,8 @@ export default class MdParser {
 	private _emptyParagraphRegExp: RegExp;
 	private _findHtmlRegExp: RegExp;
 	private _findHtmlTagRegExp: RegExp;
+	private _preParseSyntaxRegExp =
+		/<!--|<pre>|<kbd>|<html|<br|{% table|{%property|\[include:|\[html|[[{] ?#|-|\[|\{|\$/g;
 
 	private _backDashRegExp: RegExp;
 	private _backArrowRegExp: RegExp;
@@ -52,8 +71,8 @@ export default class MdParser {
 		this._idRegExp = this._createIgnoreRegExp(String.raw`[[{] ?(#.*?) ?[\]}]`);
 		this._brRegExp = this._createIgnoreRegExp(String.raw`(<br>|<br\/>)`);
 		this._kbdRegExp = this._createIgnoreRegExp(String.raw`<kbd>([\s\S]*?)<\/kbd>`);
-		this._backDashRegExp = this._createIgnoreRegExp(String.raw`(—)`);
-		this._backArrowRegExp = this._createIgnoreRegExp(String.raw`(→)`);
+		this._backDashRegExp = this._createIgnoreRegExp("(—)");
+		this._backArrowRegExp = this._createIgnoreRegExp("(→)");
 		this._findHtmlRegExp = this._createBlockCodeIgnoreRegExp(String.raw`(^[^\n]*)\[html.*]([\s\S]*?)\[\/html\]`);
 		this._findHtmlTagRegExp = this._createBlockCodeIgnoreRegExp(
 			String.raw`(^[^\n]*)(<html[^>]*>)([\s\S]*?)<\/html>`,
@@ -70,20 +89,83 @@ export default class MdParser {
 
 	preParse(content: string): string {
 		let newContent = content;
-		newContent = this._preTagParser(newContent);
-		newContent = this._removeComments(newContent);
-		newContent = this._tableParser(newContent);
-		newContent = this._includeParse(newContent);
-		newContent = this._idParser(newContent);
-		newContent = this._dashArrowParser(newContent);
-		newContent = this._squareBracketsParser(newContent);
-		newContent = this._propertyParser(newContent);
-		newContent = this._formulaParser(newContent);
-		newContent = this._brParser(newContent);
-		newContent = this._kbdParser(newContent);
+		const syntax = this._detectPreParseSyntax(content);
+		let shouldParseFormula = Boolean(syntax & PreParseSyntax.Formula);
+		if (syntax & PreParseSyntax.Pre) newContent = this._preTagParser(newContent);
+		if (syntax & PreParseSyntax.Comment) newContent = this._removeComments(newContent);
+		if (syntax & PreParseSyntax.Table) newContent = this._tableParser(newContent);
+		if (syntax & PreParseSyntax.Include) newContent = this._includeParse(newContent);
+		if (syntax & PreParseSyntax.Id) newContent = this._idParser(newContent);
+		if (syntax & PreParseSyntax.Dash) newContent = this._dashArrowParser(newContent);
+		if (syntax & PreParseSyntax.Square) {
+			const contentBeforeSquareParser = newContent;
+			newContent = this._squareBracketsParser(newContent);
+			if (newContent !== contentBeforeSquareParser) shouldParseFormula = true;
+		}
+		if (syntax & PreParseSyntax.Property) newContent = this._propertyParser(newContent);
+		if (shouldParseFormula) newContent = this._formulaParser(newContent);
+		if (syntax & PreParseSyntax.Br) newContent = this._brParser(newContent);
+		if (syntax & PreParseSyntax.Kbd) newContent = this._kbdParser(newContent);
 		newContent = this._emptyParagraphParser(newContent);
-		newContent = this._htmlParser(newContent);
+		if (syntax & PreParseSyntax.Html) newContent = this._htmlParser(newContent);
 		return newContent;
+	}
+
+	private _detectPreParseSyntax(content: string): number {
+		let syntax = 0;
+		this._preParseSyntaxRegExp.lastIndex = 0;
+		let match = this._preParseSyntaxRegExp.exec(content);
+		while (syntax !== allPreParseSyntax && match) {
+			switch (match[0]) {
+				case "<pre>":
+					syntax |= PreParseSyntax.Pre;
+					break;
+				case "<!--":
+					syntax |= PreParseSyntax.Comment;
+					break;
+				case "{% table":
+					syntax |= PreParseSyntax.Table | PreParseSyntax.Formula;
+					break;
+				case "[include:":
+					syntax |= PreParseSyntax.Include | PreParseSyntax.Square | PreParseSyntax.Formula;
+					break;
+				case "-":
+					syntax |= PreParseSyntax.Dash;
+					break;
+				case "{%property":
+					syntax |= PreParseSyntax.Property | PreParseSyntax.Formula;
+					break;
+				case "$":
+				case "{":
+					syntax |= PreParseSyntax.Formula;
+					break;
+				case "<br":
+					syntax |= PreParseSyntax.Br;
+					break;
+				case "<kbd>":
+					syntax |= PreParseSyntax.Kbd;
+					break;
+				case "[html":
+					syntax |= PreParseSyntax.Html | PreParseSyntax.Square;
+					break;
+				case "<html":
+					syntax |= PreParseSyntax.Html;
+					break;
+				case "[#":
+				case "[ #":
+					syntax |= PreParseSyntax.Id | PreParseSyntax.Square | PreParseSyntax.Formula;
+					break;
+				case "{#":
+				case "{ #":
+					syntax |= PreParseSyntax.Id | PreParseSyntax.Formula;
+					break;
+				case "[":
+					syntax |= PreParseSyntax.Square;
+					break;
+			}
+			match = this._preParseSyntaxRegExp.exec(content);
+		}
+		return syntax;
 	}
 
 	backParse(content: string): string {

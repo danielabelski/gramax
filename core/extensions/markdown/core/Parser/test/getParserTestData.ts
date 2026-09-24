@@ -12,5 +12,5 @@ export const getParserTestData = async (fileName = "emptyArticle") => {
 	const fp = app.wm.current().getFileProvider();
 	const testArticleItemRef = getItemRef(catalog, `category/${fileName}.md`);
 	const parseContext: ParserContext = new TestContext(testArticleItemRef, catalog, fp, parser, formatter);
-	return { parseContext, parser };
+	return { parseContext, parser, formatter };
 };

@@ -45,6 +45,30 @@ describe("useNavigationItem", () => {
 		expect(result.current.open).toBe(false);
 	});
 
+	test("open follows the temporary current-article ancestor set", () => {
+		const current = { ...link("a/b"), isCurrentLink: true };
+		act(() => navigationTreeStore.getState().setNavItems([link("a", [current]), link("d")]));
+		const { result } = renderHook(() => useNavigationItem("a"));
+
+		expect(result.current.open).toBe(true);
+
+		act(() => result.current.toggleExpanded("a", false));
+
+		expect(result.current.open).toBe(false);
+
+		act(() => navigationTreeStore.getState().setNavItems([link("a", [current]), link("d")]));
+
+		expect(result.current.open).toBe(false);
+
+		act(() =>
+			navigationTreeStore
+				.getState()
+				.setNavItems([link("a", [link("a/b")]), { ...link("d"), isCurrentLink: true }]),
+		);
+
+		expect(result.current.open).toBe(false);
+	});
+
 	test("isSelected follows the selected id", () => {
 		const { result } = renderHook(() => useNavigationItem("a/b"));
 		expect(result.current.isSelected).toBe(false);

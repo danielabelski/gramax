@@ -1,21 +1,21 @@
-import ButtonLink from "@components/Molecules/ButtonLink";
+import type { IconCode } from "@components/Atoms/Icon/LucideIcon";
+import { RightNavigationButton } from "@components/Layouts/CatalogLayout/RightNavigation/RightNavigationButton";
 import type { TitledLink } from "@ext/navigation/NavigationLinks";
-import { Fragment, type ReactNode } from "react";
+import { Divider } from "@ui-kit/Divider";
+import type { ReactNode } from "react";
 import { tv } from "tailwind-variants";
-import Divider from "../Atoms/Divider";
 
 interface RenderTitledLinks {
 	links: TitledLink[];
 	isCatalog?: boolean;
-	isChildren?: boolean;
 }
 
 const listStyles = tv({
-	base: "!pl-0 text-sm leading-normal text-[var(--color-primary)] list-none",
+	base: "!pl-0 text-sm leading-normal list-none",
 });
 
 const anchorStyles = tv({
-	base: "layout_link inline-flex font-light text-[var(--color-primary-general)] no-underline hover:text-[var(--color-primary)]!",
+	base: "layout_link inline-flex font-light no-underline w-full",
 });
 
 const childrenSpanStyles = tv({
@@ -31,26 +31,19 @@ const RenderTitledLink = ({ link }: { link: TitledLink }): JSX.Element => {
 			rel="noreferrer"
 			target={link.target ?? "_blank"}
 		>
-			<ButtonLink iconCode={link.icon} text={link.title} />
+			<RightNavigationButton fullWidth startIcon={link.icon as IconCode}>
+				{link.title}
+			</RightNavigationButton>
 			{link.childrens && (
 				<span className={childrenSpanStyles()}>
-					<RenderTitledLinks isChildren={true} links={link.childrens} />
+					<RenderTitledLinks links={link.childrens} />
 				</span>
 			)}
 		</a>
 	);
 };
 
-const RenderTitledLinks = ({ links, isCatalog, isChildren }: RenderTitledLinks): ReactNode => {
-	if (isChildren) {
-		return links.map((link, idx) => (
-			<Fragment key={link.url}>
-				{idx !== 0 ? "/" : ""}
-				<RenderTitledLink link={link} />
-			</Fragment>
-		));
-	}
-
+const RenderTitledLinks = ({ links, isCatalog }: RenderTitledLinks): ReactNode => {
 	return links.map((link) =>
 		!Object.keys(link).length ? (
 			<Divider className="divider" key={link.url} />
@@ -71,7 +64,6 @@ const Links = (props: {
 	articleLinks?: TitledLink[];
 	catalogLinks?: TitledLink[];
 	articleChildren?: JSX.Element;
-	isArticleActionsVisible?: boolean;
 	catalogChildren?: JSX.Element;
 	isCatalogActionsVisible?: boolean;
 	className?: string;
@@ -79,16 +71,14 @@ const Links = (props: {
 	const {
 		articleLinks = [],
 		articleChildren,
-		isArticleActionsVisible,
 		catalogLinks = [],
 		catalogChildren,
 		isCatalogActionsVisible,
 		className,
 	} = props;
 	return (
-		<ul className={listStyles({ className })}>
-			{articleLinks?.length || isArticleActionsVisible ? <Divider className="mt-4 mb-4" /> : null}
-			<ul className="!mt-0 !mb-0 !pl-5 !-ml-5 list-none">
+		<>
+			<ul className={listStyles({ className })}>
 				<RenderTitledLinks isCatalog={false} links={articleLinks} />
 				{articleChildren}
 			</ul>
@@ -97,7 +87,7 @@ const Links = (props: {
 				<RenderTitledLinks isCatalog={true} links={catalogLinks} />
 				{catalogChildren}
 			</ul>
-		</ul>
+		</>
 	);
 };
 

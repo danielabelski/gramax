@@ -1,8 +1,7 @@
-import Path from "@core/FileProvider/Path/Path";
 import type { Article } from "@core/FileStructue/Article/Article";
 import type { Category } from "@core/FileStructue/Category/Category";
-import { ItemType } from "@core/FileStructue/Item/ItemType";
 import type ParseError from "@ext/markdown/core/Parser/Error/ParseError";
+import AgentResourcesProvider from "../../core/agentResourcesProvider";
 import { AgentArticleParser } from "../parser";
 import { fail, ok, type ToolExecutionContext, type ToolExecutionResult } from "../tool";
 import { updateCatalogItem, updateCatalogItemInUi } from "../utils/catalogItem";
@@ -24,23 +23,26 @@ export async function runWriteCatalogItem({
 	openItemPath,
 }: ToolExecutionContext): Promise<ToolExecutionResult> {
 	const { catalogName, itemPath, content, headingId } = input as WriteCatalogItemInput;
+	if (AgentResourcesProvider.isSystemCatalog(catalogName)) {
+		return fail("System catalog is read-only");
+	}
 	try {
 		const catalog = await app.wm.current().getCatalog(catalogName, ctx);
-		const item = catalog.findItemByItemPath(new Path(Path.join(catalogName, itemPath))) as Article | Category;
-		if (!item) return fail(`Item not found`);
-		if (item.type !== ItemType.article && item.type !== ItemType.category) {
-			return fail(`Only article and category are supported, current type=${item.type}`);
-		}
-		const parser = await AgentArticleParser.open(app, ctx, commands, catalog, item);
+		const resolved = await CatalogItemLookup.resolve(catalog, catalogName, itemPath);
+		if (!resolved) return fail(`Item not found`);
+		const { item, lookup } = resolved;
+		const parser = await AgentArticleParser.open(app, ctx, commands, catalog, item as Article | Category);
 		const parsedContent = await updateCatalogItem(app, ctx, catalog, item, parser, content, headingId);
-		const lookup = await CatalogItemLookup.fromCatalogItem(catalog, item);
 		if (openCatalogName === lookup.catalogName && openItemPath === lookup.itemPath) {
 			await updateCatalogItemInUi(item, parsedContent, ctx, commands, catalog);
 		}
-		return ok({
-			...lookup.asJSON(),
-			...(headingId ? { headingId } : {}),
-		});
+		return ok(
+			{
+				...lookup.asAgentJSON(),
+				...(headingId ? { headingId } : {}),
+			},
+			{ navChanged: true },
+		);
 	} catch (e) {
 		const cause = (e as ParseError).cause;
 		if (cause) {

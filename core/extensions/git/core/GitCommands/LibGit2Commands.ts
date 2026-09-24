@@ -165,8 +165,13 @@ class LibGit2Commands extends LibGit2BaseCommands implements GitCommandsModel {
 	}
 
 	async add(paths?: Path[], force = false) {
-		const patterns = paths?.map((p) => p.value);
-		await git.add({ repoPath: this._repoPath, patterns: patterns?.length ? patterns : ["."], force });
+		// An empty list means there is nothing to add, and only `undefined` means "everything". Both
+		// used to arrive here as `["."]`, so a caller that had computed "no files changed" asked for a
+		// walk of the whole catalog instead of doing nothing — a second of it on a real catalog.
+		if (paths?.length === 0) return;
+
+		const patterns = paths?.map((p) => p.value) ?? ["."];
+		await git.add({ repoPath: this._repoPath, patterns, force });
 	}
 
 	async diff(opts: DiffConfig): Promise<DiffTree2TreeInfo> {
@@ -321,12 +326,31 @@ class LibGit2Commands extends LibGit2BaseCommands implements GitCommandsModel {
 		return git.graphHeadUpstreamFiles({ repoPath: this._repoPath, searchIn });
 	}
 
+	/**
+	 * The same replay, merged against the index instead of `HEAD`.
+	 *
+	 * Used when the stash outlived the operation that took it: by the time this runs the user has been
+	 * editing again, and those edits are in the index. See `stash_restore` in `crates/git`.
+	 */
+	async restoreStash(stashOid: string): Promise<git.MergeResult> {
+		try {
+			const res = await git.stashRestore({ repoPath: this._repoPath, oid: stashOid });
+			return res?.length ? res : [];
+		} catch (e) {
+			throw getGitError(e, { repositoryPath: this._repoPath, theirs: stashOid });
+		}
+	}
+
+	listStashes(): Promise<git.StashInfo[]> {
+		return git.stashList({ repoPath: this._repoPath });
+	}
+
 	deleteStash(stashOid: string): Promise<void> {
 		return git.stashDelete({ repoPath: this._repoPath, oid: stashOid });
 	}
 
-	stash(data: SourceData): Promise<string> {
-		return git.stash({ repoPath: this._repoPath, creds: this._intoCreds(data), message: null });
+	stash(): Promise<string> {
+		return git.stash({ repoPath: this._repoPath, message: null });
 	}
 
 	async stashParent(stashOid: string): Promise<GitVersion> {
@@ -360,8 +384,12 @@ class LibGit2Commands extends LibGit2BaseCommands implements GitCommandsModel {
 		return Promise.resolve(REMOTE);
 	}
 
-	getCommitAuthors(): Promise<git.CommitAuthorInfo[]> {
-		return git.getCommitAuthors({ repoPath: this._repoPath });
+	getCommitAuthors(pathspecs?: string[]): Promise<git.CommitAuthorInfo[]> {
+		return git.getCommitAuthors({ repoPath: this._repoPath, pathspecs });
+	}
+
+	getCommitRange(pathspecs?: string[]): Promise<git.CommitRangeInfo | null> {
+		return git.getCommitRange({ repoPath: this._repoPath, pathspecs });
 	}
 
 	readFile(filePath: Path, scope: TreeReadScope): Promise<ArrayBuffer> {

@@ -13,6 +13,9 @@ interface SectionComponentProps {
 	activeTab: SettingsTab;
 	formProps: FormProps;
 	form: UseFormReturn<FormData>;
+	onToggleAutoLfs?: (next: boolean) => void;
+	autoLfsChecking?: boolean;
+	lfsKnown?: boolean;
 }
 
 const getSectionComponentByTab = (activeTab: SettingsTab) => {

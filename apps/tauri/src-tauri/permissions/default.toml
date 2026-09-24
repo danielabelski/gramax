@@ -8,7 +8,6 @@ permissions = [
   "allow-get-user-language",
   "allow-http-listen-once",
   "allow-open-in-web",
-  "allow-http-request",
   "allow-get-settings",
   "allow-set-settings",
   "allow-close-current-window",
@@ -54,10 +53,6 @@ commands.allow = ["http_listen_once"]
 [[permission]]
 identifier = "allow-open-in-web"
 commands.allow = ["open_in_web"]
-
-[[permission]]
-identifier = "allow-http-request"
-commands.allow = ["http_request"]
 
 [[permission]]
 identifier = "allow-get-settings"

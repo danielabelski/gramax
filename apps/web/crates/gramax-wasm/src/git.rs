@@ -209,13 +209,23 @@ pub fn get_remote(repo_path: String) -> Result<Option<String>> {
 }
 
 #[em_bindgen(json)]
-pub fn stash(repo_path: String, message: Option<String>, creds: AccessTokenCreds) -> Result<Option<String>> {
-	git::stash(Path::new(&repo_path), message.as_deref(), creds)
+pub fn stash(repo_path: String, message: Option<String>) -> Result<Option<String>> {
+	git::stash(Path::new(&repo_path), message.as_deref())
 }
 
 #[em_bindgen(json)]
 pub fn stash_apply(repo_path: String, oid: String) -> Result<MergeResult> {
 	git::stash_apply(Path::new(&repo_path), &oid)
+}
+
+#[em_bindgen(json)]
+pub fn stash_restore(repo_path: String, oid: String) -> Result<MergeResult> {
+	git::stash_restore(Path::new(&repo_path), &oid)
+}
+
+#[em_bindgen(json)]
+pub fn stash_list(repo_path: String) -> Result<Vec<StashInfo>> {
+	git::stash_list(Path::new(&repo_path))
 }
 
 #[em_bindgen]
@@ -269,8 +279,13 @@ pub fn get_draft_merge_request(repo_path: String) -> Result<Option<MergeRequest>
 }
 
 #[em_bindgen(json)]
-pub fn get_all_commit_authors(repo_path: String) -> Result<Vec<CommitAuthorInfo>> {
-	git::get_all_commit_authors(Path::new(&repo_path))
+pub fn get_commit_authors(repo_path: String, pathspecs: Option<Vec<String>>) -> Result<Vec<CommitAuthorInfo>> {
+	git::get_commit_authors(Path::new(&repo_path), pathspecs)
+}
+
+#[em_bindgen(json)]
+pub fn get_commit_range(repo_path: String, pathspecs: Option<Vec<String>>) -> Result<Option<CommitRangeInfo>> {
+	git::get_commit_range(Path::new(&repo_path), pathspecs)
 }
 
 #[em_bindgen]

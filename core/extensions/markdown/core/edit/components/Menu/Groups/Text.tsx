@@ -4,7 +4,7 @@ import StrikeMenuButton from "@ext/markdown/elements/strikethrough/edit/componen
 import StrongMenuButton from "@ext/markdown/elements/strong/edit/components/StrongMenuButton";
 import { getPluginComponents } from "@plugins/store";
 import type { Editor } from "@tiptap/core";
-import { ToolbarSeparator } from "@ui-kit/Toolbar";
+import { GlassToolbarGroup, GlassToolbarSeparator } from "@ui-kit/GlassToolbar";
 
 export interface TextMenuGroupButtons {
 	strong?: boolean;
@@ -22,21 +22,31 @@ interface TextMenuGroupProps {
 const TextMenuGroup = ({ editor, isSelectionMenu = false, buttons }: TextMenuGroupProps) => {
 	const { strong = true, em = true, strike = true, highlight = true } = buttons || {};
 
+	const plugins = getPluginComponents();
+
 	return (
 		<>
-			{strong && <StrongMenuButton editor={editor} />}
-			{em && <EmMenuButton editor={editor} />}
-			{strike && <StrikeMenuButton editor={editor} />}
+			{(strong || em || strike) && (
+				<GlassToolbarGroup>
+					{strong && <StrongMenuButton editor={editor} />}
+					{em && <EmMenuButton editor={editor} />}
+					{strike && <StrikeMenuButton editor={editor} />}
+				</GlassToolbarGroup>
+			)}
 			{isSelectionMenu && highlight && (
 				<>
-					<ToolbarSeparator />
+					<GlassToolbarSeparator variant="inline" />
 					<HighlightMenuButton editor={editor} />
 				</>
 			)}
-			{getPluginComponents().map((Component, index) => (
-				// biome-ignore lint/suspicious/noArrayIndexKey: index used as key because the order of plugins is static
-				<Component editor={editor} key={index} />
-			))}
+			{plugins.length > 0 && (
+				<GlassToolbarGroup>
+					{plugins.map((Component, index) => (
+						// biome-ignore lint/suspicious/noArrayIndexKey: index used as key because the order of plugins is static
+						<Component editor={editor} key={index} />
+					))}
+				</GlassToolbarGroup>
+			)}
 		</>
 	);
 };

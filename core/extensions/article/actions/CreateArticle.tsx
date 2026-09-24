@@ -30,12 +30,20 @@ interface CreateArticleProps {
 	onCreate?: () => void;
 }
 
-const StyledSpan = styled.span`
+const StyledButton = styled.button`
 	width: 100%;
 	height: 100%;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	appearance: none;
+	background: none;
+	border: none;
+	padding: 0;
+	margin: 0;
+	font: inherit;
+	color: inherit;
+	text-align: inherit;
 `;
 
 const CreateArticleComponent = (props: CreateArticleProps) => {
@@ -70,7 +78,7 @@ const CreateArticleComponent = (props: CreateArticleProps) => {
 
 	return (
 		<OtherLanguagesPresentWarning action={onClickHandler}>
-			<StyledSpan className={className} data-testid="create-article">
+			<StyledButton aria-label={content} className={className} data-testid="create-article" type="button">
 				<ButtonLink
 					iconCode="plus"
 					iconContent={content}
@@ -80,7 +88,7 @@ const CreateArticleComponent = (props: CreateArticleProps) => {
 					iconViewBox="3 3 18 18"
 					textSize={item ? null : TextSize.M}
 				/>
-			</StyledSpan>
+			</StyledButton>
 		</OtherLanguagesPresentWarning>
 	);
 };

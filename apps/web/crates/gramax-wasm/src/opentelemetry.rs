@@ -14,6 +14,7 @@ static FILTER_RELOAD_HANDLE: OnceLock<reload::Handle<EnvFilter, Registry>> = Onc
 
 /// Runtime otel level switch from JS.
 /// Rank follows the Gramax scale: 0 = commands, 1 = important, 2 = internal, 3 = files, 4 = full.
+/// `Level.Off` has rank -1 on the JS side and arrives here as `255` — anything outside 0..=4 is off.
 #[no_mangle]
 pub extern "C" fn otel_set_level(rank: u8) {
 	let directive = match rank {
@@ -21,7 +22,8 @@ pub extern "C" fn otel_set_level(rank: u8) {
 		3 => "debug",
 		2 => "info",
 		1 => "warn",
-		_ => "error",
+		0 => "error",
+		_ => "off",
 	};
 
 	let Some(handle) = FILTER_RELOAD_HANDLE.get() else { return };

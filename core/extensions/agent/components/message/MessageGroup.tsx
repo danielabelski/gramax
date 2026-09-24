@@ -1,5 +1,6 @@
 import { Fragment, memo, useMemo } from "react";
 import type { ChatMessage } from "../types/chat";
+import type { MissingSecretWarning } from "./getMissingSecretsFromToolResult";
 import { MessageCard } from "./MessageCard";
 import { ToolActivityBundle } from "./ToolActivityBundle";
 
@@ -33,6 +34,8 @@ type MessageGroupProps = {
 	copyButtonMessageId?: string | null;
 	cancelledDurationMs?: number;
 	footerAlwaysVisible?: boolean;
+	missingSecretWarning?: MissingSecretWarning | null;
+	missingSecretWarningMessageId?: string | null;
 };
 
 export const MessageGroup = memo(
@@ -42,6 +45,8 @@ export const MessageGroup = memo(
 		copyButtonMessageId,
 		cancelledDurationMs,
 		footerAlwaysVisible,
+		missingSecretWarning,
+		missingSecretWarningMessageId,
 	}: MessageGroupProps) => {
 		const segments = useMemo(() => groupMessagesWithToolBundles(messages), [messages]);
 		return (
@@ -62,6 +67,8 @@ export const MessageGroup = memo(
 							footerAlwaysVisible={footerAlwaysVisible}
 							key={seg.message.id}
 							message={seg.message}
+							missingSecretWarning={missingSecretWarning}
+							missingSecretWarningMessageId={missingSecretWarningMessageId}
 							streamDescription={streamingMessageId === seg.message.id}
 						/>
 					);

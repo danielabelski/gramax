@@ -1,11 +1,13 @@
 import type { DiffFlattenTreeAnyItem } from "@ext/git/core/GitDiffItemCreator/RevisionDiffPresenter";
 
-/**
- * В упрощённом режиме ресурсы, вложенные в статью, не показываются:
- * строка статьи представляет и саму статью, и её ресурсы.
- */
-export const isDiffEntryVisible = (entry: DiffFlattenTreeAnyItem, extendedMode: boolean): boolean =>
-	extendedMode || !(entry.type === "resource" && entry.indent > 1);
+const isCommentsResource = (entry: DiffFlattenTreeAnyItem): boolean =>
+	entry.type === "resource" &&
+	(entry.filepath.new.endsWith(".comments.yaml") || entry.filepath.old.endsWith(".comments.yaml"));
+
+export const isDiffEntryVisible = (entry: DiffFlattenTreeAnyItem, extendedMode: boolean): boolean => {
+	if (extendedMode || entry.type !== "resource") return true;
+	return entry.indent <= 1 && !isCommentsResource(entry);
+};
 
 /** Сколько выбранных строк видит пользователь в текущем режиме отображения. */
 export const countSelectedVisibleEntries = (

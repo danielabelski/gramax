@@ -1,22 +1,39 @@
 import type TokenTransformerFunc from "@ext/markdown/core/edit/logic/Prosemirror/TokenTransformerFunc";
 import type { JSONContent } from "@tiptap/core";
+import type { Schema as ProsemirrorSchema } from "prosemirror-model";
 import type { ParserOptions } from "../../../Parser/Parser";
 import type PrivateParserContext from "../../../Parser/ParserContext/PrivateParserContext";
 import { type RenderableTreeNodes, type Schema, SchemaType, Tag } from "../../../render/logic/Markdoc";
 import { getMarkdocFormatter } from "../Formatter/Formatters/getMarkdocFormatter";
 import type NodeTransformerFunc from "./NodeTransformerFunc";
-import { getSchema } from "./schema";
 
 // biome-ignore lint/suspicious/noExplicitAny: token type is not yet defined
 type Token = any;
 
 export class Transformer {
+	private readonly _firstPassTransformers: TokenTransformerFunc[];
+	private readonly _secondPassTransformers: TokenTransformerFunc[];
+	private readonly _markdocFormatters = new Map<string, ReturnType<typeof getMarkdocFormatter>>();
+
 	constructor(
 		private _schemes: Record<string, Schema>,
 		private _nodeTransformerFuncs: NodeTransformerFunc[],
-		private _tokenTransformerFuncs: TokenTransformerFunc[],
+		tokenTransformerFuncs: TokenTransformerFunc[],
 		private _context: PrivateParserContext,
-	) {}
+		private _schema: ProsemirrorSchema,
+	) {
+		this._firstPassTransformers = [
+			this._annotationTokenTransformer,
+			this._variableTokenTransformer,
+			this._tagTokenTransformer,
+			...tokenTransformerFuncs,
+		];
+		this._secondPassTransformers = [
+			this._openCloseTokenTransformer,
+			...tokenTransformerFuncs,
+			this._inlineTokenTransformer,
+		];
+	}
 
 	async transformMdComponents(
 		inputNode: JSONContent,
@@ -26,31 +43,46 @@ export class Transformer {
 			parserOptions?: ParserOptions,
 		) => Promise<RenderableTreeNodes>,
 	): Promise<JSONContent> {
-		let node = inputNode;
-		if (node?.content)
-			node.content = await Promise.all(
-				node.content.map(async (n) => await this.transformMdComponents(n, renderer)),
-			);
-		if (node?.marks) {
-			const inlineMdIndex = node.marks.findIndex((mark) => mark.type === "inlineMd");
-			if (inlineMdIndex !== -1) {
-				node = {
+		const renderJobs: Promise<void>[] = [];
+		const root = { node: inputNode };
+
+		const visit = (input: JSONContent): JSONContent => {
+			let node = input;
+			if (node?.content) node.content = node.content.map(visit);
+
+			const inlineMd = node?.marks?.some((mark) => mark.type === "inlineMd");
+			if (inlineMd) {
+				const component = {
 					type: "inlineMd_component",
 					attrs: {
 						...node.attrs,
 						comment: { id: node.marks.find((mark) => mark.type === "comment")?.attrs.id },
-						tag: await renderer(node.text, this._context, { isOneElement: true, isBlock: false }),
+						tag: undefined as RenderableTreeNodes,
 						text: node.text,
 					},
 					marks: node.marks.filter((mark) => mark.type !== "comment" && mark.type !== "inlineMd"),
 				};
+				renderJobs.push(
+					renderer(node.text, this._context, { isOneElement: true, isBlock: false }).then((tag) => {
+						component.attrs.tag = tag;
+					}),
+				);
+				node = component;
 			}
-		}
-		if (node.type === "blockMd") {
-			node.attrs.tag = await renderer(node.attrs.text, this._context, { isOneElement: true, isBlock: true });
-		}
 
-		return node;
+			if (node.type === "blockMd") {
+				renderJobs.push(
+					renderer(node.attrs.text, this._context, { isOneElement: true, isBlock: true }).then((tag) => {
+						node.attrs.tag = tag;
+					}),
+				);
+			}
+			return node;
+		};
+
+		root.node = visit(root.node);
+		await Promise.all(renderJobs);
+		return root.node;
 	}
 
 	async transformTree(
@@ -91,31 +123,42 @@ export class Transformer {
 			];
 		}
 
-		const duplicate = [...this._tokenTransformerFuncs];
-
-		this._tokenTransformerFuncs.unshift(this._tagTokenTransformer);
-		this._tokenTransformerFuncs.unshift(this._variableTokenTransformer);
-		this._tokenTransformerFuncs.unshift(this._annotationTokenTransformer);
-
-		let tokens = this._filterTokens(
-			inputTokens.map((t, idx) =>
-				this._transformToken(inputTokens, idx, t, idx === 0 ? null : inputTokens[idx - 1]),
-			),
-		);
-
-		this._tokenTransformerFuncs = duplicate;
-		this._tokenTransformerFuncs.unshift(this._openCloseTokenTransformer);
-		this._tokenTransformerFuncs.push(this._inlineTokenTransformer);
-
-		tokens = this._filterTokens(
-			tokens.map((t, idx) => this._transformToken(tokens, idx, t, idx === 0 ? null : tokens[idx - 1])),
-		);
-
-		return tokens;
+		const generatedTokens = new WeakSet<object>();
+		const firstPassTokens = this._transformTokens(inputTokens, this._firstPassTransformers, false, generatedTokens);
+		return this._transformTokens(firstPassTokens, this._secondPassTransformers, true, generatedTokens);
 	}
 
-	private _filterTokens(tokens: (Token | Token[])[]): Token[] {
-		return tokens.flat().filter((n) => n);
+	private _transformTokens(
+		tokens: Token[],
+		transformerFuncs: TokenTransformerFunc[],
+		isSecondPass: boolean,
+		generatedTokens: WeakSet<object>,
+	): Token[] {
+		const transformedTokens: Token[] = [];
+		for (let index = 0; index < tokens.length; index++) {
+			const transformed = this._transformToken(
+				tokens,
+				index,
+				tokens[index],
+				index === 0 ? null : tokens[index - 1],
+				undefined,
+				transformerFuncs,
+				isSecondPass,
+				generatedTokens,
+			);
+			this._appendTokenResult(transformedTokens, transformed);
+		}
+		return transformedTokens;
+	}
+
+	private _appendTokenResult(target: Token[], result: Token | Token[]): void {
+		if (Array.isArray(result)) {
+			for (const token of result) {
+				if (token) target.push(token);
+			}
+		} else if (result) {
+			target.push(result);
+		}
 	}
 
 	private _variableTokenTransformer: TokenTransformerFunc = ({ token, transformer }) => {
@@ -124,7 +167,7 @@ export class Transformer {
 
 	private _annotationTokenTransformer: TokenTransformerFunc = ({ token, transformer, parent }) => {
 		if (token.type === "annotation") {
-			if (!parent || parent.type !== "inline") return transformer.getInlineMdTokens(`{${token.info}}`);
+			if (parent?.type !== "inline") return transformer.getInlineMdTokens(`{${token.info}}`);
 			if (!parent.attrs) parent.attrs = {};
 			if (token.meta?.attributes)
 				token.meta?.attributes.forEach(({ name, value }) => {
@@ -179,10 +222,13 @@ export class Transformer {
 				attrs,
 			};
 
-			const schema = getSchema();
-			if (!schema.nodes?.[newNode.type] && !schema.marks?.[newNode.type]) {
+			if (!this._schema.nodes?.[newNode.type] && !this._schema.marks?.[newNode.type]) {
 				const nodeSchema = transformer._schemes[newNode.type];
-				const formatter = getMarkdocFormatter(nodeSchema, this._context);
+				let formatter = this._markdocFormatters.get(tagName);
+				if (!formatter) {
+					formatter = getMarkdocFormatter(nodeSchema, this._context);
+					this._markdocFormatters.set(tagName, formatter);
+				}
 				const tag = new Tag(newNode.type, newNode.attrs);
 
 				if (token.type === "tag_open" && parent && parent.type === "inline") {
@@ -223,31 +269,68 @@ export class Transformer {
 		inputToken: Token,
 		previous?: Token,
 		parent?: Token,
+		transformerFuncs: TokenTransformerFunc[] = this._firstPassTransformers,
+		isSecondPass = false,
+		generatedTokens = new WeakSet<object>(),
 	): Token | Token[] {
 		let token = inputToken;
-		for (const transformFunc of this._tokenTransformerFuncs) {
+		for (const transformFunc of transformerFuncs) {
+			if (
+				isSecondPass &&
+				this._isBuiltInSecondPassTransformer(transformFunc) &&
+				!this._needsSecondPass(token, previous, generatedTokens)
+			) {
+				continue;
+			}
+
 			const result = transformFunc({ id, tokens, token, previous, parent, transformer: this });
 			if (result !== undefined) {
+				if (!isSecondPass) this._markGeneratedTokens(result, generatedTokens);
 				token = result;
 				return token;
 			}
 		}
 
 		if (token?.children) {
-			token.children = this._filterTokens(
-				token.children.map((childToken, idx) =>
-					this._transformToken(
-						token.children,
-						idx,
-						childToken,
-						idx === 0 ? null : token.children[idx - 1],
-						token,
-					),
-				),
-			);
+			const children = token.children;
+			const transformedChildren: Token[] = [];
+			for (let index = 0; index < children.length; index++) {
+				const transformed = this._transformToken(
+					children,
+					index,
+					children[index],
+					index === 0 ? null : children[index - 1],
+					token,
+					transformerFuncs,
+					isSecondPass,
+					generatedTokens,
+				);
+				this._appendTokenResult(transformedChildren, transformed);
+			}
+			token.children = transformedChildren;
 		}
 
 		return token;
+	}
+
+	private _needsSecondPass(token: Token, previous: Token, generatedTokens: WeakSet<object>): boolean {
+		if (token && typeof token === "object" && generatedTokens.has(token)) return true;
+		if (token?.type === "inline" && token.attrs) return true;
+		return Boolean(token?.type?.includes("_close") && previous?.type?.includes("_open"));
+	}
+
+	private _isBuiltInSecondPassTransformer(transformer: TokenTransformerFunc): boolean {
+		return transformer === this._openCloseTokenTransformer || transformer === this._inlineTokenTransformer;
+	}
+
+	private _markGeneratedTokens(result: Token | Token[], generatedTokens: WeakSet<object>): void {
+		if (Array.isArray(result)) {
+			for (const token of result) this._markGeneratedTokens(token, generatedTokens);
+			return;
+		}
+		if (!result || typeof result !== "object") return;
+		generatedTokens.add(result);
+		if (result.children) this._markGeneratedTokens(result.children, generatedTokens);
 	}
 
 	public getParagraphTokens(content?: string, children?: Token[]) {

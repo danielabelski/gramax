@@ -3,7 +3,6 @@ use tauri::*;
 use crate::platform::commands::*;
 use crate::settings;
 use crate::shared::commands::*;
-use crate::shared::http_req;
 
 pub fn generate_handler<R: Runtime>(builder: Builder<R>) -> Builder<R> {
 	builder.invoke_handler(generate_handler![
@@ -12,7 +11,6 @@ pub fn generate_handler<R: Runtime>(builder: Builder<R>) -> Builder<R> {
 		get_user_language,
 		http_listen_once,
 		open_in_web,
-		http_req::http_request,
 		settings::get_settings,
 		settings::set_settings,
 		close_current_window,

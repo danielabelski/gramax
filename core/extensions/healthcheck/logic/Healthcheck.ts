@@ -1,6 +1,7 @@
 import { CATEGORY_ROOT_FILENAME, GRAMAX_EDITOR_URL } from "@app/config/const";
 import { type IconCode, LucideIcon } from "@components/Atoms/Icon/LucideIcon";
 import type Context from "@core/Context/Context";
+import type { AliasDiagnostic } from "@core/FileStructue/Alias/AliasIndex";
 import type { Article } from "@core/FileStructue/Article/Article";
 import type { CatalogErrorGroups } from "@core/FileStructue/Catalog/CatalogErrorGroups";
 import type ContextualCatalog from "@core/FileStructue/Catalog/ContextualCatalog";
@@ -29,6 +30,8 @@ export interface CatalogErrorArgs {
 	editorLink: string;
 	title: string;
 	logicPath: string;
+	/** Short explanation shown next to the value; the value itself stays a bare identifier. */
+	hint?: string;
 	isText?: boolean;
 }
 
@@ -138,24 +141,35 @@ class Healthcheck {
 	}
 
 	private async _checkAliases(): Promise<void> {
-		const messages = {
-			"self-alias": t("alias-self"),
-			"shadowed-by-real": t("alias-shadowed"),
-			duplicate: t("alias-duplicate"),
-			"broken-moved": t("alias-broken-moved"),
-		} as const;
-		for (const diagnostic of this._catalog.deref?.aliases?.diagnostics() ?? []) {
+		const deref = this._catalog.deref;
+		for (const diagnostic of deref?.aliases?.diagnostics() ?? []) {
 			const ownerLogicPath = diagnostic.kind === "duplicate" ? diagnostic.loser : diagnostic.owner;
 			const owner = this._catalog.findArticle(ownerLogicPath, []);
 			this._errors.aliases.push(
 				this._getRefCatalogError({
-					value: `${messages[diagnostic.kind]}: ${this._catalog.deref.relativeLogicPath(diagnostic.path)}`,
+					value: deref.relativeLogicPath(diagnostic.path),
+					hint: this._getAliasHint(diagnostic, (path: string) => deref.relativeLogicPath(path)),
 					logicPath: ownerLogicPath,
 					title: owner?.getTitle() ?? new Path(ownerLogicPath).name,
 					editorLink: owner ? await this._getErrorLink(this._catalog, owner) : "",
-					isText: true,
 				}),
 			);
+		}
+	}
+
+	private _getAliasHint(diagnostic: AliasDiagnostic, relative: (logicPath: string) => string): string {
+		switch (diagnostic.kind) {
+			case "self-alias":
+				return t("alias-self");
+			case "shadowed-by-real":
+				return t("alias-shadowed");
+			// The replacements are closures on purpose: both values come from the catalog itself,
+			// so a $& or $1 inside a path or a frontmatter date would otherwise be read as a
+			// substitution pattern and the reader would see the pattern instead of the value.
+			case "duplicate":
+				return t("alias-duplicate").replace("{{winner}}", () => relative(diagnostic.winner));
+			case "broken-moved":
+				return t("alias-broken-moved").replace("{{moved}}", () => diagnostic.moved);
 		}
 	}
 

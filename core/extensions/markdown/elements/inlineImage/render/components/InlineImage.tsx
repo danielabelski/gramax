@@ -2,6 +2,7 @@ import Skeleton from "@components/Atoms/ImageSkeleton";
 import { ResourceError } from "@core-ui/ContextServices/ResourceService/errors";
 import { useGetResource } from "@core-ui/ContextServices/ResourceService/hooks/useGetResource";
 import { resolveFileKind } from "@core-ui/utils/resolveFileKind";
+// biome-ignore lint/style/noRestrictedImports: expected
 import styled from "@emotion/styled";
 import InlineCommentView from "@ext/markdown/elements/comment/edit/components/View/InlineCommentView";
 import InlineImageError from "@ext/markdown/elements/inlineImage/render/components/InlineImageError";
@@ -62,7 +63,7 @@ const ContainerWrapper = styled(InlineCommentView)`
 		outline: 2px solid var(--color-comment-block-border) !important;
 	}
 
-	&[data-comment="true"].inline-comment-view:has(.active) {
+	&[data-comment="true"].inline-comment-view.active {
 		outline: 2px solid var(--color-comment-block-hover-border) !important;
 	}
 

@@ -6,7 +6,6 @@ import { getEditorStore } from "@core-ui/stores/EditorStore";
 import t from "@ext/localization/locale/translate";
 import { useNodeViewContext } from "@ext/markdown/core/element/NodeViewContextableWrapper";
 import FloatActions from "@ext/markdown/elements/float/edit/components/FloatActions";
-import { NodeSelection } from "@tiptap/pm/state";
 import { type ReactNode, useCallback, useMemo } from "react";
 
 export interface UseDefaultActionsOptions {
@@ -22,7 +21,7 @@ const useDefaultActions = (right: ReactNode, left: ReactNode, options: UseDefaul
 	const { editor, deleteNode, node, getPos } = useNodeViewContext();
 	const apiUrlCreator = ApiUrlCreator.value;
 	const pageDataContext = PageDataContext.value;
-	const disabledComment = !pageDataContext.userInfo || !getEditorStore().commentEnabled;
+	const disabledComment = !pageDataContext.user.info || !getEditorStore().commentEnabled;
 	const { comment = false, delete: deleteAction = true, float = false } = options;
 	const hasComment = Boolean(node?.attrs?.comment?.id);
 
@@ -30,28 +29,29 @@ const useDefaultActions = (right: ReactNode, left: ReactNode, options: UseDefaul
 		deleteNode();
 	}, [deleteNode]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: apiUrlCreator comes from context and changes per catalog; dropping it would leave a stale creator in the closure
 	const handleAddComment = useCallback(async () => {
-		if (!editor || !(editor.state.selection instanceof NodeSelection)) return;
-		const anchorPosition = editor.state.selection.$anchor;
-		const node = editor.state.selection.node;
+		if (!editor || editor.isDestroyed) return;
 
-		const commentId = node.attrs.comment?.id;
+		const pos = getPos?.();
+		if (typeof pos !== "number") return;
+		const target = editor.state.doc.nodeAt(pos);
+		if (!target) return;
+
+		editor.commands.setNodeSelection(pos);
+
+		const position = { from: pos, to: pos + target.nodeSize };
+		const commentId = target.attrs.comment?.id;
 		if (commentId) {
-			editor.commands.openComment(commentId, {
-				from: anchorPosition.pos,
-				to: anchorPosition.pos + node.nodeSize,
-			});
+			editor.commands.openComment(commentId, position);
 			return;
 		}
 
 		const res = await FetchService.fetch(apiUrlCreator.getNewCommentId());
-		if (!res.ok) return;
+		if (!res.ok || editor.isDestroyed) return;
 
-		editor.commands.toggleComment(
-			{ id: await res.text() },
-			{ from: anchorPosition.pos, to: anchorPosition.pos + node.nodeSize },
-		);
-	}, [editor, apiUrlCreator]);
+		editor.commands.toggleComment({ id: await res.text() }, position);
+	}, [editor, apiUrlCreator, getPos]);
 
 	const memoRight = useMemo(
 		() => (

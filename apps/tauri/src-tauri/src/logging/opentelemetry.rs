@@ -1,6 +1,8 @@
 use std::io::BufWriter;
 use std::io::Write;
 use std::sync::mpsc;
+use std::sync::Mutex;
+use std::sync::OnceLock;
 
 use gramax_opentelemetry::OtelSpan;
 use opentelemetry_sdk::trace::SdkTracerProvider;
@@ -12,10 +14,27 @@ use tracing_subscriber::{registry::LookupSpan, Layer};
 enum LogMessage {
 	SerializedSpan { stderr: String, json: String },
 	JsSerializedSpan(Vec<String>),
+	Flush(mpsc::SyncSender<()>),
 }
 
 #[derive(Clone)]
 pub struct LogSender(mpsc::Sender<LogMessage>);
+
+static LOG_SENDER: OnceLock<Mutex<mpsc::Sender<LogMessage>>> = OnceLock::new();
+
+pub fn flush_log_writer() {
+	let Some(sender) = LOG_SENDER.get() else { return };
+	let (ack, flushed) = mpsc::sync_channel(0);
+
+	{
+		let Ok(sender) = sender.lock() else { return };
+		if sender.send(LogMessage::Flush(ack)).is_err() {
+			return;
+		}
+	}
+
+	let _ = flushed.recv_timeout(std::time::Duration::from_secs(2));
+}
 
 pub fn spawn_log_writer(mut file: BufWriter<std::fs::File>) -> LogSender {
 	let (tx, rx) = mpsc::channel::<LogMessage>();
@@ -34,10 +53,16 @@ pub fn spawn_log_writer(mut file: BufWriter<std::fs::File>) -> LogSender {
 							let _ = writeln!(file, "{json}");
 						}
 					}
+					LogMessage::Flush(ack) => {
+						let _ = file.flush();
+						let _ = ack.send(());
+					}
 				}
 			}
 		})
 		.expect("failed to spawn otel-log-writer thread");
+
+	let _ = LOG_SENDER.set(Mutex::new(tx.clone()));
 
 	LogSender(tx)
 }

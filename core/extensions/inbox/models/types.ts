@@ -1,10 +1,6 @@
 import type { ItemProps } from "@core/FileStructue/Item/Item";
-import type { PopoverRect } from "@ext/articleProvider/logic/Popover";
 import type { ProviderItemProps } from "@ext/articleProvider/models/types";
-
-export type InboxDragItemData = { draggedId: string };
-export type InboxDropItemData = { droppedId: string };
-export type InboxDragDropData = InboxDragItemData & InboxDropItemData;
+import type { JSONContent } from "@tiptap/core";
 
 export type Author = string;
 
@@ -16,18 +12,9 @@ export type InboxProps = ItemProps & {
 };
 
 export type InboxArticle = ProviderItemProps & {
+	editTree: JSONContent;
 	props: {
 		date: string;
 		author: Author;
 	};
-};
-
-export type InboxArticleId = string;
-
-export type InboxLocalStorageData = {
-	[key: InboxArticleId]: InboxArticleLocalStorageData;
-};
-
-export type InboxArticleLocalStorageData = {
-	rect: PopoverRect;
 };

@@ -6,16 +6,21 @@ import { Icon } from "@ui-kit/Icon";
 import type { HTMLAttributes } from "react";
 
 interface CardLogoProps extends HTMLAttributes<HTMLDivElement> {
-	logo: CatalogLogo;
+	logo: CatalogLogo | null;
 }
 
-const resolveCardLogoElement = (logo: CatalogLogo) => {
+interface CatalogLogoContentProps {
+	logo: CatalogLogo | null;
+	className?: string;
+}
+
+const resolveCatalogLogoElement = ({ logo, className }: CatalogLogoContentProps) => {
 	if (!logo) return null;
 
 	if ("iconCode" in logo && logo?.iconCode) {
 		return (
 			<Icon
-				className="h-full w-full ml-0.5 mt-0.5"
+				className={cn("h-full w-full ml-0.5 mt-0.5", className)}
 				color={logo?.iconColor ? `var(--color-icon-${logo?.iconColor})` : undefined}
 				icon={logo?.iconCode as IconCode}
 			/>
@@ -24,22 +29,21 @@ const resolveCardLogoElement = (logo: CatalogLogo) => {
 
 	if ("emoji" in logo && logo?.emoji) {
 		return (
-			<span className="flex items-center justify-center h-full w-full text-5xl leading-none">{logo.emoji}</span>
+			<span className={cn("flex items-center justify-center h-full w-full text-5xl leading-none", className)}>
+				{logo.emoji}
+			</span>
 		);
 	}
 
 	if ("src" in logo && logo?.src) {
 		return (
 			<div
+				className={cn("h-full w-full ml-0.5 mt-0.5", className)}
 				style={{
 					backgroundImage: `url(${logo.src})`,
-					height: "100%",
-					width: "100%",
 					backgroundSize: "contain",
 					backgroundPosition: "center center",
 					backgroundRepeat: "no-repeat",
-					marginLeft: "2px",
-					marginTop: "2px",
 				}}
 			/>
 		);
@@ -48,8 +52,10 @@ const resolveCardLogoElement = (logo: CatalogLogo) => {
 	return null;
 };
 
+export const CatalogLogoContent = (props: CatalogLogoContentProps) => resolveCatalogLogoElement(props);
+
 export const CardLogo = ({ logo, className, ...props }: CardLogoProps) => {
-	const logoElement = resolveCardLogoElement(logo);
+	const logoElement = resolveCatalogLogoElement({ logo });
 	if (!logoElement) return null;
 	return (
 		<CardVisualBadge className={cn("-bottom-0.5 -right-0.5", className)} {...props}>

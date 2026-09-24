@@ -2,6 +2,7 @@ import DefaultError from "@ext/errorHandlers/logic/DefaultError";
 
 export enum AgentErrorType {
 	Unauthorized = "unauthorized",
+	Forbidden = "forbidden",
 	PaymentRequired = "payment_required",
 	MaxStepsExceeded = "max_steps_exceeded",
 	NetworkError = "network_error",

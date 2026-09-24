@@ -5,7 +5,7 @@ import { ApplyApiMiddleware } from "../../../logic/Api/ApplyMiddleware";
 
 export default ApplyApiMiddleware(
 	async function (req: ApiRequest, res: ApiResponse) {
-		await this.app.am.login(req, res);
+		await this.app.amp.current().login(req, res);
 	},
 	[new MainMiddleware()],
 );

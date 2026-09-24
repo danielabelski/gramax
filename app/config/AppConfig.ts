@@ -11,7 +11,6 @@ export type AppSettingsSchema = StoredSettings<typeof AppSettings>;
 export type AppGlobalConfig = WorkspaceManagerConfig &
 	EnterpriseConfig &
 	AppConfigWithGesCloud & {
-		version?: number;
 		settings?: AppSettingsSchema;
 	};
 
@@ -65,7 +64,7 @@ export type AppConfig = {
 
 	mail: { user: string; password: string };
 	admin: { login: string; password: string };
-	tokens: { share: string; cookie: string };
+	tokens: { share: string; cookie: string; healthcheck: string };
 	services: ServicesConfig;
 	enterprise: EnterpriseConfig;
 	enterpriseCloud: EnterpriseCloudConfig;
@@ -191,6 +190,7 @@ export const getConfig = (): AppConfig => {
 		tokens: {
 			share: env("SHARE_ACCESS_TOKEN") || null,
 			cookie: env("COOKIE_SECRET") || null,
+			healthcheck: env("HEALTHCHECK_TOKEN") || null,
 		},
 
 		mail: {
@@ -225,6 +225,10 @@ export const getConfig = (): AppConfig => {
 
 	if (getExecutingEnvironment() === "next" && !global.config.tokens.cookie) {
 		console.warn("WARNING: You need to set COOKIE_SECRET if you run gramax in production.");
+	}
+
+	if (getExecutingEnvironment() === "next" && !global.config.tokens.healthcheck) {
+		console.warn("WARNING: You need to set HEALTHCHECK_TOKEN if you run gramax in production.");
 	}
 
 	return global.config;

@@ -30,7 +30,7 @@ const CatalogFetchNotification = ({ catalogLink }: { catalogLink: CatalogLink })
 	if (!syncCount || (!syncCount.errorMessage && !syncCount.hasChanges)) return null;
 	if (syncCount.errorMessage) {
 		return (
-			<Tooltip delayDuration={0}>
+			<Tooltip>
 				<TooltipContent>{syncCount.errorMessage}</TooltipContent>
 				<TooltipTrigger asChild>
 					<ErrorState className="justify-start p-0 font-normal text-xs gap-1.5">

@@ -11,7 +11,6 @@ pub struct ScanOpts {
 	pub docroot_filenames: Vec<String>,
 	pub workspace_config_filename: String,
 	pub docroot_search_depth: u8,
-	pub optional_category_index: bool,
 	pub max_concurrency: usize,
 	pub follow_symlinks: bool,
 	#[serde(default)]
@@ -41,7 +40,6 @@ impl Default for ScanOpts {
 			],
 			workspace_config_filename: "workspace.yaml".into(),
 			docroot_search_depth: 5,
-			optional_category_index: false,
 			max_concurrency: 8,
 			follow_symlinks: false,
 			known_workspace_paths: Vec::new(),

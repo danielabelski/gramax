@@ -27,6 +27,10 @@ export default class SearcherManager {
 		return this._defaultSearcher;
 	}
 
+	hasChatBotSearcher(): boolean {
+		return Boolean(this._chatBotSearcher);
+	}
+
 	getChatBotSearcher(): ChatBotSearcher {
 		assert(this._chatBotSearcher, "Chatbot searcher not initialized");
 		return this._chatBotSearcher;

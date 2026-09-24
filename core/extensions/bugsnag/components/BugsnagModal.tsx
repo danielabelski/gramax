@@ -1,4 +1,5 @@
 import Icon from "@components/Atoms/Icon";
+// biome-ignore lint/style/noRestrictedImports: pre-existing @emotion/styled import; the Tailwind migration is not this change's scope
 import styled from "@emotion/styled";
 import BugsnagMessageDetails from "@ext/bugsnag/components/BugsnagMessageDetails";
 import { useBugsnag } from "@ext/bugsnag/logic/useBugsnag";
@@ -37,7 +38,7 @@ const BugsnagModal = ({ itemLogicPath, onClose }: { itemLogicPath: string; onClo
 	});
 
 	const formSubmit = (e) => {
-		form.handleSubmit((data) => {
+		void form.handleSubmit((data) => {
 			onSubmit({
 				description: data.description,
 				bAttach: data.detail,
@@ -83,7 +84,7 @@ const BugsnagModal = ({ itemLogicPath, onClose }: { itemLogicPath: string; onClo
 												form.setValue("detail", checked as unknown as boolean)
 											}
 										/>
-										<Tooltip delayDuration={0}>
+										<Tooltip>
 											<TooltipContent>{t("bug-report.this-will-help-us")}</TooltipContent>
 											<TooltipTrigger asChild className="text-gray-500">
 												<Icon code="circle-question-mark" isAction />

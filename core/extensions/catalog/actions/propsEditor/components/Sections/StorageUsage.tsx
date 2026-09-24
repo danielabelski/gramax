@@ -7,6 +7,7 @@ import styled from "@emotion/styled";
 import { SectionContainer } from "@ext/catalog/actions/propsEditor/components/Sections/SectionContainer";
 import type { StorageStats } from "@ext/git/core/GitCommands/model/GitCommandsModel";
 import t from "@ext/localization/locale/translate";
+import SectionHeader from "@ext/settings/components/SectionHeader";
 import { useSetting } from "@ext/settings/logic/hooks";
 import {
 	AlertDialog,
@@ -207,7 +208,7 @@ export const StorageUsage = () => {
 	};
 
 	return (
-		<SectionContainer>
+		<SectionContainer header={<SectionHeader title={t("forms.catalog-edit-props.tabs.storageUsage")} />}>
 			<div className="flex flex-col">
 				<GroupRow
 					action={

@@ -10,7 +10,7 @@ import publicApi from "./handlers/publicApi";
 import seo from "./handlers/seo";
 import DocportalApiRequest from "./logic/DocportalApiRequest";
 import DocportalApiResponse from "./logic/DocportalApiResponse";
-import type ServerContext from "./types/ServerContext";
+import ServerContext from "./types/ServerContext";
 import { applyBasePath } from "./utils/basePath";
 import parseRequestBody from "./utils/parseRequestBody";
 
@@ -32,13 +32,13 @@ const server = Bun.serve({
 		const url = new URL(req.url);
 		const redirect = applyBasePath(url);
 		if (redirect) return redirect;
-		const ctx: ServerContext = {
+		const ctx = new ServerContext(
+			url,
+			new DocportalApiRequest(req, await parseRequestBody(req)),
+			new DocportalApiResponse(new Response()),
 			app,
-			path: url,
-			commands: getCommands(app),
-			res: new DocportalApiResponse(new Response()),
-			req: new DocportalApiRequest(req, await parseRequestBody(req)),
-		};
+			getCommands(app),
+		);
 
 		for (const handler of [seo, publicApi, auth, health, clientAssets, api, page]) {
 			const response = await handler(ctx);

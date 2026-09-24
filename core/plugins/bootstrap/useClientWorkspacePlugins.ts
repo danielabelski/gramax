@@ -6,6 +6,7 @@ import { span } from "@ext/loggers/opentelemetry";
 import { clearAllPlugins, getPluginIsReady, loadPlugins, makePluginReady } from "@plugins/store";
 import { toast } from "@ui-kit/Toast";
 import { useEffect } from "react";
+import { showPluginCompatibilityToast } from "../components/showPluginCompatibilityToast";
 import {
 	ensureWorkspacePluginsLoaded,
 	resetWorkspacePluginBootstrap,
@@ -50,6 +51,7 @@ export const useClientWorkspacePlugins = ({ pageProps, platform }: UseClientWork
 			getPluginIsReady,
 			onPluginLoadError: (pluginName) =>
 				toast(t("plugins.messages.load-error").replace("{name}", pluginName), { status: "error" }),
+			onPluginCompatibilityIssue: (issue) => showPluginCompatibilityToast(issue.pluginName),
 			onError: (error) => span()?.recordException(error as Error),
 		});
 

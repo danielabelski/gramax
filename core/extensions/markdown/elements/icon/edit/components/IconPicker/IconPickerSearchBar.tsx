@@ -5,7 +5,7 @@ import type {
 } from "@ext/markdown/elements/icon/edit/components/IconPicker/IconPicker";
 import { IconPickerColor } from "@ext/markdown/elements/icon/edit/components/IconPicker/IconPickerColor";
 import type { IconPickerTab } from "@ext/markdown/elements/icon/edit/components/IconPicker/IconPickerToggleGroup";
-import { useComponentVariant } from "@ui-kit/hooks/useComponentVariant";
+import { narrowVariant, useComponentVariant } from "@ui-kit/hooks/useComponentVariant";
 import { Icon } from "@ui-kit/Icon";
 import { TextInput } from "@ui-kit/Input";
 import { tv } from "tailwind-variants";
@@ -23,15 +23,15 @@ const textInputStyles = tv({
 	base: [
 		"min-w-0 !h-7 text-sm w-full hover:!shadow-none focus:!shadow-none",
 		"!shadow-none bg-transparent",
-		"has-[input:focus]:!bg-transparent",
+		"focus-within:!bg-transparent",
 		"[&>div:first-of-type]:pl-2 w-full",
 	],
 	variants: {
 		variant: {
 			default:
-				"text-primary-fg has-[input:focus]:border-secondary-border border-secondary-border hover:border-secondary-border",
+				"text-primary-fg focus-within:border-secondary-border border-secondary-border hover:border-secondary-border",
 			inverse:
-				"text-inverse-primary-fg has-[input:focus]:border-inverse-border border-inverse-border hover:border-inverse-border",
+				"text-inverse-primary-fg focus-within:border-inverse-border border-inverse-border hover:border-inverse-border",
 		},
 	},
 	defaultVariants: {
@@ -47,7 +47,8 @@ export const IconPickerSearchBar = ({
 	setIconColor,
 	disable = [],
 }: IconPickerSearchBarProps) => {
-	const { variant: theme } = useComponentVariant();
+	const { variant } = useComponentVariant();
+	const theme = narrowVariant(variant, ["inverse"]);
 	return (
 		<div className="flex items-center gap-1 p-1 overflow-hidden">
 			<TextInput

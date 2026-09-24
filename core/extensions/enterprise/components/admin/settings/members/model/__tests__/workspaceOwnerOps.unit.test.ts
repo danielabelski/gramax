@@ -10,7 +10,6 @@ import {
 
 const makeWorkspace = (workspaceOwner?: AccessEntry): WorkspaceSettings => ({
 	name: "ws",
-	sections: {},
 	wordTemplates: [],
 	pdfTemplates: [],
 	git: { source: { url: "https://example.com", type: "GitLab", repos: ["repo-1"] } },
@@ -89,14 +88,12 @@ describe("applyGroupWorkspaceOwner", () => {
 		expect(workspace.access).toEqual({ workspaceOwner: { gxGroups: ["qa"], users: [] } });
 	});
 
-	it("grants an sso group into ssoGroups without touching gxGroups", () => {
+	it("does not grant workspaceOwner to an sso group", () => {
 		const workspace = makeWorkspace(owner({ gxGroups: ["dev"] }));
 
 		applyGroupWorkspaceOwner(workspace, "sso-dev", GroupSource.SSO_GROUPS, true);
 
-		expect(workspace.access).toEqual({
-			workspaceOwner: { gxGroups: ["dev"], ssoGroups: ["sso-dev"], users: [] },
-		});
+		expect(workspace.access).toEqual({ workspaceOwner: { gxGroups: ["dev"], users: [] } });
 	});
 
 	it("revokes an sso group", () => {

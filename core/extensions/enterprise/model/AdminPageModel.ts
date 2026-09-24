@@ -1,6 +1,7 @@
 import GesAccessTokensComponent from "@ext/enterprise/components/admin/settings/accessTokens/GesAccessTokensComponent";
 import GroupsComponent from "@ext/enterprise/components/admin/settings/groups/GroupsComponent";
 import GuestsComponent from "@ext/enterprise/components/admin/settings/guests/GuestsComponent";
+import LicenseComponent from "@ext/enterprise/components/admin/settings/license/LicenseComponent";
 import MailComponent from "@ext/enterprise/components/admin/settings/MailComponent";
 import MetricsPage from "@ext/enterprise/components/admin/settings/metrics/MetricsPage";
 import SearchMetricsComponent from "@ext/enterprise/components/admin/settings/metrics/search/SearchMetricsComponent";
@@ -183,6 +184,13 @@ export const adminPageDescriptors: Record<Page, AdminPageDescriptor> = {
 		component: GesAccessTokensComponent,
 		loader: async () => {},
 	},
+	[Page.LICENSE]: {
+		type: "single",
+		page: Page.LICENSE,
+		icon: "badge-check",
+		component: LicenseComponent,
+		loader: async () => {},
+	},
 };
 
 export const sidebarPageDescriptors: AdminPageDescriptor[] = [
@@ -194,4 +202,5 @@ export const sidebarPageDescriptors: AdminPageDescriptor[] = [
 	adminPageDescriptors[Page.MAIL],
 	adminPageDescriptors[Page.METRICS],
 	adminPageDescriptors[Page.ACCESS_TOKENS],
+	adminPageDescriptors[Page.LICENSE],
 ];

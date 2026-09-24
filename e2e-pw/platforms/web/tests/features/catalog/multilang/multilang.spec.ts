@@ -38,12 +38,14 @@ editorTest.describe("Multilanguage", () => {
 		});
 
 		await editorTest.step("language switcher shows Russian", async () => {
-			await expect(sharedPage.locator('[data-qa="switch-content-language"]')).toContainText("Русский");
+			await expect(sharedPage.locator('[data-qa="switch-content-language"]:visible')).toHaveAccessibleName(
+				"Русский",
+			);
 		});
 	});
 
 	editorTest("Adds English as second language from right panel", async ({ catalogPage, sharedPage }) => {
-		await sharedPage.locator('[data-qa="switch-content-language"]').click();
+		await sharedPage.locator('[data-qa="switch-content-language"]:visible').click();
 		await sharedPage.getByText("Add language").click();
 		await sharedPage.getByText("English").click();
 		await catalogPage.waitForLoad();
@@ -60,7 +62,7 @@ editorTest.describe("Multilanguage", () => {
 
 	editorTest("Switches to Russian language version", async ({ catalogPage, sharedPage, editor }) => {
 		await editorTest.step("Russian article is open and editable", async () => {
-			await sharedPage.locator('[data-qa="switch-content-language"]').click();
+			await sharedPage.locator('[data-qa="switch-content-language"]:visible').click();
 			await sharedPage.getByTestId("dropdown-content").getByText("Русский").click();
 			await catalogPage.waitForLoad();
 			catalogPage.assertUrl("/-/-/-/-/untitled/untitled");

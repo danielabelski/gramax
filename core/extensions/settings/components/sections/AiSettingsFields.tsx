@@ -3,6 +3,7 @@ import t from "@ext/localization/locale/translate";
 import { FormField } from "@ui-kit/Form";
 import { TextInput } from "@ui-kit/Input";
 import { Loader } from "@ui-kit/Loader";
+import type { ReactNode } from "react";
 
 // AI is a workspace-level setting. Writes flow through /api/settings/update,
 // where the backend dispatcher routes `services.ai.*` at Level.workspace to the
@@ -11,11 +12,12 @@ type Props = {
 	prefix: string;
 	isChecking?: boolean;
 	labelClassName?: string;
+	header?: ReactNode;
 };
 
-const AiSettingsFields = ({ prefix, isChecking, labelClassName = "w-44" }: Props) => {
+const AiSettingsFields = ({ prefix, isChecking, labelClassName = "w-[30%] shrink-0", header }: Props) => {
 	return (
-		<SectionContainer>
+		<SectionContainer header={header}>
 			<FormField
 				control={({ field }) => (
 					<TextInput
@@ -27,7 +29,6 @@ const AiSettingsFields = ({ prefix, isChecking, labelClassName = "w-44" }: Props
 				)}
 				description={t("workspace.ai-server-url-description")}
 				labelClassName={labelClassName}
-				layout="vertical"
 				name={`${prefix}.endpoint`}
 				title={t("workspace.ai-server-url")}
 			/>
@@ -37,7 +38,6 @@ const AiSettingsFields = ({ prefix, isChecking, labelClassName = "w-44" }: Props
 				)}
 				description={t("workspace.ai-server-token-description")}
 				labelClassName={labelClassName}
-				layout="vertical"
 				name={`${prefix}.token`}
 				title={t("workspace.ai-server-token")}
 			/>

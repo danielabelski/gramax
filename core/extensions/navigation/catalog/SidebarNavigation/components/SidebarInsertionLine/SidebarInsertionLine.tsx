@@ -3,7 +3,11 @@ import { InsertionConnectorLine } from "@ext/navigation/catalog/SidebarNavigatio
 import { InsertionDepthIcon } from "@ext/navigation/catalog/SidebarNavigation/components/SidebarInsertionLine/InsertionDepthIcon";
 import { InsertionTailLine } from "@ext/navigation/catalog/SidebarNavigation/components/SidebarInsertionLine/InsertionTailLine";
 import { useInsertionLine } from "@ext/navigation/catalog/SidebarNavigation/hooks/useInsertionLine";
-import { Fragment, forwardRef } from "react";
+import { useLazyAnimatedPresence } from "@ext/navigation/catalog/SidebarNavigation/hooks/useLazyAnimatedPresence";
+import { useNavigationTreeStore } from "@ext/navigation/catalog/SidebarNavigation/store/navigationTreeStore";
+import { Fragment, forwardRef, memo, useCallback, useEffect, useRef, useState } from "react";
+
+const INSERTION_LINE_EXIT_FALLBACK_MS = 250;
 
 export type SidebarInsertionLineProps = {
 	className?: string;
@@ -14,28 +18,60 @@ export type SidebarInsertionLineProps = {
 	onParentHover?: (depth: number | null) => void;
 };
 
-export const SidebarInsertionLine = forwardRef<HTMLDivElement, SidebarInsertionLineProps>(
+const SidebarInsertionLineComponent = forwardRef<HTMLDivElement, SidebarInsertionLineProps>(
 	({ className, minDepth, maxDepth, level, onAdd, onParentHover }, ref) => {
-		const { items, tailLeft, isTailSolid, clickableDepth, handleMouseMove, handleMouseLeave } = useInsertionLine({
-			minDepth,
-			maxDepth,
-			levelOffset: level - 1,
-			onParentHover,
+		const [isHovered, setIsHovered] = useState(false);
+		const wasDndActiveRef = useRef(false);
+		const isDndActive = useNavigationTreeStore((state) => state.draggingId !== null);
+		const {
+			isPresent: areVisualsMounted,
+			isVisible: areVisualsVisible,
+			onTransitionEnd: handleVisualsTransitionEnd,
+		} = useLazyAnimatedPresence({
+			exitFallbackMs: INSERTION_LINE_EXIT_FALLBACK_MS,
+			forceOpen: isDndActive,
+			isOpen: isHovered,
 		});
+		const { items, tailLeft, isTailSolid, clickableDepth, overhang, handleMouseMove, handleMouseLeave } =
+			useInsertionLine({
+				minDepth,
+				maxDepth,
+				isHovered,
+				levelOffset: level - 1,
+				onParentHover,
+			});
+		const handleClick = useCallback(
+			(event: React.MouseEvent<HTMLDivElement>) => {
+				if (clickableDepth) {
+					onAdd(clickableDepth);
+					return;
+				}
 
-		const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
-			if (clickableDepth) {
-				onAdd(clickableDepth);
+				const interactiveElementBehind = document
+					.elementsFromPoint(event.clientX, event.clientY)
+					.map((element) => element.closest<HTMLElement>("a, button, [role='button']"))
+					.find((element) => element && !event.currentTarget.contains(element));
+
+				interactiveElementBehind?.click();
+			},
+			[clickableDepth, onAdd],
+		);
+		const handlePointerEnter = useCallback(() => setIsHovered(true), []);
+		const handlePointerLeave = useCallback(() => {
+			setIsHovered(false);
+			handleMouseLeave();
+		}, [handleMouseLeave]);
+
+		useEffect(() => {
+			if (isDndActive) {
+				wasDndActiveRef.current = true;
 				return;
 			}
 
-			const interactiveElementBehind = document
-				.elementsFromPoint(event.clientX, event.clientY)
-				.map((element) => element.closest<HTMLElement>("a, button, [role='button']"))
-				.find((element) => element && !event.currentTarget.contains(element));
-
-			interactiveElementBehind?.click();
-		};
+			if (!wasDndActiveRef.current) return;
+			wasDndActiveRef.current = false;
+			if (!isHovered) handleMouseLeave();
+		}, [handleMouseLeave, isDndActive, isHovered]);
 
 		return (
 			<div
@@ -46,34 +82,51 @@ export const SidebarInsertionLine = forwardRef<HTMLDivElement, SidebarInsertionL
 				)}
 				data-sidebar="sidebar-insertion-line"
 				onClick={handleClick}
-				onMouseLeave={handleMouseLeave}
 				onMouseMove={handleMouseMove}
+				onPointerEnter={handlePointerEnter}
+				onPointerLeave={handlePointerLeave}
 				ref={ref}
+				style={{ left: -overhang }}
 			>
-				{items.map(({ depth, isHidden, isPlaceholder, isActive, iconLeft, connectorLeft }) => (
-					<Fragment key={depth}>
-						{connectorLeft && (
-							<InsertionConnectorLine isHidden={isHidden} style={{ left: connectorLeft }} />
+				{areVisualsMounted && (
+					<div
+						className={cn(
+							"pointer-events-none absolute inset-0 delay-75 duration-[160ms] transition-opacity",
+							areVisualsVisible ? "opacity-100" : "opacity-0",
 						)}
-						<InsertionDepthIcon
-							isActive={isActive}
-							isHidden={isHidden}
-							isPlaceholder={isPlaceholder}
-							style={{ left: iconLeft }}
-						/>
-					</Fragment>
-				))}
+						data-sidebar="sidebar-insertion-line-visuals"
+						onTransitionEnd={handleVisualsTransitionEnd}
+						style={{ left: overhang }}
+					>
+						{items.map(({ depth, isHidden, isPlaceholder, isActive, iconLeft, connectorLeft }) => (
+							<Fragment key={depth}>
+								{connectorLeft && (
+									<InsertionConnectorLine isHidden={isHidden} style={{ left: connectorLeft }} />
+								)}
+								<InsertionDepthIcon
+									isActive={isActive}
+									isHidden={isHidden}
+									isPlaceholder={isPlaceholder}
+									style={{ left: iconLeft }}
+								/>
+							</Fragment>
+						))}
 
-				<InsertionTailLine
-					className={
-						isTailSolid
-							? "bg-primary-fg"
-							: "[background:linear-gradient(90deg,hsl(var(--muted))_0%,rgba(113,113,122,0.00)_100%)]"
-					}
-					style={{ left: tailLeft }}
-				/>
+						<InsertionTailLine
+							className={
+								isTailSolid
+									? "bg-primary-fg"
+									: "[background:linear-gradient(90deg,hsl(var(--muted))_0%,rgba(113,113,122,0.00)_100%)]"
+							}
+							style={{ left: tailLeft }}
+						/>
+					</div>
+				)}
 			</div>
 		);
 	},
 );
+SidebarInsertionLineComponent.displayName = "SidebarInsertionLine";
+
+export const SidebarInsertionLine = memo(SidebarInsertionLineComponent);
 SidebarInsertionLine.displayName = "SidebarInsertionLine";

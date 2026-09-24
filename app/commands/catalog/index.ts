@@ -4,7 +4,6 @@ import getViewRenderData from "@app/commands/catalog/properties/getViewRenderDat
 import getUploadStatus from "./cloud/getUploadStatus";
 import upload from "./cloud/upload";
 import create from "./create";
-import getArticlesData from "./favorite/getArticlesData";
 import getBrotherFileNames from "./getBrotherFileNames";
 import getNameAfterMove from "./getNameAfterMove";
 import getProps from "./getProps";
@@ -29,9 +28,6 @@ const catalog = {
 	cloud: {
 		upload,
 		getUploadStatus,
-	},
-	favorite: {
-		getArticlesData,
 	},
 	views,
 	links,

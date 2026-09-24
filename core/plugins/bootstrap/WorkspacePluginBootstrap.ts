@@ -1,5 +1,6 @@
 import type { WorkspacePath } from "@ext/workspace/WorkspaceConfig";
 import type { PluginProps } from "@gramax/sdk";
+import type { PluginLoadIssue, PluginLoadResult } from "@plugins/store/PluginStore";
 import type { PluginConfig } from "@plugins/types";
 
 export interface WorkspacePluginsResponse {
@@ -15,10 +16,11 @@ export interface WorkspacePluginBootstrapOptions {
 	skipServerOnly?: boolean;
 	getPlugins: (workspacePath?: WorkspacePath) => Promise<WorkspacePluginsResponse>;
 	clearAllPlugins: () => void;
-	loadPlugins: (plugins: PluginConfig[], props?: PluginProps, app?: unknown) => Promise<void>;
+	loadPlugins: (plugins: PluginConfig[], props?: PluginProps, app?: unknown) => Promise<PluginLoadResult>;
 	makePluginReady: () => void;
 	getPluginIsReady: () => boolean;
 	onPluginLoadError?: (pluginName: string) => void;
+	onPluginCompatibilityIssue?: (issue: PluginLoadIssue) => void;
 	onError?: (error: unknown) => void;
 }
 
@@ -51,6 +53,7 @@ export const ensureWorkspacePluginsLoaded = async ({
 	makePluginReady,
 	getPluginIsReady,
 	onPluginLoadError,
+	onPluginCompatibilityIssue,
 	onError,
 }: WorkspacePluginBootstrapOptions) => {
 	const isServer = typeof window === "undefined";
@@ -88,7 +91,10 @@ export const ensureWorkspacePluginsLoaded = async ({
 			}
 
 			const pluginsToLoad = skipServerOnly ? plugins.filter((p) => !p.metadata.serverOnly) : plugins;
-			await loadPlugins(pluginsToLoad, props, app);
+			const { issues } = await loadPlugins(pluginsToLoad, props, app);
+			for (const issue of issues) {
+				if (issue.type === "sdk-incompatible") onPluginCompatibilityIssue?.(issue);
+			}
 		} catch (error) {
 			if (!isServer) state.loadKey = undefined;
 			onError?.(error);

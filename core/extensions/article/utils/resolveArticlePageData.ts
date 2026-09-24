@@ -129,8 +129,14 @@ const resolveOldScope = async (
 const resolveArticlePageData = async (
 	app: Application,
 	commands: CommandTree,
-	props: ArticlePageDataParams,
+	params: ArticlePageDataParams,
 ): Promise<{ data: ArticlePageData; context: PageDataContext }> => {
+	// `page/getArticlePageData` takes `path` straight from the query string, so a client that asks
+	// for page data with no article open sends nothing and `path` arrives as null (#910).
+	// Normalize once here: every step below then reads it as "no catalog" and answers with
+	// Catalog404 instead of throwing on `path.split`.
+	const props: ArticlePageDataParams = { ...params, path: params.path ?? "" };
+
 	const catalogContext = await prepareCatalogContext(app, props);
 
 	const resolvedProps = await resolveOldScope(props, catalogContext);

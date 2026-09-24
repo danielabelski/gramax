@@ -1,6 +1,7 @@
 import DiagramType from "@core/components/Diagram/DiagramType";
 import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/ButtonStateService";
 import type { Mark, NodeType } from "@core-ui/ContextServices/ButtonStateService/hooks/types";
+import SecretsMenuButton from "@ext/agent/components/skills/toolbar/SecretsMenuButton";
 import t from "@ext/localization/locale/translate";
 import useSupportedElements from "@ext/markdown/core/edit/components/Menu/Groups/hooks/useSupportedElements";
 import PropertyMenuGroup from "@ext/markdown/core/edit/components/Menu/Groups/Property";
@@ -13,6 +14,7 @@ import IconMenuButton from "@ext/markdown/elements/icon/edit/components/IconMenu
 import ImageMenuButton from "@ext/markdown/elements/image/edit/components/ImageMenuButton";
 import OpenApiMenuButton from "@ext/markdown/elements/openApi/edit/components/OpenApiMenuButton";
 import QuestionMenuButton from "@ext/markdown/elements/question/edit/components/QuestionMenuButton";
+import { SECRET_NODE_NAME } from "@ext/markdown/elements/secret/edit/model/secretNode";
 import TabsMenuButton from "@ext/markdown/elements/tabs/edit/components/TabsMenuButton";
 import VideoMenuButton from "@ext/markdown/elements/video/edit/components/VideoMenuButton";
 import ViewMenuButton from "@ext/markdown/elements/view/edit/components/ViewMenuButton";
@@ -68,7 +70,12 @@ const useSemiBlocksMenu = ({ editor, fileName, isSmallEditor, includeResources }
 	const hasDiagrams =
 		includeResources && (isDrawioSupported || isMermaidSupported || isPlantUmlSupported || isOpenApiSupported);
 	const hasFiles = includeResources;
-	const hasTools = isTabsSupported || isFragmentSupported || isHtmlSupported || isViewSupported;
+	const isSkillEditor = !!(
+		editor &&
+		!editor.isDestroyed &&
+		editor.extensionManager.extensions.some((ext) => ext.name === SECRET_NODE_NAME)
+	);
+	const hasTools = isTabsSupported || isFragmentSupported || isHtmlSupported || isViewSupported || isSkillEditor;
 
 	const onOpenChange = useCallback(
 		(open: boolean) => {
@@ -133,6 +140,14 @@ const useSemiBlocksMenu = ({ editor, fileName, isSmallEditor, includeResources }
 					type: "action",
 					label: t("properties.view.name"),
 					node: <ViewMenuButton editor={editor} />,
+				});
+			if (isSkillEditor)
+				items.push({
+					key: "keys-and-passwords",
+					section: Sections.Tools,
+					type: "action",
+					label: t("editor.keys-and-passwords.name"),
+					node: <SecretsMenuButton editor={editor} />,
 				});
 		}
 
@@ -221,6 +236,7 @@ const useSemiBlocksMenu = ({ editor, fileName, isSmallEditor, includeResources }
 		hasDiagrams,
 		hasFiles,
 		hasTools,
+		isSkillEditor,
 		isDrawioSupported,
 		isMermaidSupported,
 		isPlantUmlSupported,

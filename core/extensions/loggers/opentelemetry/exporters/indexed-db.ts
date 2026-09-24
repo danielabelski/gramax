@@ -114,6 +114,7 @@ export default class IndexedDbExporter implements sdk.SpanExporter {
 		} else {
 			const allowed = IndexedDbExporter._localDayKeys(scope === "today" ? 1 : 7);
 			selected = sessionStores.filter((n) => {
+				if (n === this._storeName) return true;
 				const date = IndexedDbExporter._extractDateFromStoreName(n);
 				return !Number.isNaN(date.getTime()) && allowed.has(IndexedDbExporter._localDayKey(date));
 			});

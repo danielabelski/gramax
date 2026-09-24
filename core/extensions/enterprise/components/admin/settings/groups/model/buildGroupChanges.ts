@@ -1,6 +1,6 @@
 import type { AccessChange } from "@ext/enterprise/components/admin/settings/members/model/AccessChange";
 import type { MemberAccess } from "@ext/enterprise/components/admin/settings/members/model/Member";
-import type { GroupSource } from "@ext/enterprise/components/admin/settings/workspace/components/access/components/group/types/GroupTypes";
+import { GroupSource } from "@ext/enterprise/components/admin/settings/workspace/components/access/components/group/types/GroupTypes";
 import { changedList } from "@ext/enterprise/utils/changedList";
 
 export interface BuildGroupChangesArgs {
@@ -26,12 +26,13 @@ export const buildGroupChanges = (args: BuildGroupChangesArgs): AccessChange[] =
 	if (changedList(args.isAdd, args.users, args.originalUsers))
 		changes.push({ kind: "setGroupUsers", groupId: args.id, emails: args.users });
 
-	if (args.isWorkspaceOwner !== args.wasWorkspaceOwner)
+	const isWorkspaceOwner = args.source === GroupSource.SSO_GROUPS ? false : args.isWorkspaceOwner;
+	if (isWorkspaceOwner !== args.wasWorkspaceOwner)
 		changes.push({
 			kind: "setGroupWorkspaceOwner",
 			groupId: args.id,
 			source: args.source,
-			owner: args.isWorkspaceOwner,
+			owner: isWorkspaceOwner,
 		});
 
 	return changes;

@@ -9,6 +9,7 @@ default-members = [
 members = [
   "apps/tauri/plugins/plugin-gramax-core",
   "apps/tauri/plugins/plugin-browser-session",
+  "apps/tauri/plugins/plugin-mail",
   "apps/tauri/plugins/tauri-otel-context",
   "apps/tauri/src-tauri",
   "crates/bugsnag",
@@ -44,6 +45,7 @@ tauri = { version = "^2.0.0", features = [
 
 tauri-plugin-deep-link = "^2.0.0"
 tauri-plugin-dialog = "^2.0.0"
+tauri-plugin-http = "^2.5.9"
 tauri-plugin-updater = { git = "https://github.com/pashokitsme/plugins-workspace", rev = "d7fd4b76d0edcb12490738acb55ae230d04fbcd0", features = [
   "zip",
 ] }
@@ -52,10 +54,11 @@ tauri-plugin-window-state = "^2.0.0"
 
 serde = { version = "^1.0", features = ["derive"] }
 serde_yml = "^0.0"
-serde_json = "^1.0"
-reqwest = { version = "^0.12", features = ["blocking", "json", "cookies"] }
-reqwest_cookie_store = "0.9.0"
-cookie_store = "^0.22"
+# `preserve_order` keeps `serde_json::Map` insertion-ordered (IndexMap instead of BTreeMap). The scan
+# hands article frontmatter to the frontend as JSON and the frontend writes it back verbatim, so an
+# alphabetising Map would rewrite every file it touches (gram-ax/gramax#879).
+serde_json = { version = "^1.0", features = ["preserve_order"] }
+reqwest = { version = "^0.12", features = ["blocking", "json"] }
 itertools = "0.14.0"
 nanoid = "0.4.0"
 anyhow = "^1.0"

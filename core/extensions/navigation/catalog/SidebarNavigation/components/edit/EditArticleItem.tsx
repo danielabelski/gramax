@@ -1,14 +1,13 @@
 import { BeforeItemDropZone } from "@ext/navigation/catalog/SidebarNavigation/components/SidebarDragnDrop/BeforeItemDropZone";
-import { DragInsertionLine } from "@ext/navigation/catalog/SidebarNavigation/components/SidebarDragnDrop/DragInsertionLine";
 import {
 	DraggableSideMenuItemContent,
 	ItemDroppable,
 } from "@ext/navigation/catalog/SidebarNavigation/components/SidebarDragnDrop/ItemDndBindings";
+import { ItemDragInsertionLine } from "@ext/navigation/catalog/SidebarNavigation/components/SidebarDragnDrop/ItemDragInsertionLine";
 import { SidebarInsertionLine } from "@ext/navigation/catalog/SidebarNavigation/components/SidebarInsertionLine/SidebarInsertionLine";
 import { VerticalLineSegment } from "@ext/navigation/catalog/SidebarNavigation/components/SidebarInsertionLine/VerticalLineSegment";
 import type { useInsertionLineState } from "@ext/navigation/catalog/SidebarNavigation/hooks/useInsertionLineState";
 import type { DragLineState, useItemDndState } from "@ext/navigation/catalog/SidebarNavigation/hooks/useItemDndState";
-import { DropMode } from "@ext/navigation/catalog/SidebarNavigation/utils/dropMode";
 import type { ItemLink } from "@ext/navigation/NavigationLinks";
 import type { MutableRefObject } from "react";
 
@@ -70,12 +69,7 @@ export const EditArticleItem = ({
 				onAdd={handleAdd}
 				onParentHover={handleParentHover}
 			/>
-			{dropMode && (
-				<DragInsertionLine
-					className={dropMode === DropMode.Into ? "left-6" : undefined}
-					position={dropMode === DropMode.Before ? "top" : undefined}
-				/>
-			)}
+			<ItemDragInsertionLine dropMode={dropMode} />
 		</ItemDroppable>
 	);
 };

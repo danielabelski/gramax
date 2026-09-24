@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getSessions } from "../store/AgentStore";
 import type { SessionStatePayload } from "../types/chat";
 import {
 	type AgentSessionSnapshot,
@@ -30,41 +31,46 @@ export const useAgentPollTick = ({
 	const [sending, setSending] = useState(false);
 	const [showAgentThinking, setShowAgentThinking] = useState(false);
 	const sendingRef = useRef(false);
-	const sessionSnapshotRef = useRef<AgentSessionSnapshot | null>(null);
+	const sessionSnapshotRef = useRef<AgentSessionSnapshot>(snapshotAgentSession(null));
 
 	const setShowAgentThinkingIfChanged = useCallback((next: boolean) => {
 		setShowAgentThinking((prev) => (prev === next ? prev : next));
 	}, []);
+
+	const syncBusyState = useCallback(
+		(snapshot: AgentSessionSnapshot) => {
+			const busy = snapshot.processing || sendingRef.current;
+			setSending(busy);
+			setShowAgentThinkingIfChanged(shouldShowAgentThinkingSpinner(snapshot, { isSending: sendingRef.current }));
+			if (!busy) {
+				stopPolling();
+				setShowAgentThinkingIfChanged(false);
+			}
+			return busy;
+		},
+		[stopPolling, setShowAgentThinkingIfChanged],
+	);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: reset sending state on session change
 	useEffect(() => {
 		if (!sessionId) return;
 		setSending(false);
 		sendingRef.current = false;
-		setShowAgentThinkingIfChanged(false);
-		sessionSnapshotRef.current = null;
+		const cached = getSessions().find((s) => s.id === sessionId);
+		sessionSnapshotRef.current = cached ? snapshotAgentSession(cached) : snapshotAgentSession(null);
+		syncBusyState(sessionSnapshotRef.current);
 	}, [sessionId]);
 
 	const pollTick = useCallback(async (): Promise<boolean> => {
 		if (!sessionId) return false;
+
 		const state = await fetchSessionState();
-		const currentSnapshot = snapshotAgentSession(state);
+		if (!state) return true;
+
 		flushAndRefresh(state);
-		setShowAgentThinkingIfChanged(
-			shouldShowAgentThinkingSpinner(currentSnapshot, { isSending: sendingRef.current }),
-		);
-		sessionSnapshotRef.current = currentSnapshot;
-
-		const busy = !!state?.processing || sendingRef.current;
-		setSending(busy);
-
-		if (!busy) {
-			stopPolling();
-			setShowAgentThinkingIfChanged(false);
-		}
-
-		return busy;
-	}, [sessionId, fetchSessionState, flushAndRefresh, stopPolling, setShowAgentThinkingIfChanged]);
+		sessionSnapshotRef.current = snapshotAgentSession(state);
+		return syncBusyState(sessionSnapshotRef.current);
+	}, [sessionId, fetchSessionState, flushAndRefresh, syncBusyState]);
 
 	const pollTickRef = useRef(pollTick);
 	pollTickRef.current = pollTick;
@@ -73,7 +79,7 @@ export const useAgentPollTick = ({
 	useEffect(() => {
 		if (!sessionId || sessionLoading) return;
 		void pollTickRef.current().then((busy) => {
-			if (busy) startPolling(() => void pollTickRef.current());
+			if (busy) startPolling(() => pollTickRef.current().then(() => undefined));
 		});
 	}, [sessionId, sessionLoading, openCatalogName, openItemPath]);
 

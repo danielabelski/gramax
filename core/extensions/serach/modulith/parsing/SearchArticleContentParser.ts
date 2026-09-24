@@ -50,13 +50,14 @@ export default class SearchArticleContentParser extends SearchArticleContentPars
 	}
 
 	protected async _handleNote(note: JSONContent): Promise<void> {
-		this._collector.enterBlock(note.attrs?.title ?? "");
+		const title = note.attrs?.title;
+		if (title) this._collector.enterBlock(note.attrs?.title ?? "");
 		await this._parseItems(note.content);
-		this._collector.exitBlock();
+		if (title) this._collector.exitBlock();
 	}
 
 	protected async _handleTab(tab: JSONContent): Promise<void> {
-		this._collector.enterBlock(tab.attrs?.title ?? "");
+		this._collector.enterBlock(tab.attrs?.title ?? tab.attrs?.name ?? "");
 		await this._parseItems(tab.content);
 		this._collector.exitBlock();
 	}

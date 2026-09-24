@@ -1,6 +1,4 @@
-import Icon from "@components/Atoms/Icon";
 import LinksBreadcrumb from "@components/Breadcrumbs/LinksBreadcrumb";
-import IsMobileService from "@core-ui/ContextServices/isMobileService";
 import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
 import useWatch from "@core-ui/hooks/useWatch";
 import { useArticlePropsStore } from "@core-ui/stores/ArticlePropsStore/ArticlePropsStore.provider";
@@ -15,10 +13,8 @@ import ItemMenu from "@ext/item/EditMenu";
 import t from "@ext/localization/locale/translate";
 import NavigationDropdown from "@ext/navigation/components/NavigationDropdown";
 import type { ItemLink } from "@ext/navigation/NavigationLinks";
-import Properties from "@ext/properties/components/Helpers/Properties";
-import PropertyServiceProvider from "@ext/properties/components/PropertyService";
-import { useUpdateArticleProperty } from "@ext/properties/logic/hooks/useUpdateArticleProperty";
-import { Button, IconButton } from "@ui-kit/Button";
+import { IconButton } from "@ui-kit/Button";
+import { ComponentVariantProvider } from "@ui-kit/Providers";
 import { useRef, useState } from "react";
 
 interface ArticleBreadcrumbProps {
@@ -31,8 +27,6 @@ interface ArticleBreadcrumbProps {
 const ArticleBreadcrumb = ({ className, itemLinks, hasPreview, showActions = true }: ArticleBreadcrumbProps) => {
 	const linksRef = useRef<HTMLDivElement>(null);
 	const breadcrumbRef = useRef<HTMLDivElement>(null);
-	const { articleProperties, setArticleProperties, properties } = PropertyServiceProvider.value;
-	const isMobile = IsMobileService.value;
 	const isDoublePanel = useIsDoublePanel();
 	const isDiff = useIsDiffView();
 
@@ -47,54 +41,36 @@ const ArticleBreadcrumb = ({ className, itemLinks, hasPreview, showActions = tru
 		setItemLink(newItemLink);
 	}, [articleProps.ref.path]);
 
-	const { onSubmit, onDelete } = useUpdateArticleProperty({
-		properties: articleProperties,
-		setProperties: setArticleProperties,
-	});
-
 	const showArticleActions =
 		(!articleProps?.errorCode || articleProps?.errorCode === 500) && !!itemLink && showActions;
 	const isHasPreview = hasPreview || (isDoublePanel && isDiff);
 
 	return (
-		<div className={cn("article-breadcrumb", className, isHasPreview && "has-preview")} ref={breadcrumbRef}>
-			<LinksBreadcrumb itemLinks={itemLinks} ref={linksRef} />
-			{!isReadOnly && showArticleActions && (
-				<div className="article-actions" data-qa="qa-article-actions">
-					<NavigationDropdown
-						className="article-actions"
-						style={{ marginRight: "-2px" }}
-						tooltipText={t("article.actions.title")}
-						trigger={
-							<Button className="p-0 h-full" size="xs" variant="text">
-								<Icon code="ellipsis-vertical" style={{ fontSize: "1.7em" }} />
-							</Button>
-						}
-					>
-						<ItemMenu itemLink={itemLink} setItemLink={setItemLink} />
-					</NavigationDropdown>
-				</div>
-			)}
-			<div className="flex min-w-0 max-w-full gap-2 ml-auto flex-row-reverse overflow-hidden">
-				<Properties
-					catalogProperties={properties}
-					hideList={isMobile}
-					isReadOnly={isReadOnly || !itemLink}
-					onDelete={onDelete}
-					onSubmit={onSubmit}
-					properties={articleProperties}
-					trigger={
-						<IconButton
-							className="flex-shrink-0"
-							data-testid="catalog-properties"
-							icon="list-plus"
-							size="xs"
-							variant="text"
-						/>
-					}
-				/>
+		<ComponentVariantProvider variant="glass">
+			<div className={cn("article-breadcrumb", className, isHasPreview && "has-preview")} ref={breadcrumbRef}>
+				<LinksBreadcrumb itemLinks={itemLinks} ref={linksRef} />
+				{!isReadOnly && showArticleActions && (
+					<div className="article-actions" data-qa="qa-article-actions">
+						<NavigationDropdown
+							className="article-actions"
+							style={{ marginRight: "-2px" }}
+							tooltipText={t("article.actions.title")}
+							trigger={
+								<IconButton
+									aria-label={t("article.actions.title")}
+									icon="ellipsis"
+									iconClassName="size-4"
+									size="sm"
+									variant="ghost"
+								/>
+							}
+						>
+							<ItemMenu itemLink={itemLink} setItemLink={setItemLink} />
+						</NavigationDropdown>
+					</div>
+				)}
 			</div>
-		</div>
+		</ComponentVariantProvider>
 	);
 };
 

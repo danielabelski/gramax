@@ -1,5 +1,6 @@
 import type { CommentBlock, CommentUser } from "@core-ui/CommentBlock";
 import useWatch from "@core-ui/hooks/useWatch";
+import t from "@ext/localization/locale/translate";
 import { CommentContent } from "@ext/markdown/elements/comment/edit/components/Popover/CommentContent";
 import { CommentHeader } from "@ext/markdown/elements/comment/edit/components/Popover/CommentHeader";
 import { CommentMessage } from "@ext/markdown/elements/comment/edit/components/Popover/CommentMessage";
@@ -110,7 +111,7 @@ export const Comment = (props: CommentProps) => {
 
 	if (isNewComment) {
 		return (
-			<CommentContent data-qa="qa-add-comment" ref={containerRef}>
+			<CommentContent aria-label={t("comment")} data-qa="qa-add-comment" ref={containerRef} role="dialog">
 				<div>
 					<CommentMessage
 						autofocus
@@ -131,7 +132,7 @@ export const Comment = (props: CommentProps) => {
 	const isCurrentUser = isEditable ? data.comment.user.mail === user.mail : false;
 
 	return (
-		<CommentContent ref={containerRef}>
+		<CommentContent aria-label={t("comment")} ref={containerRef} role="dialog">
 			<CommentHeader commentId={commentId} onClose={onClose} onResolve={onDelete} renderDeleteIcon={isEditable} />
 			<ScrollShadowContainer className="scroll-area" ref={scrollShadowContainerRef}>
 				<div className="px-1 py-1">

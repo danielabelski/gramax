@@ -5,6 +5,8 @@ export const getLocalizedAgentErrorTypeMessage = (errorType: AgentErrorType): st
 	switch (errorType) {
 		case AgentErrorType.Unauthorized:
 			return t("agent.error-type.unauthorized");
+		case AgentErrorType.Forbidden:
+			return t("agent.error-type.forbidden");
 		case AgentErrorType.PaymentRequired:
 			return t("agent.error-type.payment_required");
 		case AgentErrorType.MaxStepsExceeded:

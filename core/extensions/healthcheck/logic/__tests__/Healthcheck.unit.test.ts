@@ -86,9 +86,15 @@ test("alias diagnostics surface as catalog errors with catalog-relative paths", 
 	const checkResult = await healthcheck.checkCatalog();
 
 	expect(checkResult.aliases.length).toBe(2);
-	expect(checkResult.aliases[0].args.value).toContain(": guide");
+	// The value column carries the bare alias, like every sibling check group (#915);
+	// the reason travels separately in `hint` and names the article that wins the alias.
+	expect(checkResult.aliases[0].args.value).toBe("guide");
+	expect(checkResult.aliases[0].args.isText).toBeUndefined();
 	expect(checkResult.aliases[0].args.logicPath).toBe("cat/guide");
-	expect(checkResult.aliases[1].args.value).toContain(": legacy");
+	expect(checkResult.aliases[1].args.value).toBe("legacy");
+	// Language-agnostic: whatever the locale, the winner's catalog-relative path is interpolated in.
+	expect(checkResult.aliases[1].args.hint).not.toContain("{{winner}}");
+	expect(checkResult.aliases[1].args.hint).toMatch(/\ba\b/);
 	expect(checkResult.aliases[1].args.logicPath).toBe("cat/b");
 });
 

@@ -57,6 +57,17 @@ fetch_gh_ratelimit() {
         | awk -F'[:,]' '/"core":/{c=1} c && /"remaining"/ {gsub(/ /,"",$2); print $2; exit}'
 }
 
+if [ "$CI_MODE" = true ] && [ -n "${NPM_AUTH:-}" ]; then
+    npmrc_files=".npmrc"
+    [ -d services ] && npmrc_files="$npmrc_files services/.npmrc"
+
+    for npmrc in $npmrc_files; do
+        printf 'registry=https://nexus.ics-it.ru/repository/npm-proxy/\n//nexus.ics-it.ru/repository/npm-proxy/:_auth=%s\n' "$NPM_AUTH" >> "$npmrc"
+    done
+    export NO_PROXY="nexus.ics-it.ru${NO_PROXY:+,${NO_PROXY}}"
+    export no_proxy="nexus.ics-it.ru${no_proxy:+,${no_proxy}}"
+fi
+
 if [ "$SKIP_NPM" = false ]; then
     install "."
     [ -f services/package.json ] && install services

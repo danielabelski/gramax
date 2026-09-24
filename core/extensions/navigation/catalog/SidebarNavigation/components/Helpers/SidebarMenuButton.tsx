@@ -21,7 +21,6 @@ const sidebarMenuButtonStyles = tv({
 		"group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 [&>span:last-child]:truncate",
 		"[&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-muted [&[data-active=true]>svg]:text-primary-accent",
 		"group-data-[collapsible=icon]:[&>svg]:text-secondary-fg group-data-[collapsible=icon]:[&>svg]:hover:text-primary-fg group-data-[collapsible=icon]:[&[data-active=true]>svg]:text-primary-accent",
-		"group-has-[[data-sidebar=menu-action]]/menu-item:pr-8",
 	],
 	variants: {
 		variant: {

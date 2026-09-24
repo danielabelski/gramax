@@ -13,15 +13,22 @@ import AddCatalogMenu from "@ext/catalog/actions/AddCatalogMenu";
 import useSignOut from "@ext/enterprise/components/SingInOut/hooks/useSignOut";
 import { GesCloudSwitchOrganization } from "@ext/enterprise-cloud/components/GesCloudOrganizationSwitch";
 import { GesCloudSignInOut } from "@ext/enterprise-cloud/components/SignInOut/GesCloudSignInOut";
-import UserMenu from "@ext/settings/components/UserMenu";
 import SwitchWorkspace from "@ext/workspace/components/SwitchWorkspace";
 import { HomeLogo } from "../../../../../apps/web/src/components/Atoms/HomeLogo";
+import PermissionService from "../../../security/logic/Permission/components/PermissionService";
+import { editCatalogPermission } from "../../../security/logic/Permission/Permissions";
 
 export const GesCloudTopMenu = ({ section }: { section?: Section }) => {
 	const hasWorkspace = WorkspaceService.hasActive();
 	const { isLogged } = useSignOut();
 	const { enabled } = PageDataContextService.value.conf.enterpriseCloud;
 	const isWorkWithCatalogAllowed = hasWorkspace && (isLogged || !enabled);
+
+	const hasEditCatalogPermission = PermissionService.useCheckPermission(
+		editCatalogPermission,
+		WorkspaceService.current().path,
+	);
+	const canEditCatalogContent = hasEditCatalogPermission || !enabled;
 
 	return (
 		<TopMenuWrapper>
@@ -30,14 +37,18 @@ export const GesCloudTopMenu = ({ section }: { section?: Section }) => {
 				<TopMenuLeftSideActions>
 					{hasWorkspace && !enabled && <SwitchWorkspace />}
 					{isLogged && enabled && <GesCloudSwitchOrganization />}
-					{isWorkWithCatalogAllowed && <AddCatalogMenu />}
+					{isWorkWithCatalogAllowed && (
+						<AddCatalogMenu
+							canCreateCatalog={canEditCatalogContent}
+							canImportCatalog={canEditCatalogContent}
+						/>
+					)}
 				</TopMenuLeftSideActions>
 			</TopMenuLeftSide>
 			<TopMenuRightSide>
 				{isWorkWithCatalogAllowed && <TopMenuSearch section={section} />}
 				<TopMenuSwitchUiLanguageButton />
 				<TopMenuThemeToggle />
-				<UserMenu />
 				<GesCloudSignInOut />
 			</TopMenuRightSide>
 		</TopMenuWrapper>

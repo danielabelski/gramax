@@ -4,8 +4,8 @@ import ResourceService from "@core-ui/ContextServices/ResourceService/ResourceSe
 import { setEditorStore } from "@core-ui/stores/EditorStore";
 import t from "@ext/localization/locale/translate";
 import type { Editor } from "@tiptap/core";
+import { DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@ui-kit/Dropdown";
 import { Icon } from "@ui-kit/Icon";
-import { ToolbarDropdownMenuItem } from "@ui-kit/Toolbar";
 import { useCallback } from "react";
 import createDrawio from "../logic/createDrawio";
 
@@ -19,18 +19,21 @@ const DrawioMenuButton = ({ editor, fileName }: DrawioMenuButtonProps) => {
 	const resourceService = ResourceService.value;
 	const { disabled, isActive } = ButtonStateService.useCurrentAction({ action: "drawio" });
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	const onSelect = useCallback(() => {
 		setEditorStore({ lastUsedDiagramType: "drawio" });
 		void createDrawio(editor, fileName || articleProps?.fileName, resourceService);
 	}, [editor, fileName, articleProps, resourceService]);
 
 	return (
-		<ToolbarDropdownMenuItem active={isActive} disabled={disabled} onSelect={onSelect}>
-			<div className="flex flex-row items-center gap-2 mr-3" data-qa="qa-edit-menu-diagrams.net">
-				<Icon icon="drawio" />
-				{t("diagram.names.drawio")}
-			</div>
-		</ToolbarDropdownMenuItem>
+		<DropdownMenuRadioGroup value={isActive ? "drawio" : undefined}>
+			<DropdownMenuRadioItem disabled={disabled} onSelect={onSelect} value="drawio">
+				<div className="flex flex-row items-center gap-2 mr-3" data-qa="qa-edit-menu-diagrams.net">
+					<Icon icon="drawio" />
+					{t("diagram.names.drawio")}
+				</div>
+			</DropdownMenuRadioItem>
+		</DropdownMenuRadioGroup>
 	);
 };
 

@@ -15,6 +15,9 @@ pub enum FsEventKind {
 	Modified,
 	Removed,
 	Renamed { from: String },
+	/// The backend dropped events and the ones it lost are unrecoverable. Carries no path: the
+	/// receiver has to re-read the whole watch root.
+	Rescan,
 }
 
 #[derive(Debug, Clone, Deserialize)]

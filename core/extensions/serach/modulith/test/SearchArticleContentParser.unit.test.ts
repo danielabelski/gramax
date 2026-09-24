@@ -139,6 +139,35 @@ describe("SearchArticleContentParser", () => {
 		]);
 	});
 
+	it("keeps indexing the article when mermaid parser rejects the diagram type", async () => {
+		const paragraph = (text: string): JSONContent => ({ type: "paragraph", content: [{ type: "text", text }] });
+		const content: JSONContent[] = [
+			paragraph("Before"),
+			{
+				type: "diagrams",
+				attrs: {
+					diagramName: DiagramType.mermaid,
+					content: 'C4Container\n  title System\n  Person(user, "User")',
+					title: "Containers",
+				},
+			},
+			paragraph("After"),
+		];
+		const actual = await new SearchArticleContentParser({
+			items: content,
+			getFragmentItems,
+			getPropertyValue,
+			getLinkId,
+			lang: "none",
+			articleId: "test-mermaid-c4",
+			title: "",
+		}).parse();
+		expect(toHierarchical(actual)).toEqual([
+			{ type: "text", text: "Before" },
+			{ type: "text", text: "After" },
+		]);
+	});
+
 	it("loads mermaid definition from attrs.src via getDiagramFileText when content absent", async () => {
 		const loadSpy = jest.spyOn(extractTextsMermaidModule, "extractTextsMermaid").mockResolvedValue(["Pie", "A"]);
 		const readResource = jest.fn(async (src: string) =>

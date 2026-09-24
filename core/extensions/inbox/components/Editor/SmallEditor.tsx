@@ -1,10 +1,10 @@
-import { classNames } from "@components/libs/classNames";
 import ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import FetchService from "@core-ui/ApiServices/FetchService";
 import MimeTypes from "@core-ui/ApiServices/Types/MimeTypes";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import ResourceService from "@core-ui/ContextServices/ResourceService/ResourceService";
 import { useDebounce } from "@core-ui/hooks/useDebounce";
+import { cn } from "@core-ui/utils/cn";
 // biome-ignore lint/style/noRestrictedImports: refactor in future releases
 import styled from "@emotion/styled";
 import type { ArticleProviderType } from "@ext/articleProvider/logic/ArticleProvider";
@@ -85,6 +85,9 @@ interface SmallEditorProps<T> {
 	disableToolbar?: boolean;
 	inlineToolbarButtons?: InlineToolbarButtons;
 	updateCallback?: (id: string, content: JSONContent, title: string) => void;
+	manualSave?: boolean;
+	disableArticleMat?: boolean;
+	disableInlineToolbar?: boolean;
 }
 
 const defaultContent = { type: "doc", content: [{ type: "paragraph" }, { type: "paragraph" }] };
@@ -94,6 +97,7 @@ const editorButtons: InlineToolbarButtons = {
 		file: false,
 		comment: false,
 		prettify: false,
+		discuss: false,
 	},
 };
 
@@ -109,6 +113,9 @@ const SmallEditor = <T extends MiniProps<unknown>>(proprs: SmallEditorProps<T>) 
 		className,
 		inlineToolbarButtons = editorButtons,
 		disableToolbar = false,
+		manualSave = false,
+		disableArticleMat = false,
+		disableInlineToolbar = false,
 	} = proprs;
 	const apiUrlCreator = ApiUrlCreatorService.value;
 	const resourceService = ResourceService.value;
@@ -141,10 +148,14 @@ const SmallEditor = <T extends MiniProps<unknown>>(proprs: SmallEditorProps<T>) 
 			const json = editor.getJSON();
 			const title = editor.state.doc.firstChild?.textContent?.trim();
 			json.content.shift();
+			if (manualSave) {
+				updateCallback?.(id, json, title);
+				return;
+			}
 			debouncedUpdateContent.cancel();
 			debouncedUpdateContent.start(json, title);
 		},
-		[debouncedUpdateContent],
+		[debouncedUpdateContent, id, manualSave, updateCallback],
 	);
 
 	const updateLinkExtansion = useCallback(() => {
@@ -181,6 +192,7 @@ const SmallEditor = <T extends MiniProps<unknown>>(proprs: SmallEditorProps<T>) 
 		[resourceService, id],
 	);
 
+	const editorDependency = manualSave ? id : content;
 	const editor = useEditor(
 		{
 			onUpdate: onUpdateContent,
@@ -194,11 +206,14 @@ const SmallEditor = <T extends MiniProps<unknown>>(proprs: SmallEditorProps<T>) 
 			],
 			editable: true,
 			editorProps: {
+				attributes: {
+					"data-testid": "article-editor",
+				},
 				handlePaste,
 			},
 			autofocus: content?.content?.length === 2,
 		},
-		[content],
+		[editorDependency],
 	);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
@@ -213,18 +228,20 @@ const SmallEditor = <T extends MiniProps<unknown>>(proprs: SmallEditorProps<T>) 
 
 	return (
 		<ApiUrlCreatorService.Provider value={newApiUrlCreator}>
-			<SmallEditorWrapper className={classNames(className, {}, ["article"])}>
+			<SmallEditorWrapper className={cn("article", className)}>
 				<div className="mini-article">
 					<div className="mini-article-body">
-						<InlineLinkMenu editor={editor} />
-						<InlineToolbar buttons={inlineToolbarButtons} editor={editor} shouldShow={shouldShow} />
+						{!disableInlineToolbar && <InlineLinkMenu editor={editor} />}
+						{!disableInlineToolbar && (
+							<InlineToolbar buttons={inlineToolbarButtons} editor={editor} shouldShow={shouldShow} />
+						)}
 						<EditorContent
 							className={"article-body"}
 							data-iseditable={true}
 							data-qa="article-editor"
 							editor={editor}
 						/>
-						<ArticleMat editor={editor} />
+						{!disableArticleMat && <ArticleMat editor={editor} />}
 					</div>
 				</div>
 				{editor && !disableToolbar && <SmallEditorToolbar editor={editor} {...options?.menuProps} />}

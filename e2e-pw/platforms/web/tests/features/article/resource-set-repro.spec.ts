@@ -30,7 +30,7 @@ catalogTest("mermaid insert into docroot folder article", async ({ basePage, cat
 	await editor.focus();
 
 	await editor.clickToolbar("semiBlocks");
-	await sharedPage.getByRole("menuitem", { name: "Mermaid" }).click();
+	await sharedPage.getByRole("menuitemradio", { name: "Mermaid" }).click();
 	await basePage.waitForLoad();
 
 	await expect(sharedPage.locator(".node-diagrams").first()).toBeVisible();

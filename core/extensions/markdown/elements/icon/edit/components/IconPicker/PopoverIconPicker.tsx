@@ -36,7 +36,9 @@ export const PopoverIconPicker = (props: PopoverIconPickerProps) => {
 				{value && <TriggerButtonLogo value={value} />}
 				<TextOverflowTooltip>{label}</TextOverflowTooltip>
 				<div className="flex items-center ml-auto">
-					{value ? <InlineTriggerButton className="shrink-0" onClick={onClear} /> : null}
+					{value ? (
+						<InlineTriggerButton className="shrink-0" data-testid="icon-clear" onClick={onClear} />
+					) : null}
 					<Tooltip>
 						<TooltipContent>{t("pick-random-value")}</TooltipContent>
 						<TooltipTrigger asChild>

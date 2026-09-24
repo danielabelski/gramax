@@ -53,10 +53,10 @@ async function compactSearchHit(
 
 	const item = catalog.findItemByItemPath(new Path(hit.refPath));
 	const lookup = item
-		? await CatalogItemLookup.fromCatalogItem(catalog, item)
+		? CatalogItemLookup.fromCatalogItem(catalog, item)
 		: new CatalogItemLookup(catalogName, itemPath);
 
-	return { ...lookup.asJSON(), snippets };
+	return { ...lookup.asAgentJSON(), snippets };
 }
 
 export async function compactSearchResults(

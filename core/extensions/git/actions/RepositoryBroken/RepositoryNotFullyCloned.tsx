@@ -2,7 +2,6 @@ import Icon from "@components/Atoms/Icon";
 import { useRouter } from "@core/Api/useRouter";
 import { RequestStatus, useApi } from "@core-ui/hooks/useApi";
 import { useCatalogPropsStore } from "@core-ui/stores/CatalogPropsStore/CatalogPropsStore.provider";
-import styled from "@emotion/styled";
 import { makeGitShareData } from "@ext/git/actions/Clone/logic/makeGitShareData";
 import { useCloneRepo } from "@ext/git/actions/Clone/logic/useCloneRepo";
 import { ErrorLine, TechnicalDetails } from "@ext/git/actions/RepositoryBroken/TechnicalDetails";
@@ -19,12 +18,6 @@ export type RepositoryNotFullyClonedProps = {
 	trigger: JSX.Element;
 	error: Error;
 };
-
-const FooterWrapper = styled.div`
-	display: flex;
-	gap: 0.5rem;
-	padding: 0rem 1rem 1rem 3rem;
-`;
 
 export const RepositoryNotFullyCloned = ({ trigger, error }: RepositoryNotFullyClonedProps) => {
 	const router = useRouter();
@@ -72,15 +65,17 @@ export const RepositoryNotFullyCloned = ({ trigger, error }: RepositoryNotFullyC
 		<Dialog onOpenChange={setOpen} open={open}>
 			<DialogTrigger asChild>{trigger}</DialogTrigger>
 			<DialogContent>
-				<DialogBody className="flex flex-row items-start gap-4 lg:py-6">
-					<Icon className="text-status-error" code="circle-alert" size="24px" />
-					<div className="min-w-0 flex-1 space-y-2">
-						<DialogTitle className="text-lg">{t("git.error.broken.clone-failed.title")}</DialogTitle>
-						<p style={{ paddingBottom: "1rem" }}>{t("git.error.broken.clone-failed.body")}</p>
-						<ErrorLine error={removeCatalogError} />
+				<DialogBody className="lg:py-6">
+					<div className="flex flex-row items-start gap-4">
+						<Icon className="text-status-error" code="circle-alert" size="24px" />
+						<div className="min-w-0 flex-1 space-y-2">
+							<DialogTitle className="text-lg">{t("git.error.broken.clone-failed.title")}</DialogTitle>
+							<p style={{ paddingBottom: "1rem" }}>{t("git.error.broken.clone-failed.body")}</p>
+							<ErrorLine error={removeCatalogError} />
+						</div>
 					</div>
 				</DialogBody>
-				<FooterWrapper>
+				<div className="flex gap-2 pb-4 pl-14 pr-4 lg:pl-16">
 					<TechnicalDetails className="my-auto text-sm" error={error}>
 						{t("git.error.broken.clone-failed.technical-details")}
 					</TechnicalDetails>
@@ -110,7 +105,7 @@ export const RepositoryNotFullyCloned = ({ trigger, error }: RepositoryNotFullyC
 							</Button>
 						</AlertConfirm>
 					</div>
-				</FooterWrapper>
+				</div>
 			</DialogContent>
 		</Dialog>
 	);

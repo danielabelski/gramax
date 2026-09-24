@@ -10,7 +10,7 @@ use tracing::{info, warn};
 
 rust_i18n::i18n!("locales");
 
-const WINDOW_LABEL_PREFIX: &str = "browser-session";
+pub const WINDOW_LABEL_PREFIX: &str = "browser-session";
 const WINDOW_INSET_PX: i32 = 40;
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
 const READINESS_ATTEMPTS: usize = 10;
@@ -321,6 +321,10 @@ fn handle_window_event<R: Runtime>(app: &tauri::AppHandle<R>, label: &str, event
 
 fn get_state<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::State<'_, BrowserSessionState> {
 	app.state::<BrowserSessionState>()
+}
+
+pub fn is_browser_session_label(label: &str) -> bool {
+	label.starts_with(WINDOW_LABEL_PREFIX)
 }
 
 fn build_label(agent_session_id: &str) -> String {

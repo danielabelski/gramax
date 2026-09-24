@@ -1,6 +1,7 @@
 import OpenGraph from "@components/OpenGraph/OpenGraph";
 import type { PageProps } from "@components/Pages/models/Pages";
 import ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
+import { LEFT_SIDEBAR_BOOTSTRAP_SCRIPT } from "@core-ui/ContextServices/Sidebars/leftSidebarBootstrap";
 import getPageTitle from "@core-ui/getPageTitle";
 import { CacheProvider } from "@emotion/react";
 import { validateTheme } from "@ext/Theme/utils";
@@ -49,11 +50,12 @@ export function renderHtml(isAdmin: boolean, data: PageProps) {
 	const seoTags = getSeoTags(data);
 
 	return `<!doctype html>
-<html lang="ru" class=${theme}>
+<html lang="ru" class=${theme} data-left-sidebar-pinned="true">
   <head>
     <title>${isAdmin ? "Admin" : getPageTitle(data)}</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<script>${LEFT_SIDEBAR_BOOTSTRAP_SCRIPT}</script>
     <link rel="icon" href="${basePath}/assets/favicon.ico" />
     ${openGraphTags}
     ${seoTags}

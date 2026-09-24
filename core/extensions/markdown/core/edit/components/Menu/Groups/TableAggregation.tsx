@@ -12,9 +12,8 @@ import {
 } from "@ext/markdown/elements/table/edit/model/tableTypes";
 import type { Editor } from "@tiptap/core";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ui-kit/Dropdown";
+import { GlassToolbarIcon, GlassToolbarTrigger } from "@ui-kit/GlassToolbar";
 import { Icon } from "@ui-kit/Icon";
-import { ComponentVariantProvider } from "@ui-kit/Providers";
-import { ToolbarIcon, ToolbarTrigger } from "@ui-kit/Toolbar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 import { CellSelection } from "prosemirror-tables";
 import { memo, useCallback, useState } from "react";
@@ -31,7 +30,7 @@ const TableAggregation = memo(({ editor, disabled }: { editor: Editor; disabled:
 			.map((range) => {
 				return range.$from.parent.textContent?.trim() || "";
 			})
-			.filter((d) => d && d.length);
+			.filter((d) => d?.length);
 
 		const methodsData = [];
 		const formatter = getFormatter();
@@ -58,36 +57,34 @@ const TableAggregation = memo(({ editor, disabled }: { editor: Editor; disabled:
 	);
 
 	return (
-		<ComponentVariantProvider variant="inverse">
-			<DropdownMenu onOpenChange={onOpenChange}>
-				<DropdownMenuTrigger asChild>
-					<ToolbarTrigger disabled={disabled}>
-						<ToolbarIcon icon="sigma" />
-						<ToolbarIcon icon="chevron-down" />
-					</ToolbarTrigger>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent align="start" side="bottom" sideOffset={8}>
-					{Object.values(AggregationMethod).map((method, index) => (
-						<Tooltip key={method}>
-							<TooltipContent>
-								{methodsWithTooltip[method] && t(`editor.table.aggregation.methods.${method}.tooltip`)}
-							</TooltipContent>
-							<TooltipTrigger asChild>
-								<DropdownMenuItem key={method} onSelect={() => copyAggregation(index)}>
-									<div className="flex items-center gap-2 w-full justify-between">
-										<div className="flex items-center gap-2">
-											<Icon icon={aggregationMethodIcons[method]} />
-											{t(`editor.table.aggregation.methods.${method}.name`)}
-										</div>
-										<span>{aggregationData[index]}</span>
+		<DropdownMenu onOpenChange={onOpenChange}>
+			<DropdownMenuTrigger asChild>
+				<GlassToolbarTrigger disabled={disabled}>
+					<GlassToolbarIcon icon="sigma" />
+					<GlassToolbarIcon icon="chevron-down" />
+				</GlassToolbarTrigger>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="start" side="bottom" sideOffset={8}>
+				{Object.values(AggregationMethod).map((method, index) => (
+					<Tooltip key={method}>
+						<TooltipContent>
+							{methodsWithTooltip[method] && t(`editor.table.aggregation.methods.${method}.tooltip`)}
+						</TooltipContent>
+						<TooltipTrigger asChild>
+							<DropdownMenuItem key={method} onSelect={() => copyAggregation(index)}>
+								<div className="flex items-center gap-2 w-full justify-between">
+									<div className="flex items-center gap-2">
+										<Icon icon={aggregationMethodIcons[method]} />
+										{t(`editor.table.aggregation.methods.${method}.name`)}
 									</div>
-								</DropdownMenuItem>
-							</TooltipTrigger>
-						</Tooltip>
-					))}
-				</DropdownMenuContent>
-			</DropdownMenu>
-		</ComponentVariantProvider>
+									<span>{aggregationData[index]}</span>
+								</div>
+							</DropdownMenuItem>
+						</TooltipTrigger>
+					</Tooltip>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 });
 

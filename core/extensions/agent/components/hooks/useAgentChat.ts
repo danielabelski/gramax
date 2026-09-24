@@ -1,22 +1,11 @@
-import Path from "@core/FileProvider/Path/Path";
-import { useArticlePropsStore } from "@core-ui/stores/ArticlePropsStore/ArticlePropsStore.provider";
 import { mapAgentTimelineToViewModel } from "@ext/agent/components/utils/agentTimeline";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { setChatState } from "../store/ChatStore";
+import { useAgentOpenCatalogPaths } from "./useAgentOpenCatalogPaths";
 import { useAgentSender } from "./useAgentSender";
 import { useAgentSession } from "./useAgentSession";
 import { useAgentTimeline } from "./useAgentTimeline";
 import { useSessionPolling } from "./useSessionPolling";
-
-const useAgentOpenCatalogPaths = (): { openCatalogName: string | null; openItemPath: string | null } => {
-	const articlePath = useArticlePropsStore((s) => s.data.ref.path);
-	return useMemo(() => {
-		const openPath = new Path(articlePath);
-		const openCatalogName = openPath.rootDirectory.value || null;
-		const openItemPath = openCatalogName ? openPath.rootDirectory.subDirectory(openPath)?.value || null : null;
-		return { openCatalogName, openItemPath };
-	}, [articlePath]);
-};
 
 export const useAgentChat = (sessionId: string | null) => {
 	const { openCatalogName, openItemPath } = useAgentOpenCatalogPaths();
@@ -25,7 +14,7 @@ export const useAgentChat = (sessionId: string | null) => {
 
 	const { start: startPolling, stop: stopPolling } = useSessionPolling();
 
-	const { sessionLoading, sessionError, fetchSessionState, flushSessionEvents } = useAgentSession({
+	const { sessionLoading, sessionError, fetchSessionState, applySessionState } = useAgentSession({
 		sessionId,
 		openCatalogName,
 		openItemPath,
@@ -55,7 +44,7 @@ export const useAgentChat = (sessionId: string | null) => {
 		openCatalogName,
 		openItemPath,
 		fetchSessionState,
-		flushSessionEvents,
+		applySessionState,
 		startPolling,
 		stopPolling,
 		appendError,

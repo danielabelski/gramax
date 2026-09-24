@@ -76,6 +76,16 @@ test("syncs and retries once when the first publish is rejected", async () => {
 	expect(fetchMock.mock.calls[1][4]).toBe(true);
 });
 
+test("sends the commit message in the request body, not the URL (avoids 431 on large change sets)", async () => {
+	mockSync(["ok"]);
+	fetchMock.mockResolvedValueOnce(okResponse());
+
+	await expect(PublishEmitter.publish(apiUrlCreator, "restructure: move 265 files", ["a.md"])).resolves.toBe(true);
+
+	const body = fetchMock.mock.calls[0][1] as string;
+	expect(body).toContain("restructure: move 265 files");
+});
+
 test("retries when the first rejection is returned in the response body", async () => {
 	const syncMock = mockSync(["ok", "ok"]);
 	fetchMock
@@ -116,15 +126,15 @@ test("does not retry another publish error", async () => {
 	expect(ErrorConfirmService.notify).toHaveBeenCalledWith(response.error);
 });
 
-test.each<SyncOutcome>([
-	"error",
-	"conflict",
-])("does not retry publish when the recovery sync ends with %s", async (outcome) => {
-	const syncMock = mockSync(["ok", outcome]);
-	fetchMock.mockResolvedValueOnce(errorResponse(GitErrorCode.PushRejectedError));
+test.each<SyncOutcome>(["error", "conflict"])(
+	"does not retry publish when the recovery sync ends with %s",
+	async (outcome) => {
+		const syncMock = mockSync(["ok", outcome]);
+		fetchMock.mockResolvedValueOnce(errorResponse(GitErrorCode.PushRejectedError));
 
-	await expect(PublishEmitter.publish(apiUrlCreator, "message", ["article.md"])).resolves.toBe(false);
+		await expect(PublishEmitter.publish(apiUrlCreator, "message", ["article.md"])).resolves.toBe(false);
 
-	expect(syncMock).toHaveBeenCalledTimes(2);
-	expect(fetchMock).toHaveBeenCalledTimes(1);
-});
+		expect(syncMock).toHaveBeenCalledTimes(2);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	},
+);

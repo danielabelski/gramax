@@ -21,6 +21,19 @@ mod win;
 #[cfg(target_os = "macos")]
 mod custom_protocol;
 
+#[cfg(target_os = "macos")]
+mod macos_print;
+
+// `tests/print_to_pdf.rs` drives AppKit/WebKit directly and can't run under the normal test harness (needs the
+// process main thread and its own `NSApplication` — see that file), so it stays a real integration test rather
+// than a `#[cfg(test)]` unit test. That means it links `gramax` as an external crate and needs these two items
+// public; everything else about print stays private to this module.
+#[cfg(target_os = "macos")]
+#[doc(hidden)]
+pub mod macos_print_test_support {
+	pub use super::macos_print::{run_print_operation, PrintOutcome};
+}
+
 #[cfg(target_family = "unix")]
 pub use menu::MenuBuilder;
 

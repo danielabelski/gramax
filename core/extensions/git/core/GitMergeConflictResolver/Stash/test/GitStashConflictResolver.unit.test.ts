@@ -70,7 +70,7 @@ describe("GitStashConflictResolver", () => {
 		const hashBefore = (await gvc.getCommitHash()).toString();
 		await writeFile("1.txt", "conflict content theirs");
 		const statusBefore = await gvc.getChanges();
-		const stashHash = await gvc.stash(mockUserData);
+		const stashHash = await gvc.stash();
 
 		await commit(gvc, { "1.txt": "conflict content ours" });
 		await gvc.applyStash(stashHash, { deleteAfterApply: false });
@@ -97,7 +97,7 @@ describe("GitStashConflictResolver", () => {
 		const resolvedMergeFiles = [{ path: "1.txt", content: "conflict content ours and theirs :)" }];
 		await writeFile("1.txt", "conflict content theirs");
 		const hashBefore = (await gvc.getCommitHash()).toString();
-		const stashHash = await gvc.stash(mockUserData);
+		const stashHash = await gvc.stash();
 
 		await commit(gvc, { "1.txt": "conflict content ours" });
 		await gvc.applyStash(stashHash, { deleteAfterApply: false });

@@ -3,15 +3,18 @@ import type { OpenApiDocElement } from "@gramax/openapi-viewer";
 const BLOCK_SELECTOR = '[data-testid="open-api"]';
 /** A spec that never resolves must not hold the export hostage: past this the block goes to paper as it stands. */
 const RENDER_TIMEOUT_MS = 15_000;
+/** The viewer may finish descendant updates just after its render event; paginate only once that DOM is quiet. */
+const RENDER_SETTLE_MS = 50;
 
 /**
  * The viewer is lazy twice over — its chunk is imported on demand, and the spec is fetched after that — so a
- * block is still an empty skeleton when React reports the article as rendered. Settled means the document is
- * on the page (the element has a model) or the block gave up and rendered its error instead.
+ * block is still an empty skeleton when React reports the article as rendered. A valid model is assigned
+ * before its DOM is necessarily complete, so the wrapper marks the element only after `openapi-updated`.
  */
 const blockSettled = (block: Element): boolean => {
 	const doc = block.querySelector<OpenApiDocElement>("openapi-doc");
-	if (doc) return !!doc.model;
+	const model = doc?.model;
+	if (doc) return model?.validationErrors.length === 0 && doc.dataset.openApiRendered === "true";
 	// No viewer at all: either the error branch replaced the block, or the lazy chunk has not arrived yet.
 	return !block.querySelector(".openapi-block");
 };
@@ -27,19 +30,27 @@ const blockSettled = (block: Element): boolean => {
  */
 export const waitForOpenApiBlocks = (source: HTMLElement, signal?: AbortSignal): Promise<void> => {
 	const blocks = Array.from(source.querySelectorAll(BLOCK_SELECTOR));
-	if (!blocks.length || blocks.every(blockSettled) || signal?.aborted) return Promise.resolve();
+	if (!blocks.length || signal?.aborted) return Promise.resolve();
 
 	return new Promise<void>((resolve) => {
+		let settleTimer: ReturnType<typeof setTimeout> | undefined;
 		const observer = new MutationObserver(() => check());
 		const stop = () => {
 			clearTimeout(timer);
+			if (settleTimer !== undefined) clearTimeout(settleTimer);
 			observer.disconnect();
 			source.removeEventListener("openapi-updated", check);
 			signal?.removeEventListener("abort", stop);
 			resolve();
 		};
 		const check = () => {
-			if (blocks.every(blockSettled)) stop();
+			if (settleTimer !== undefined) clearTimeout(settleTimer);
+			settleTimer = undefined;
+			if (!blocks.every(blockSettled)) return;
+			settleTimer = setTimeout(() => {
+				settleTimer = undefined;
+				if (blocks.every(blockSettled)) stop();
+			}, RENDER_SETTLE_MS);
 		};
 		const timer = setTimeout(stop, RENDER_TIMEOUT_MS);
 

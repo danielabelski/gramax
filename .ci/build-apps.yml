@@ -16,7 +16,7 @@ build-desktop-web:
   extends: .template.build.apps
   image: gitlab.ics-it.ru:4567/ics/doc-reader/base-image:$USE_IMAGE_TAG
   tags:
-    - kubernetes01-gramax
+    - kubernetes01-gramax-5ghz
   variables:
     KUBERNETES_MEMORY_REQUEST: '8Gi'
     KUBERNETES_CPU_REQUEST: '1.5'
@@ -83,6 +83,7 @@ build-mobile-android:
     - shell-macos-arm64v8
   when: manual
   rules:
+    - !reference [.rules, default-pipeline-guards]
     - if: $CI_COMMIT_BRANCH == 'develop'
   script:
     - ./gx make-icons

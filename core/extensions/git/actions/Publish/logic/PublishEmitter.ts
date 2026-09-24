@@ -59,12 +59,12 @@ export const PublishEmitter = {
 
 		if (!(await syncCatalog(apiUrlCreator))) return false;
 
-		const endpoint = apiUrlCreator.getStoragePublishUrl(message);
+		const endpoint = apiUrlCreator.getStoragePublishUrl();
 		for (let attempt = 0; attempt < PUBLISH_ATTEMPTS_COUNT; attempt++) {
 			const isLastAttempt = attempt === PUBLISH_ATTEMPTS_COUNT - 1;
 			const res = await FetchService.fetch<DefaultError>(
 				endpoint,
-				JSON.stringify(files),
+				JSON.stringify({ message, filePaths: files }),
 				MimeTypes.json,
 				undefined,
 				isLastAttempt,

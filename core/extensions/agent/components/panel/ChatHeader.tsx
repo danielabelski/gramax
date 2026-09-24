@@ -1,26 +1,19 @@
-import { TooltipIconButton } from "@components/Atoms/TooltipIconButton";
 import Method from "@core-ui/ApiServices/Types/Method";
 import MimeTypes from "@core-ui/ApiServices/Types/MimeTypes";
 import { useDeferApi } from "@core-ui/hooks/useApi";
 import { useAgentChatVisibility } from "@ext/agent/components/hooks/useAgentChatVisibility";
-import { AgentSettingsModal } from "@ext/agent/components/panel/AgentSettingsModal";
 import { ChatDropdown } from "@ext/agent/components/panel/ChatDropdown";
-import { setAgentChatIsOpen } from "@ext/agent/components/store/AgentChatIsOpenStore";
 import { useActiveSessionBrowser } from "@ext/agent/components/store/AgentStore";
 import t from "@ext/localization/locale/translate";
-import { Icon } from "@ui-kit/Icon";
-import { Label } from "@ui-kit/Label";
-import { memo, useCallback, useState } from "react";
-import { useApiKey } from "../store/AgentStore";
+import { FloatingIconButton } from "@ui-kit/FloatingPanel";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
+import { memo, useCallback } from "react";
 import { useChatHeaderActions } from "../store/ChatStore";
 
 export const ChatHeader = memo(() => {
-	const { sessions, activeSessionId, onSelectSession, onCloseTab, onNewSession, onSaveSettings } =
-		useChatHeaderActions();
-	const [settingsOpen, setSettingsOpen] = useState(false);
-	const apiKey = useApiKey();
+	const { sessions, activeSessionId, onSelectSession, onCloseTab, onNewSession } = useChatHeaderActions();
 	const browser = useActiveSessionBrowser();
-	const { showGear, showBrowserReveal } = useAgentChatVisibility();
+	const { showBrowserReveal } = useAgentChatVisibility();
 	const { call: callReveal } = useDeferApi({});
 
 	const handleReveal = useCallback(() => {
@@ -38,58 +31,26 @@ export const ChatHeader = memo(() => {
 
 	return (
 		<>
-			<div className="flex min-h-10 max-w-full min-w-0 items-center gap-0.5 justify-between px-4 pt-2">
-				<div className="flex items-center gap-2">
-					<Icon icon="wand-sparkles" />
-					<Label>{t("agent.panel-name")}</Label>
-				</div>
-				<div className="flex gap-1">
-					{showBrowserReveal && browser?.active && (
-						<TooltipIconButton
-							className="p-1"
-							icon="globe"
-							iconClassName="size-3.5"
-							onClick={() => void handleReveal()}
-							size="xs"
-							tooltip={t("agent.browser.tooltip")}
-							variant="ghost"
-						/>
-					)}
-					<ChatDropdown
-						activeId={activeSessionId}
-						onClose={onCloseTab}
-						onNew={onNewSession}
-						onSelect={onSelectSession}
-						sessions={sessions}
-					/>
-					{showGear && (
-						<TooltipIconButton
-							className="p-1"
-							icon="settings"
-							iconClassName="size-3.5"
-							onClick={() => setSettingsOpen(true)}
-							size="xs"
-							tooltip={t("agent.tooltips.settings")}
-							variant="ghost"
-						/>
-					)}
-					<TooltipIconButton
-						className="p-1"
-						icon="x"
-						iconClassName="size-3.5"
-						onClick={() => setAgentChatIsOpen(false)}
-						size="xs"
-						tooltip={t("agent.tooltips.close")}
-						variant="ghost"
-					/>
-				</div>
-			</div>
-			<AgentSettingsModal
-				defaultKey={apiKey ?? ""}
-				onOpenChange={setSettingsOpen}
-				onSave={(key) => onSaveSettings?.(key)}
-				open={settingsOpen}
+			{showBrowserReveal && browser?.active && (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<FloatingIconButton icon="globe" onClick={() => void handleReveal()} />
+					</TooltipTrigger>
+					<TooltipContent>{t("agent.browser.tooltip")}</TooltipContent>
+				</Tooltip>
+			)}
+			<ChatDropdown
+				activeId={activeSessionId}
+				onClose={onCloseTab}
+				onSelect={onSelectSession}
+				sessions={sessions}
 			/>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<FloatingIconButton icon="squarePen" iconClassName="h-3.5 w-3.5" onClick={onNewSession} />
+				</TooltipTrigger>
+				<TooltipContent>{t("agent.tooltips.new-chat")}</TooltipContent>
+			</Tooltip>
 		</>
 	);
 });

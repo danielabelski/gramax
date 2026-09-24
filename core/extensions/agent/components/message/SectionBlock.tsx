@@ -4,7 +4,9 @@ import { Loader } from "@ui-kit/Loader";
 import { memo, useMemo, useRef } from "react";
 import type { ChatMessage } from "../types/chat";
 import { partitionSectionMessages } from "../utils/partitionSectionMessages";
+import { getMissingSecretsFromToolResult } from "./getMissingSecretsFromToolResult";
 import { MessageCard } from "./MessageCard";
+import { MissingSecretWarning } from "./MessageCard/MissingSecretWarning";
 import { MessageGroup } from "./MessageGroup";
 import { ThinkingCollapsible } from "./ThinkingCollapsible";
 
@@ -63,6 +65,12 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 		() => responses.filter((m) => m.kind === "cancelled" || m.kind === "error" || m.kind === "warning"),
 		[responses],
 	);
+	const visibleStatusMessages = useMemo(
+		() => statusMessages.filter((m) => isFinished || m.kind !== "warning"),
+		[statusMessages, isFinished],
+	);
+
+	const compactedMessage = useMemo(() => responses.find((m) => m.kind === "context_compacted"), [responses]);
 
 	const cancelledDurationMs = useMemo(() => {
 		const cancelled = responses.find((m) => m.kind === "cancelled");
@@ -74,15 +82,22 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 	}, [responses, user.ts]);
 
 	const preThinkingMessages = useMemo(() => {
-		if (hasThinkingBlock) return responses.slice(0, firstCompletedExpIdx + 1);
-		return responses.filter((m) => m.kind !== "turn_duration");
+		if (hasThinkingBlock) {
+			return responses.slice(0, firstCompletedExpIdx + 1).filter((m) => m.kind !== "context_compacted");
+		}
+		return responses.filter((m) => m.kind !== "turn_duration" && m.kind !== "context_compacted");
 	}, [responses, firstCompletedExpIdx, hasThinkingBlock]);
 
 	const afterFirst = useMemo(() => {
 		if (!hasThinkingBlock) return [];
 		return responses
 			.slice(firstCompletedExpIdx + 1)
-			.filter((m) => m.kind !== "turn_duration" && !statusMessages.some((s) => s === m));
+			.filter(
+				(m) =>
+					m.kind !== "turn_duration" &&
+					m.kind !== "context_compacted" &&
+					!statusMessages.some((s) => s === m),
+			);
 	}, [responses, firstCompletedExpIdx, statusMessages, hasThinkingBlock]);
 
 	const { insideMessages, belowAssistant, belowAssistantIsGray, belowToolMessages } = useMemo(
@@ -106,6 +121,29 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 	const showCopyButton = !showThinking && streamingMessageId === null;
 	const copyButtonMessageId = showCopyButton ? lastAssistantId : null;
 
+	const missingSecretWarning = useMemo(() => {
+		if (!isLast) return null;
+		const secrets: string[] = [];
+		for (const m of responses) {
+			if (m.kind !== "tool_result") continue;
+			const warning = getMissingSecretsFromToolResult(m);
+			if (!warning) continue;
+			for (const secret of warning.secrets) {
+				if (!secrets.includes(secret)) secrets.push(secret);
+			}
+		}
+		return secrets.length > 0 ? { secrets } : null;
+	}, [isLast, responses]);
+	const missingSecretWarningAnchorIsVisible =
+		lastAssistantId !== null &&
+		(preThinkingMessages.some((m) => m.id === lastAssistantId) || belowAssistant?.id === lastAssistantId);
+	const renderMissingSecretWarningAtSectionEnd =
+		showCopyButton &&
+		missingSecretWarning &&
+		(!missingSecretWarningAnchorIsVisible || visibleStatusMessages.length > 0);
+	const missingSecretWarningMessageId =
+		showCopyButton && missingSecretWarning && !renderMissingSecretWarningAtSectionEnd ? lastAssistantId : null;
+
 	return (
 		<div className={cn("group/turn w-full min-w-0 shrink-0")}>
 			<MessageCard message={user} stickyUserPrompt streamDescription={streamingMessageId === user.id} />
@@ -118,6 +156,8 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 							copyButtonMessageId={copyButtonMessageId}
 							footerAlwaysVisible={isLast}
 							messages={preThinkingMessages}
+							missingSecretWarning={missingSecretWarning}
+							missingSecretWarningMessageId={missingSecretWarningMessageId}
 							streamingMessageId={hasThinkingBlock ? null : streamingMessageId}
 						/>
 					)}
@@ -142,12 +182,16 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 								</ThinkingCollapsible>
 							)}
 
+							{compactedMessage && <MessageCard message={compactedMessage} />}
+
 							{belowAssistant && (
 								<div className="group" data-gray={belowAssistantIsGray || undefined}>
 									<MessageCard
 										copyButtonMessageId={copyButtonMessageId}
 										footerAlwaysVisible={isLast}
 										message={belowAssistant}
+										missingSecretWarning={missingSecretWarning}
+										missingSecretWarningMessageId={missingSecretWarningMessageId}
 										streamDescription={streamingMessageId === belowAssistant.id}
 									/>
 								</div>
@@ -162,15 +206,16 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 								</div>
 							)}
 
-							{statusMessages
-								.filter((m) => isFinished || m.kind !== "warning")
-								.map((m) => (
-									<MessageCard cancelledDurationMs={cancelledDurationMs} key={m.id} message={m} />
-								))}
+							{visibleStatusMessages.map((m) => (
+								<MessageCard cancelledDurationMs={cancelledDurationMs} key={m.id} message={m} />
+							))}
 						</>
 					)}
 				</div>
 			)}
+
+			{/* No completed assistant message to anchor the warning to, so render it at the section end. */}
+			{renderMissingSecretWarningAtSectionEnd && <MissingSecretWarning warning={missingSecretWarning} />}
 		</div>
 	);
 });

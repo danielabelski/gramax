@@ -1,3 +1,4 @@
+import GitMergeStatus from "@ext/git/actions/MergeConflictHandler/model/GitMergeStatus";
 import GitCommands from "@ext/git/core/GitCommands/GitCommands";
 import type GitSourceData from "@ext/git/core/model/GitSourceData.schema";
 import { TEST_GIT_FIXTURES_PATH } from "@ext/git/test/testGitFixturesPath";
@@ -46,8 +47,9 @@ describe("GitStorage", () => {
 			test("без конфилктов", async () => {
 				const hashBefore = (await git.getHeadCommit()).toString();
 
-				await storage.pull(mockUserData);
+				const conflicts = await storage.pull(mockUserData);
 
+				expect(conflicts).toEqual([]);
 				expect((await git.getHeadCommit()).toString()).not.toBe(hashBefore);
 			});
 
@@ -57,7 +59,9 @@ describe("GitStorage", () => {
 				await git.add();
 				await git.commit("", mockUserData);
 
-				await storage.pull(mockUserData);
+				const conflicts = await storage.pull(mockUserData);
+
+				expect(conflicts).toEqual([{ status: GitMergeStatus.BothModified, path: "main.txt" }]);
 
 				const newContent = await dfp.read(new Path([repNameWithoutSubmodules, "main.txt"]));
 				expect((await git.getHeadCommit()).toString()).not.toBe(hashBefore);

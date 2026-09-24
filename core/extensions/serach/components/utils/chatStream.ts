@@ -1,6 +1,7 @@
 import { readNDJson } from "@core/utils/readNDJson";
 import FetchService from "@core-ui/ApiServices/FetchService";
 import type Url from "@core-ui/ApiServices/Types/Url";
+import { SearchRequestError } from "@ext/serach/components/model/searchRequestError";
 import type { SearchChatStreamItem as ResponseStreamItem } from "@ext/serach/types";
 
 interface ChatStreamArgs {
@@ -22,7 +23,8 @@ export const chatStream = async ({ url, query, signal, onData, catalogNames }: C
 		undefined,
 		signal,
 	);
-	if (!res.ok || signal.aborted) return;
+	if (signal.aborted) return;
+	if (!res.ok) throw new SearchRequestError(res.status);
 
 	const itemGenerator = readNDJson<ResponseStreamItem>(res.body.getReader(), signal);
 

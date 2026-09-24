@@ -1,8 +1,9 @@
 import { span } from "@ext/loggers/opentelemetry";
 import { type InvokeArgs, type InvokeOptions, invoke as rawInvoke } from "@tauri-apps/api/core";
-import { once } from "@tauri-apps/api/event";
+import { listen, once } from "@tauri-apps/api/event";
 import { getAllWebviews } from "@tauri-apps/api/webview";
 import { confirm } from "@tauri-apps/plugin-dialog";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 
 export type HttpListenOnceAction = { type: "redirect"; value: string } | { type: "tryClose" };
 
@@ -51,21 +52,43 @@ export const openChildWindow = async (opts: { url: string; redirect?: string }):
 
 export const openDirectory = () => invoke<string>("open_directory");
 
-type HttpResponseBody = { type: "text"; data: string } | { type: "binary"; data: Array<number> };
+export type HttpFetchOptions = {
+	timeout?: { type: "off" } | { type: "on"; ms: number };
+};
 
-export const httpFetch = (req: {
+export const httpFetch = (
+	input: Parameters<typeof tauriFetch>[0],
+	init?: Parameters<typeof tauriFetch>[1],
+	options?: HttpFetchOptions,
+): Promise<Response> => {
+	const timeout = options?.timeout ?? { type: "on" as const, ms: 30_000 };
+	const requestSignal = init?.signal;
+
+	let signal: AbortSignal | undefined;
+	if (timeout.type === "off") signal = requestSignal;
+	else if (requestSignal) signal = AbortSignal.any([requestSignal, AbortSignal.timeout(timeout.ms)]);
+	else signal = AbortSignal.timeout(timeout.ms);
+
+	return tauriFetch(input, {
+		...init,
+		connectTimeout: init?.connectTimeout ?? 10_000,
+		signal,
+	});
+};
+
+export const mailFetch = (req: {
 	url: string;
+	command?: string;
 	body?: string;
-	method?: string;
-	headers?: { [name: string]: string };
-	auth?: { token?: string } | { login?: string; password?: string };
+	auth?: { username: string; password: string };
 }): Promise<{
-	body?: HttpResponseBody;
-	contentType?: string;
-	status: number;
-	statusText?: string;
+	status: string;
+	statusText: string;
+	ok: boolean;
+	body: string;
+	truncated: boolean;
 }> => {
-	return invoke("http_request", { req });
+	return invoke("plugin:plugin-mail|mail_request", { req });
 };
 
 export const moveToTrash = (path: string) => invoke<void>("move_to_trash", { path });
@@ -86,9 +109,31 @@ export const historyBackForwardCanGo = () => invoke<[boolean, boolean]>("history
 
 export type UpdateCheckResult = "up-to-date" | "update-found" | "in-progress";
 
-export const updateCheck = async (clearCache: boolean): Promise<UpdateCheckResult> => {
+/**
+ * `update_check` downloads a found update before it returns. With `resolveOnFound` the promise settles
+ * as soon as the update is found (download started or it was already cached); the download goes on in
+ * the background and reports to the update toast through `update:*` events.
+ */
+export const updateCheck = async (clearCache: boolean, resolveOnFound = false): Promise<UpdateCheckResult> => {
 	if (clearCache) await invoke<void>("update_cache_clear");
-	return invoke<UpdateCheckResult>("update_check");
+	if (!resolveOnFound) return invoke<UpdateCheckResult>("update_check");
+
+	let onFound!: () => void;
+	const found = new Promise<UpdateCheckResult>((resolve) => {
+		onFound = () => resolve("update-found");
+	});
+	// Subscribe before invoking, otherwise an early `update:incoming` could be missed.
+	const unlisten = await Promise.all([listen("update:incoming", onFound), listen("update:ready", onFound)]);
+
+	const check = invoke<UpdateCheckResult>("update_check");
+	// A download failure after an early return reaches the user through the `update:error` toast.
+	check.catch(() => {});
+
+	try {
+		return await Promise.race([check, found]);
+	} finally {
+		for (const stop of unlisten) stop();
+	}
 };
 
 export const updateInstall = () => invoke<void>("update_install");

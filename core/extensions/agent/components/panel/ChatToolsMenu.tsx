@@ -2,21 +2,12 @@ import InputFile from "@components/Atoms/InputFile";
 import { RequestStatus, useApi } from "@core-ui/hooks/useApi";
 import type { AgentSkill } from "@ext/agent/core/agentResourcesProvider";
 import t from "@ext/localization/locale/translate";
-import { IconButton } from "@ui-kit/Button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuEmptyItem,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@ui-kit/Dropdown";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ui-kit/Dropdown";
+import { FloatingTriggerButton } from "@ui-kit/FloatingPanel";
 import { Icon } from "@ui-kit/Icon";
-import { TextOverflowTooltip, Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 import { type ChangeEventHandler, useState } from "react";
+import { ChatSkillsMenu } from "./ChatSkillsMenu";
 
 type SkillsListResponse = { skills: AgentSkill[] };
 
@@ -57,53 +48,30 @@ const ChatToolsMenu = ({ catalogName, selectedSkillName, onSkillChange, onFileCh
 		>
 			<Tooltip>
 				<TooltipTrigger asChild>
-					<DropdownMenuTrigger asChild>
-						<IconButton
-							aria-label={t("agent.tooltips.add")}
-							className="rounded-full p-1"
-							icon="plus"
-							iconClassName="size-4"
-							size="xs"
-							variant="ghost"
-						/>
-					</DropdownMenuTrigger>
+					<span className="inline-flex">
+						<DropdownMenuTrigger asChild>
+							<FloatingTriggerButton aria-label={t("agent.tooltips.add")} className="h-7">
+								<Icon className="h-4 w-4" icon="plus" />
+							</FloatingTriggerButton>
+						</DropdownMenuTrigger>
+					</span>
 				</TooltipTrigger>
 				<TooltipContent>{t("agent.tooltips.add")}</TooltipContent>
 			</Tooltip>
-			<DropdownMenuContent align="start" className="w-56">
+			<DropdownMenuContent align="start" side="top">
 				<InputFile className="w-full" onChange={handleFileChange}>
 					<DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-						<Icon className="size-4" icon="paperclip" />
+						<Icon icon="paperclip" />
 						{t("agent.skills.attach-file")}
 					</DropdownMenuItem>
 				</InputFile>
-				<DropdownMenuSeparator />
-				<DropdownMenuLabel>{t("agent.skills.name")}</DropdownMenuLabel>
-				{skillList.length === 0 && isLoading ? (
-					<DropdownMenuItem disabled>{t("agent.skills.loading")}</DropdownMenuItem>
-				) : skillList.length === 0 ? (
-					<DropdownMenuEmptyItem>{t("agent.skills.no-skills")}</DropdownMenuEmptyItem>
-				) : (
-					<DropdownMenuRadioGroup value={selectedSkillName ?? ""}>
-						{skillList.map((skill) => {
-							const isSelected = selectedSkillName === skill.name;
-							return (
-								<DropdownMenuRadioItem
-									key={skill.name}
-									onSelect={(e) => {
-										e.preventDefault();
-										onSkillChange(isSelected ? null : skill.name);
-									}}
-									value={skill.name}
-								>
-									<TextOverflowTooltip className="truncate whitespace-nowrap">
-										{skill.name ?? t("agent.skills.unnamed-skill")}
-									</TextOverflowTooltip>
-								</DropdownMenuRadioItem>
-							);
-						})}
-					</DropdownMenuRadioGroup>
-				)}
+				<ChatSkillsMenu
+					isLoading={isLoading}
+					onClose={() => setOpen(false)}
+					onSkillChange={onSkillChange}
+					selectedSkillName={selectedSkillName}
+					skills={skillList}
+				/>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

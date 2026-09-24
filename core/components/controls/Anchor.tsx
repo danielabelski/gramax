@@ -4,6 +4,7 @@ import Url from "@core-ui/ApiServices/Types/Url";
 import ArticleTooltipService from "@core-ui/ContextServices/ArticleTooltip";
 import isMobileService from "@core-ui/ContextServices/isMobileService";
 import { usePlatform } from "@core-ui/hooks/usePlatform";
+import { cn } from "@core-ui/utils/cn";
 import type { ReactNode } from "react";
 import Icon from "../Atoms/Icon";
 import Link from "../Atoms/Link";
@@ -30,7 +31,7 @@ const Anchor = (Props: AnchorProps) => {
 	const target = isTauri || props.href?.startsWith("gramax://") ? "_self" : propTarget;
 	const isMobile = isMobileService.value;
 
-	if (!isAnchor && props.href != null && props.href.slice(basePathLength + 1, basePathLength + 4) != "api") {
+	if (!isAnchor && props.href != null && props.href.slice(basePathLength + 1, basePathLength + 4) !== "api") {
 		const isExternal = props.href?.match(/^\w+:/);
 
 		if (!isExternal) {
@@ -53,7 +54,7 @@ const Anchor = (Props: AnchorProps) => {
 		}
 
 		return (
-			<a {...props} rel="noopener" target={target}>
+			<a {...props} className={cn("external-link", props.className)} rel="noopener" target={target}>
 				{children}
 				<span
 					className={"external-link-wrapper"}

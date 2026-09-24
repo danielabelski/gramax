@@ -4,6 +4,7 @@ import FetchService from "@core-ui/ApiServices/FetchService";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
 import useWatch from "@core-ui/hooks/useWatch";
+import AddChildArticleItem from "@ext/article/actions/AddChildArticleItem";
 import BugsnagTrigger from "@ext/bugsnag/components/BugsnagTrigger";
 import { NotificationSettingsButton } from "@ext/enterprise/components/NotificationSettingsButton";
 import { useIsEnterprise } from "@ext/enterprise/utils/useIsEnterprise";
@@ -109,6 +110,7 @@ const EditorEditMenu = ({ itemLink, setItemLink }: EditMenuProps) => {
 	return (
 		<>
 			<HeaderLabel />
+			<AddChildArticleItem itemLink={itemLink} />
 			<DropdownMenuSeparator />
 			{isLinkToValidArticle && (
 				<>

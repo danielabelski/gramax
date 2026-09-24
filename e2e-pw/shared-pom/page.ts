@@ -1,4 +1,6 @@
 import { expect, type Locator, type Page as PlaywrightPage } from "@playwright/test";
+import { evaluateOnApp } from "@utils/app";
+import { gotoWhenReady } from "@utils/navigation";
 import { sleep } from "@utils/utils";
 import type { FileTree } from "@web/utils";
 import { fileURLToPath } from "url";
@@ -13,6 +15,15 @@ export default class BaseSharedPage {
 
 	get raw() {
 		return this._page;
+	}
+
+	/** See {@link evaluateOnApp} — the method form, for code that already holds a page object. */
+	async evaluateOnApp<Arg, R>(
+		fn: (arg: Arg) => R | Promise<R>,
+		arg: Arg,
+		options?: { timeout?: number },
+	): Promise<R> {
+		return evaluateOnApp(this._page, fn, arg, options);
 	}
 
 	assertUrl(url: string) {
@@ -35,7 +46,7 @@ export default class BaseSharedPage {
 		await this.page.evaluate(async () => await window.debug?.clearGxLock());
 		const url = this._baseUrl + path;
 		if (this.page.url() === url) return await this.waitForLoad();
-		await this.page.goto(url, { waitUntil: "domcontentloaded" });
+		await gotoWhenReady(this._page, url);
 		return this;
 	}
 
@@ -84,7 +95,8 @@ export default class BaseSharedPage {
 	}
 
 	async createFileTree(page: PlaywrightPage, tree: FileTree, basePath: string = ""): Promise<void> {
-		await page.evaluate(
+		await evaluateOnApp(
+			page,
 			async ({ tree, basePath }: { tree: FileTree; basePath: string }) => {
 				const intoPath = window.debug.intoPath;
 				const { wm } = await window.app!;
@@ -125,7 +137,8 @@ export default class BaseSharedPage {
 	}
 
 	async assertFileTree(page: PlaywrightPage, tree: FileTree, basePath: string = "") {
-		await page.evaluate(
+		await evaluateOnApp(
+			page,
 			async ({ tree, basePath }: { tree: FileTree; basePath: string }) => {
 				const intoPath = window.debug.intoPath;
 				const { wm } = await window.app!;

@@ -27,6 +27,12 @@ const getHtmlTagType = (name: string) => {
 	return null;
 };
 
+const getTagWrap = (source: string, position: number) => {
+	if (source.charCodeAt(position) === 60) return ["angle", tagWraps.angle] as const;
+	if (source.charCodeAt(position) === 123 && source.charCodeAt(position + 1) === 37)
+		return ["curly", tagWraps.curly] as const;
+};
+
 // biome-ignore lint/suspicious/noExplicitAny: it's ok
 const transformUnschemedTag = (meta: any, options?: { tags?: Schemes["tags"]; allowHtmlFallback?: boolean }) => {
 	if (!meta.tag || !options?.tags) return meta;
@@ -79,7 +85,7 @@ const block =
 		const start = state.bMarks[startLine] + state.tShift[startLine];
 		const finish = state.eMarks[startLine];
 
-		const tagMatch = Object.entries(tagWraps).find(([_, tag]) => state.src.startsWith(tag.open, start));
+		const tagMatch = getTagWrap(state.src, start);
 
 		if (!tagMatch) return false;
 
@@ -112,10 +118,8 @@ const block =
 const inline =
 	(tags: Schemes["tags"]): RuleInline =>
 	(state, silent): boolean => {
-		if (state.src.startsWith(gitConflictOpen)) return false;
-
-		const tagMatch = Object.entries(tagWraps).find(([_, tag]) => state.src.startsWith(tag.open, state.pos));
-		if (!tagMatch) return false;
+		const tagMatch = getTagWrap(state.src, state.pos);
+		if (!tagMatch || state.src.startsWith(gitConflictOpen)) return false;
 
 		const [tagName, currentTag] = tagMatch;
 		const tagEnd = findTagEnd(state.src, state.pos, currentTag.close);

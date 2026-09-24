@@ -85,7 +85,7 @@ const PdfRenderer = ({ file, onLoad, onError, onMetaChange }: RendererProps) => 
 
 	return (
 		<div
-			className="flex min-h-full w-[min(100%,210mm)] flex-col items-center justify-self-center overflow-visible"
+			className="mx-auto flex min-h-full w-[min(100%,210mm)] flex-col items-center overflow-visible"
 			ref={containerRef}
 		>
 			{Array.from({ length: numPages }, (_, index) => index + 1).map((pageNumber) => {
@@ -98,7 +98,7 @@ const PdfRenderer = ({ file, onLoad, onError, onMetaChange }: RendererProps) => 
 						key={`page-${pageNumber}`}
 					>
 						<canvas
-							className="block max-w-full"
+							className="block"
 							data-page-num={index}
 							data-preview-page={pageNumber}
 							ref={(el) => {

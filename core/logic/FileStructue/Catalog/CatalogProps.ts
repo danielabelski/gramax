@@ -1,3 +1,4 @@
+import type { AutoLfsProps } from "@core/GitLfs/logic/autoLfsAttachments";
 import type { CatalogView } from "@ext/catalog/views/models/CatalogViews";
 import type { RefInfo } from "@ext/git/core/GitCommands/model/GitCommandsModel";
 import type { FSLocalizationProps } from "@ext/localization/core/events/FSLocalizationEvents";
@@ -15,6 +16,9 @@ export type CatalogProps = FSLocalizationProps & {
 	versions?: string[];
 	filterProperty?: PropertyID;
 	syntax?: Syntax;
+
+	/** Automatic LFS for new attachments. Absent means the catalog predates the feature — treat as off. */
+	lfs?: AutoLfsProps;
 
 	relatedLinks?: TitledLink[];
 	private?: string[];
@@ -41,6 +45,16 @@ export type CatalogProps = FSLocalizationProps & {
 	hasGitmodules?: boolean;
 };
 
+export const normalizeCatalogProps = (props: CatalogProps): CatalogProps => {
+	const normalizedProps = { ...props };
+	const title = normalizedProps.title as unknown;
+
+	if (typeof title === "number" || typeof title === "boolean") normalizedProps.title = String(title);
+	else if (typeof title !== "string") delete normalizedProps.title;
+
+	return normalizedProps;
+};
+
 export const ExcludedProps: (keyof CatalogProps)[] = [
 	"url",
 	"docroot",
@@ -51,4 +65,9 @@ export const ExcludedProps: (keyof CatalogProps)[] = [
 	"cloneCancelDisabled",
 	"redirectOnClone",
 	"resolvedView",
+	// Detected while scanning, never authored: writing them back would put `isGitRepo: true` at the
+	// top of the user's doc-root and commit it to their repository.
+	"isGitRepo",
+	"isBareRepo",
+	"hasGitmodules",
 ];

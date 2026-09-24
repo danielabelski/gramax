@@ -8,6 +8,7 @@ export interface ProgressManager {
 	getProgressCallback(prid: unknown): ProgressCallback;
 	hasProgresses(): boolean;
 	doneProgress(prid: unknown): void;
+	getLastProgressAt(): number | undefined;
 }
 
 export class NullProgressManager implements ProgressManager {
@@ -31,13 +32,18 @@ export class NullProgressManager implements ProgressManager {
 		return false;
 	}
 	doneProgress(_prid: unknown): void {}
+	getLastProgressAt(): number | undefined {
+		return undefined;
+	}
 }
 
 export class DefaultProgressManager implements ProgressManager {
 	private readonly _subscribers = new Set<ProgressCallback>();
 	private readonly _doneProgresses = new Set<unknown>();
+	private _lastProgressAt?: number;
 	private readonly _progress = new DynamicAggregateProgress({
 		onChange: (p) => {
+			this._lastProgressAt = Date.now();
 			const progess = this._progress.getProgressesCount() === 0 ? 1 : p;
 			return this._subscribers.forEach((x) => x(progess));
 		},
@@ -52,6 +58,7 @@ export class DefaultProgressManager implements ProgressManager {
 	}
 
 	addProgress(): unknown {
+		this._lastProgressAt = Date.now();
 		return this._progress.addProgress();
 	}
 
@@ -68,11 +75,16 @@ export class DefaultProgressManager implements ProgressManager {
 	}
 
 	doneProgress(prid: unknown) {
+		this._lastProgressAt = Date.now();
 		this._doneProgresses.add(prid);
 		if (this._doneProgresses.size === this._progress.getProgressesCount()) {
 			this._doneProgresses.forEach((x) => this._progress.removeProgress(x));
 			this._doneProgresses.clear();
 		}
+	}
+
+	getLastProgressAt(): number | undefined {
+		return this._lastProgressAt;
 	}
 }
 

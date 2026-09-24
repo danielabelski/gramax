@@ -1,3 +1,4 @@
+import { leaveEditModeGuard } from "@components/HomePage/leaveEditModeGuard";
 import { topMenuItemClassName } from "@components/HomePage/TopMenu/const";
 import { classNames } from "@components/libs/classNames";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
@@ -143,9 +144,7 @@ const WorkspaceItem = ({
 			className="workspace-item"
 			data-qa="qa-clickable"
 			key={path}
-			onClick={async () => {
-				await WorkspaceService.setActive(path, apiUrlCreator);
-			}}
+			onClick={() => WorkspaceService.setActive(path, apiUrlCreator)}
 		>
 			<MenuItemInteractiveTemplate
 				buttonDisabled={disableEnterpriseEdit}
@@ -191,8 +190,13 @@ const SwitchWorkspace = () => {
 	const [dropdownOpen, setDropdownOpen] = useState(false);
 	const showDot = syncableWorkspaces.hasSyncableWorkspaces;
 
+	const onOpenChange = async (open: boolean) => {
+		if (open && !(await leaveEditModeGuard())) return;
+		setDropdownOpen(open);
+	};
+
 	return (
-		<DropdownMenu onOpenChange={setDropdownOpen} open={dropdownOpen}>
+		<DropdownMenu onOpenChange={onOpenChange} open={dropdownOpen}>
 			{isMobile ? (
 				<DropdownMenuTriggerButton
 					className={classNames("relative aspect-square p-2", {}, [topMenuItemClassName])}

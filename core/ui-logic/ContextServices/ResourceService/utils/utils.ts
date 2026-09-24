@@ -22,6 +22,7 @@ interface LoadInternalDataProps {
 	catalogName: string;
 	id: string;
 	provider: ArticleProviderType;
+	signal?: AbortSignal;
 }
 
 export function checkLfsPointer(buffer: Buffer, src: string): ResourceError | undefined {
@@ -29,9 +30,9 @@ export function checkLfsPointer(buffer: Buffer, src: string): ResourceError | un
 	return undefined;
 }
 
-export async function fetchImage(src: string): Promise<ResourceFetchResult> {
+export async function fetchImage(src: string, signal?: AbortSignal): Promise<ResourceFetchResult> {
 	try {
-		const res = await fetch(src);
+		const res = await fetch(src, { signal });
 		if (!res.ok) {
 			return { error: new ResourceNotFoundError(src) };
 		}
@@ -43,28 +44,34 @@ export async function fetchImage(src: string): Promise<ResourceFetchResult> {
 	}
 }
 
-export async function fetchInTauri(src: string): Promise<ResourceFetchResult> {
+export async function fetchInTauri(src: string, signal?: AbortSignal): Promise<ResourceFetchResult> {
 	try {
-		const res = await resolveModule("httpFetch")({ url: src });
-		if (res?.body?.type !== "binary") {
+		const res = await resolveModule("httpFetch")(src, { signal });
+		if (!res) {
 			return { error: new ResourceNotFoundError(src) };
 		}
-		return { buffer: Buffer.from(res.body.data) };
+		const contentType = res.headers.get("content-type");
+		const buffer = Buffer.from(await res.arrayBuffer());
+		if (contentType?.includes("application/json") || contentType?.includes("text")) {
+			return { error: new ResourceNotFoundError(src) };
+		}
+		return { buffer };
 	} catch (e) {
 		return { error: new ResourceLoadError(src, e instanceof Error ? e : undefined) };
 	}
 }
 
-export async function loadExternalData(src: string): Promise<ResourceFetchResult> {
-	const result = getExecutingEnvironment() === "tauri" ? await fetchInTauri(src) : await fetchImage(src);
+export async function loadExternalData(src: string, signal?: AbortSignal): Promise<ResourceFetchResult> {
+	const result =
+		getExecutingEnvironment() === "tauri" ? await fetchInTauri(src, signal) : await fetchImage(src, signal);
 	return result;
 }
 
 export async function loadInternalData(props: LoadInternalDataProps): Promise<ResourceFetchResult> {
-	const { src, apiUrlCreator, catalogName, id, provider } = props;
+	const { src, apiUrlCreator, catalogName, id, provider, signal } = props;
 	const url = apiUrlCreator.getArticleResource(src, undefined, catalogName, id, provider);
 	try {
-		const res = await FetchService.fetch(url, undefined, MimeTypes.text, Method.POST, false);
+		const res = await FetchService.fetch(url, undefined, MimeTypes.text, Method.POST, false, undefined, signal);
 		if (!res.ok) {
 			return { error: new ResourceNotFoundError(src) };
 		}
@@ -77,10 +84,14 @@ export async function loadInternalData(props: LoadInternalDataProps): Promise<Re
 	}
 }
 
-export async function getNoParentResource(path: Path, apiUrlCreator: ApiUrlCreator): Promise<ResourceFetchResult> {
+export async function getNoParentResource(
+	path: Path,
+	apiUrlCreator: ApiUrlCreator,
+	signal?: AbortSignal,
+): Promise<ResourceFetchResult> {
 	const url = apiUrlCreator.getResourceByPath(path.value);
 	try {
-		const res = await FetchService.fetch(url, undefined, MimeTypes.text, Method.POST, false);
+		const res = await FetchService.fetch(url, undefined, MimeTypes.text, Method.POST, false, undefined, signal);
 		if (!res.ok) {
 			return { error: new ResourceNotFoundError(path.value) };
 		}

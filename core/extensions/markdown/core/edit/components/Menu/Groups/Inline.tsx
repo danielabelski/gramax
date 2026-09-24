@@ -1,4 +1,6 @@
 import PageDataContext from "@core-ui/ContextServices/PageDataContext";
+import { useAgentChatVisibility } from "@ext/agent/components/hooks/useAgentChatVisibility";
+import DiscussInChat from "@ext/agent/components/panel/DiscussInChat";
 import TextPrettify from "@ext/ai/components/Buttons/TextPrettify";
 import useSupportedElements from "@ext/markdown/core/edit/components/Menu/Groups/hooks/useSupportedElements";
 import CodeMenuButton from "@ext/markdown/elements/code/edit/components/CodeMenuButton";
@@ -7,7 +9,7 @@ import { FileMenuButton } from "@ext/markdown/elements/file/edit/components/File
 import FragmentLinkMenuButton from "@ext/markdown/elements/fragment-link/edit/components/FragmentLinkMenuButton";
 import LinkMenuButton from "@ext/markdown/elements/link/edit/components/LinkMenuButton";
 import type { Editor } from "@tiptap/core";
-import { ToolbarSeparator } from "@ui-kit/Toolbar";
+import { GlassToolbarGroup, GlassToolbarSeparator } from "@ui-kit/GlassToolbar";
 
 export interface InlineMenuGroupButtons {
 	link?: boolean;
@@ -15,6 +17,7 @@ export interface InlineMenuGroupButtons {
 	code?: boolean;
 	comment?: boolean;
 	prettify?: boolean;
+	discuss?: boolean;
 	fragmentLink?: boolean;
 }
 
@@ -31,27 +34,37 @@ const InlineMenuGroup = ({ editor, onClick, buttons }: InlineMenuGroupProps) => 
 		code = true,
 		comment = true,
 		prettify = true,
+		discuss = true,
 		fragmentLink = true,
 	} = buttons || {};
 	const isGramaxAiEnabled = PageDataContext.value?.conf?.ai?.enabled;
+	const { showToggle: isAgentChatEnabled } = useAgentChatVisibility();
 	const { isCommentSupported } = useSupportedElements();
+
+	const hasDiscuss = isAgentChatEnabled && discuss;
+	const hasComment = isCommentSupported && comment;
+	const hasPrettify = isGramaxAiEnabled && prettify && !isAgentChatEnabled;
+	const isLastGroupAvailable = hasDiscuss || hasComment || hasPrettify;
 
 	return (
 		<>
-			{link && <LinkMenuButton editor={editor} onClick={onClick} />}
-			{code && <CodeMenuButton editor={editor} isInline />}
-			{file && <FileMenuButton editor={editor} onSave={onClick} />}
-			{fragmentLink && <FragmentLinkMenuButton editor={editor} />}
-			{isCommentSupported && comment && (
-				<>
-					<ToolbarSeparator />
-					{comment && <CommentMenuButton editor={editor} />}
-				</>
+			{(link || code || file || fragmentLink) && (
+				<GlassToolbarGroup>
+					{link && <LinkMenuButton editor={editor} onClick={onClick} />}
+					{code && <CodeMenuButton editor={editor} isInline />}
+					{file && <FileMenuButton editor={editor} onSave={onClick} />}
+					{fragmentLink && <FragmentLinkMenuButton editor={editor} />}
+				</GlassToolbarGroup>
 			)}
-			{isGramaxAiEnabled && prettify && (
+			{isLastGroupAvailable && (
 				<>
-					{!isCommentSupported && !comment && <ToolbarSeparator />}
-					<TextPrettify editor={editor} />
+					<GlassToolbarSeparator variant="inline" />
+
+					<GlassToolbarGroup>
+						{hasDiscuss && <DiscussInChat editor={editor} />}
+						{hasComment && <CommentMenuButton editor={editor} />}
+						{hasPrettify && <TextPrettify editor={editor} />}
+					</GlassToolbarGroup>
 				</>
 			)}
 		</>

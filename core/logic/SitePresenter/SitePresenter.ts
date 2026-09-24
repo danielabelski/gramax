@@ -1,9 +1,14 @@
 import { getExecutingEnvironment } from "@app/resolveModule/env";
+import { resolveWorkspaceLayout } from "@components/HomePage/utils/workspaceLayout";
+import { createEventEmitter } from "@core/Event/EventEmitter";
 import type ContextualCatalog from "@core/FileStructue/Catalog/ContextualCatalog";
 import type { Category } from "@core/FileStructue/Category/Category";
 import { ItemType } from "@core/FileStructue/Item/ItemType";
+import type { AutoLfsProps } from "@core/GitLfs/logic/autoLfsAttachments";
 import type CustomArticlePresenter from "@core/SitePresenter/CustomArticlePresenter";
+import SitePresenterEventHandlers from "@core/SitePresenter/events/SitePresenterEventHandlers";
 import LastVisited from "@core/SitePresenter/LastVisited";
+import type SitePresenterEvents from "@core/SitePresenter/SitePresenterEvents";
 import homeSections from "@core/utils/homeSections";
 import { isEditorInstance } from "@core-ui/utils/isEditorInstance";
 import CatalogViewRules from "@ext/catalog/views/logic/rules/CatalogViewRules";
@@ -28,7 +33,7 @@ import type { TemplateField } from "@ext/templates/models/types";
 import { GitTreeScopeParser } from "@ext/versioning/GitTreeScopeParser";
 import type { FileStatus } from "@ext/Watchers/model/FileStatus";
 import type { Workspace } from "@ext/workspace/Workspace";
-import type { WorkspaceConfig, WorkspaceSection } from "@ext/workspace/WorkspaceConfig";
+import type { WorkspaceConfig, WorkspaceLayoutItem } from "@ext/workspace/WorkspaceConfig";
 import { WorkspaceView } from "@ext/workspace/WorkspaceConfig";
 import { ContentLanguage, resolveLanguage } from "../../extensions/localization/core/model/Language";
 import type MarkdownParser from "../../extensions/markdown/core/Parser/Parser";
@@ -76,6 +81,7 @@ export type ClientCatalogProps = {
 	filterProperty?: PropertyID;
 	logo?: string;
 	logo_dark?: string;
+	lfs?: AutoLfsProps;
 	hasViews?: boolean;
 };
 
@@ -113,6 +119,7 @@ export type Section = {
 	view?: WorkspaceView;
 	description?: string;
 	sections?: Sections;
+	layoutItems?: WorkspaceLayoutItem[];
 };
 
 export type Sections = Record<string, Section>;
@@ -123,9 +130,17 @@ export type HomePageBreadcrumb = {
 };
 
 export type HomePageData = {
+	catalogsLinks: CatalogLink[];
+	views: Record<HomePageView, HomePageViewData>;
+	rootSections?: Record<HomePageView, Section>;
+	hasPersonalOverride: boolean;
+};
+
+export type HomePageView = "global" | "personal";
+
+export type HomePageViewData = {
 	section: Section;
 	breadcrumb: HomePageBreadcrumb[];
-	catalogsLinks: CatalogLink[];
 	group?: string;
 };
 
@@ -137,6 +152,7 @@ export type OpenGraphData = {
 
 export default class SitePresenter {
 	private _filters: ItemFilter[];
+	private _events = createEventEmitter<SitePresenterEvents>();
 
 	constructor(
 		private _nav: Navigation,
@@ -148,6 +164,7 @@ export default class SitePresenter {
 		private _context: Context,
 		private _isReadOnly: boolean,
 	) {
+		new SitePresenterEventHandlers(this).mount();
 		new NavigationEventHandlers(this._nav, this._context, this._customArticlePresenter).mount();
 		this._filters = new RuleProvider(this._context, this._nav, this._customArticlePresenter).getItemFilters();
 
@@ -156,9 +173,16 @@ export default class SitePresenter {
 		});
 	}
 
+	get events() {
+		return this._events;
+	}
+
 	async getHomePageData(workspace: WorkspaceConfig, path?: string): Promise<HomePageData> {
 		const pathSections = homeSections.getHomePathSections(path);
-		const sectionsInfo = workspace?.sections || workspace?.groups || {};
+		const layout = resolveWorkspaceLayout(workspace);
+		const hasPersonalOverride = layout.personal !== undefined;
+		const globalItems = layout.items;
+		const personalItems = layout.personal?.items ?? globalItems;
 
 		const catalogs = this._workspace.getAllCatalogs();
 		const lastVisited = new LastVisited(this._context, workspace.name);
@@ -172,9 +196,24 @@ export default class SitePresenter {
 				!this._context.contentLanguage ||
 				c.props.language === this._context.contentLanguage,
 		);
-		const { section, breadcrumb, group } = this._getSection(catalogsLinks, sectionsInfo, pathSections);
-
-		return { section, catalogsLinks, breadcrumb, group: group ?? null };
+		const global = this._getSection(catalogsLinks, globalItems, [...pathSections]);
+		const personal = this._getSection(catalogsLinks, personalItems, [...pathSections]);
+		return {
+			catalogsLinks,
+			hasPersonalOverride,
+			views: {
+				global: { ...global, group: global.group ?? null },
+				personal: { ...personal, group: personal.group ?? null },
+			},
+			...(pathSections.length
+				? {
+						rootSections: {
+							global: this._getSection(catalogsLinks, globalItems, []).section,
+							personal: this._getSection(catalogsLinks, personalItems, []).section,
+						},
+					}
+				: {}),
+		};
 	}
 
 	async getArticlePageData(
@@ -186,7 +225,7 @@ export default class SitePresenter {
 			await parseContent(article, catalog, this._context, this._parser, this._parserContextFactory);
 		}
 
-		const articleProps = await this.serializeArticleProps(article, await catalog?.getPathname(article));
+		const articleProps = await this.serializeArticleProps(article, await catalog?.getPathname(article), catalog);
 		const isReadOnly = this._isReadOnly || !!articleProps.errorCode;
 
 		let categoryIsExists = true;
@@ -263,7 +302,11 @@ export default class SitePresenter {
 		return catalog;
 	}
 
-	async serializeArticleProps(article: Article, pathname: string): Promise<ClientArticleProps> {
+	async serializeArticleProps(
+		article: Article,
+		pathname: string,
+		catalog?: ReadonlyCatalog,
+	): Promise<ClientArticleProps> {
 		let storedQuestions: Record<string, StoredQuestion> = null;
 		if (this._isReadOnly) {
 			const renderTree = await article.parsedContent.read((p) => p?.renderTree);
@@ -289,7 +332,8 @@ export default class SitePresenter {
 			questions: storedQuestions,
 			quiz: article.props.quiz ?? null,
 			searchPhrases: article.props.searchPhrases ?? [],
-			aliases: article.props.aliases ?? [],
+			// a translation has no aliases of its own — it shows (and edits) those of its main-language twin
+			aliases: catalog?.aliases.listFor(article) ?? article.props.aliases ?? [],
 		};
 	}
 
@@ -349,6 +393,7 @@ export default class SitePresenter {
 			syntax: syntax?.toUpperCase() === Syntax.xml ? Syntax.xml : (syntax ?? null),
 			logo: catalog.props.logo ?? null,
 			logo_dark: catalog.props.logo_dark ?? null,
+			lfs: catalog.props.lfs ?? null,
 			hasViews,
 		};
 	}
@@ -455,70 +500,14 @@ export default class SitePresenter {
 
 	private _getSection(
 		catalogLinks: CatalogLink[],
-		sectionsInfo: Record<string, WorkspaceSection>,
+		items: WorkspaceLayoutItem[],
 		pathSections: string[],
 	): {
 		section: Section;
 		breadcrumb: HomePageBreadcrumb[];
 		group?: string;
 	} {
-		const addedCatalogLinks: Set<CatalogLink> = new Set();
-		const catalogLinksByName = new Map(catalogLinks.map((cLink) => [cLink.name, cLink]));
-
-		const getSections = (
-			level: number,
-			sectionsInfo: Record<string, WorkspaceSection>,
-			parentSectionKeys: string[] = [],
-		) => {
-			const sections: Sections = {};
-
-			for (const sectionName of Object.keys(sectionsInfo)) {
-				const sectionInfo = sectionsInfo[sectionName];
-				const findCatalogLinks = [];
-				const sectionKeys = [...parentSectionKeys, sectionName];
-
-				const sectionCatalogs = sectionInfo?.catalogs?.map((c) => (Number.isInteger(c) ? String(c) : c)) ?? [];
-
-				const addCatalogLink = (cLink?: CatalogLink) => {
-					if (!cLink || addedCatalogLinks.has(cLink)) return;
-					findCatalogLinks.push(cLink);
-					addedCatalogLinks.add(cLink);
-				};
-
-				for (const catalogName of sectionCatalogs) {
-					addCatalogLink(catalogLinksByName.get(catalogName));
-				}
-
-				if (level === 0) {
-					for (const cLink of catalogLinks) {
-						if (cLink.group === sectionName && !sectionCatalogs.includes(cLink.name)) addCatalogLink(cLink);
-					}
-				}
-
-				const childSections = sectionInfo?.sections
-					? getSections(level + 1, sectionInfo?.sections, sectionKeys)
-					: null;
-				const hasChildSections = !!childSections && Object.keys(childSections).length > 0;
-
-				if (findCatalogLinks.length === 0 && !hasChildSections) continue;
-
-				sections[sectionName] = {
-					catalogLinks: findCatalogLinks,
-					title: sectionInfo?.title ?? "",
-					icon: sectionInfo?.icon || null,
-					view: sectionInfo?.view || null,
-					href: homeSections.getSectionHref(sectionKeys),
-					description: sectionInfo?.description || null,
-					sections: childSections,
-				};
-			}
-
-			return sections;
-		};
-
-		const sections = getSections(0, sectionsInfo);
-		const otherCatalogLinks = catalogLinks.filter((cLink) => !addedCatalogLinks.has(cLink));
-		const mainSection = homeSections.getMainSection(otherCatalogLinks, sections);
+		const mainSection = homeSections.buildHomeLayout(catalogLinks, items);
 
 		const targetSection = homeSections.findSection(pathSections, mainSection);
 		if (pathSections.length !== 1 || targetSection.section.view !== WorkspaceView.section) return targetSection;
@@ -559,7 +548,7 @@ export default class SitePresenter {
 
 	private async _getBaseData(article: Article, catalog: ReadonlyCatalog) {
 		const itemLinks = catalog ? await this._nav.getCatalogNav(catalog, article.ref.path.value) : [];
-		const articleProps = await this.serializeArticleProps(article, await catalog?.getPathname(article));
+		const articleProps = await this.serializeArticleProps(article, await catalog?.getPathname(article), catalog);
 		const catalogProps = await this.serializeCatalogProps(catalog);
 		const rootRef = catalog ? await this._nav.getRootItemLink(catalog) : null;
 
@@ -572,6 +561,9 @@ export default class SitePresenter {
 		mode: T["mode"],
 		content: T["content"],
 	): Promise<T> {
-		return { ...(await this._getBaseData(article, catalog)), content, mode } as T;
+		const mutable: { content: unknown } = { content };
+		const context = { getCatalog: () => catalog };
+		await this._events.emit("before-return-content", { mutable, context, mode });
+		return { ...(await this._getBaseData(article, catalog)), content: mutable.content, mode } as T;
 	}
 }

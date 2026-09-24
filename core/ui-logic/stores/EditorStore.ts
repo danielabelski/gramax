@@ -15,6 +15,8 @@ export interface BaseEditorContext {
 	apiUrlCreator: ApiUrlCreator;
 	articleProps: ClientArticleProps;
 	propertyService?: PropertyService;
+	/** The article view the editor lives in; stamped on the rename it starts. */
+	view?: string | null;
 }
 
 export interface EditorContext {
@@ -37,7 +39,6 @@ export type LastUsedDiagramType = "mermaid" | "plant-uml" | "drawio" | "openapi"
 interface EditorServiceState {
 	editor: Editor | null;
 	commentEnabled: boolean;
-	review: boolean;
 	lastUsedHighlightColor: HIGHLIGHT_COLOR_NAMES;
 	lastUsedHeadingLevel: HeadingLevel;
 	lastUsedListType: "bullet" | "ordered" | "task";
@@ -57,7 +58,6 @@ interface EditorServiceState {
 const editorStore = createStore<EditorServiceState>()(() => ({
 	editor: null,
 	commentEnabled: false,
-	review: false,
 	lastUsedHighlightColor: null,
 	lastUsedHeadingLevel: null,
 	lastUsedListType: null,

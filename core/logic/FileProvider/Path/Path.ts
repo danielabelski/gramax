@@ -40,8 +40,11 @@ class Path implements ToSpan {
 	}
 
 	get extension(): string {
-		const index = this._path.lastIndexOf("/");
-		return this._path.slice(index == -1 ? 0 : index).match(/\.([^.]+)$/)?.[1] ?? null;
+		const name = this.nameWithExtension;
+		if (!name) return null;
+		// A leading dot names the file rather than introducing an extension, exactly as `path.extname`
+		// reads it: ".gitignore" has none, while ".env.local" still keeps "local".
+		return name.slice(1).match(/\.([^.]+)$/)?.[1] ?? null;
 	}
 
 	set extension(value: string) {

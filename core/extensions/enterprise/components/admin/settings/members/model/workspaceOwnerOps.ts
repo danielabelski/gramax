@@ -39,9 +39,11 @@ export const applyGroupWorkspaceOwner = (
 	groupSource: GroupSource | undefined,
 	owner: boolean,
 ) => {
+	if (groupSource === GroupSource.SSO_GROUPS && owner) return;
+
 	const entry = ensureWorkspaceOwnerEntry(workspace);
 
-	if (groupSource === GroupSource.SSO_GROUPS) entry.ssoGroups = toggleId(entry.ssoGroups ?? [], groupId, owner);
+	if (groupSource === GroupSource.SSO_GROUPS) entry.ssoGroups = toggleId(entry.ssoGroups ?? [], groupId, false);
 	else entry.gxGroups = toggleId(entry.gxGroups, groupId, owner);
 };
 

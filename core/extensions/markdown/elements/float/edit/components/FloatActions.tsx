@@ -21,7 +21,7 @@ const FloatActions = ({ node, editor, getPos }: { node: Node; editor: Editor; ge
 
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger>
+			<DropdownMenuTrigger asChild>
 				<ActionButton icon={FLOAT_ALIGN_ICONS[float]} tooltipText={t("editor.float.name")} />
 			</DropdownMenuTrigger>
 			<DropdownMenuContent>

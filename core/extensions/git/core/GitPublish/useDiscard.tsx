@@ -1,3 +1,4 @@
+import ArticleUpdaterService from "@components/Article/ArticleUpdater/ArticleUpdaterService";
 import { useRouter } from "@core/Api/useRouter";
 import RouterPathProvider from "@core/RouterPath/RouterPathProvider";
 import FetchService from "@core-ui/ApiServices/FetchService";
@@ -40,7 +41,10 @@ export const useDiscard = (selectedFiles: Set<string>, onDiscard?: () => void): 
 			if (!res.ok) return;
 			const redirectPath = await res.text();
 			if (deletedArticlePath && redirectPath) router.pushPath(redirectPath);
-			else refreshPage();
+			else {
+				await ArticleUpdaterService.update(apiUrlCreator);
+				refreshPage();
+			}
 			onDiscard?.();
 
 			BranchUpdaterService.updateBranch(
@@ -48,7 +52,7 @@ export const useDiscard = (selectedFiles: Set<string>, onDiscard?: () => void): 
 				reset ? OnBranchUpdateCaller.MergeRequest : OnBranchUpdateCaller.DiscardNoReset,
 			);
 		},
-		[apiUrlCreator, onDiscard, getDeletedArticlePath, router],
+		[onDiscard, getDeletedArticlePath, router],
 	);
 
 	return {

@@ -80,7 +80,7 @@ const useNotifications = ({ userEmail, gesUrl, token }: UseNotificationsParams) 
 };
 
 export const NotificationsInit = ({ pageProps }: { pageProps: PageProps }) => {
-	const userEmail = pageProps.context?.userInfo?.mail;
+	const userEmail = pageProps.context?.user?.info?.mail;
 	const gesUrl = pageProps.context?.conf?.enterprise?.gesUrl;
 	const sourceDatas = SourceDataService.value;
 	// biome-ignore lint/correctness/useExhaustiveDependencies: sourceDatas is reactive service state, token must recompute with it

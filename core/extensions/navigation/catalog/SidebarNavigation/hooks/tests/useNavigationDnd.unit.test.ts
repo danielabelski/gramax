@@ -132,6 +132,25 @@ describe("onDragMove over an item", () => {
 		expect(store().dragTarget).toEqual({ anchorId: "folder", parentId: "group", mode: DropMode.Before });
 	});
 
+	test("`before` stays on the row the pointer is over, never on the row above it", () => {
+		// the line is drawn on the anchor's own top edge, so moving the anchor to the previous sibling would put
+		// it at the end of that row instead — a different place on screen for the same gesture
+		const result = render();
+
+		dragMove(result, "child", overRow(beforeItemSlotId("leaf")));
+
+		expect(store().dragTarget).toEqual({ anchorId: "leaf", parentId: "group", mode: DropMode.Before });
+	});
+
+	test("the top strip of a row resolves the same way as its boundary zone", () => {
+		const result = render();
+		movePointerTo(ROW_TOP + 1);
+
+		dragMove(result, "child", overRow("leaf"));
+
+		expect(store().dragTarget).toEqual({ anchorId: "leaf", parentId: "group", mode: DropMode.Before });
+	});
+
 	test("the middle of a row means `into`", () => {
 		const result = render();
 		movePointerTo(ROW_TOP + 5);
@@ -148,6 +167,38 @@ describe("onDragMove over an item", () => {
 		dragMove(result, "leaf", overRow("folder"));
 
 		expect(store().dragTarget).toEqual({ anchorId: "folder", parentId: "group", mode: DropMode.After });
+	});
+
+	test("the bottom strip of an expanded container reads as `into`, not `after`", () => {
+		// its row ends right above its own children, so an `after` line there would be drawn between the row and
+		// its content while meaning "after the whole subtree"
+		const result = render();
+		act(() => store().toggleExpanded("folder", true));
+		movePointerTo(ROW_TOP + ROW_HEIGHT - DROP_AFTER_ZONE_PX);
+
+		dragMove(result, "leaf", overRow("folder"));
+
+		expect(store().dragTarget).toEqual({ anchorId: "folder", parentId: null, mode: DropMode.Into });
+	});
+
+	test("the middle of an expanded container still means `into`", () => {
+		const result = render();
+		act(() => store().toggleExpanded("folder", true));
+		movePointerTo(ROW_TOP + 5);
+
+		dragMove(result, "leaf", overRow("folder"));
+
+		expect(store().dragTarget).toEqual({ anchorId: "folder", parentId: null, mode: DropMode.Into });
+	});
+
+	test("the bottom strip of an expanded childless item still means `after`", () => {
+		const result = render();
+		act(() => store().toggleExpanded("leaf", true));
+		movePointerTo(ROW_TOP + ROW_HEIGHT - DROP_AFTER_ZONE_PX);
+
+		dragMove(result, "child", overRow("leaf"));
+
+		expect(store().dragTarget).toEqual({ anchorId: "leaf", parentId: "group", mode: DropMode.After });
 	});
 
 	test("dropping onto itself is rejected", () => {

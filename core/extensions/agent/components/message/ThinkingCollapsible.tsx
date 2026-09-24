@@ -5,6 +5,7 @@ import { Divider } from "@ui-kit/Divider";
 import { Icon } from "@ui-kit/Icon";
 import { Loader } from "@ui-kit/Loader";
 import { type ReactNode, useEffect, useState } from "react";
+import { useAutoScrollGuard } from "../context/scrollGuardContext";
 import { formatElapsed } from "../utils/formatDuration";
 
 type ThinkingCollapsibleProps = {
@@ -23,6 +24,7 @@ export const ThinkingCollapsible = ({
 	isActive = false,
 }: ThinkingCollapsibleProps) => {
 	const [isOpen, setIsOpen] = useState(false);
+	useAutoScrollGuard(isOpen);
 	const [elapsed, setElapsed] = useState(() => Date.now() - startedAt);
 
 	const isFinished = durationMs !== undefined;

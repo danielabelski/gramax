@@ -23,6 +23,14 @@ describe("isDiffEntryVisible", () => {
 		expect(isDiffEntryVisible(resource(1, "docs/pic.png"), false)).toBe(true);
 		expect(isDiffEntryVisible(node(0, "docs"), false)).toBe(true);
 	});
+
+	test.each([
+		["изменённый", resource(1, "docs/_index.comments.yaml")],
+		["удалённый", resource(1, "", "docs/_index.comments.yaml")],
+	])("прячет %s файл комментариев только в упрощённом режиме", (_, entry) => {
+		expect(isDiffEntryVisible(entry, false)).toBe(false);
+		expect(isDiffEntryVisible(entry, true)).toBe(true);
+	});
 });
 
 describe("countSelectedVisibleEntries", () => {

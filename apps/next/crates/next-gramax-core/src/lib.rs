@@ -58,12 +58,50 @@ pub fn setup_remote_context(span_id: Option<&str>, trace_id: Option<&str>) -> op
 	opentelemetry::Context::current().with_remote_span_context(context).attach()
 }
 
+static FILTER_RELOAD_HANDLE: std::sync::OnceLock<
+	tracing_subscriber::reload::Handle<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>,
+> = std::sync::OnceLock::new();
+
+/// Runtime otel level switch from JS — same Gramax scale as the Tauri `set_otel_level` command.
+/// Crate-scoped `RUST_LOG` directives (`crate=level`) are preserved; only the global level is replaced.
+#[napi(js_name = "set_otel_level")]
+pub fn set_otel_level(level: String) -> napi::Result<()> {
+	let directive = match level.as_str() {
+		"off" => "off",
+		"commands" => "error",
+		"important" => "warn",
+		"internal" => "info",
+		"files" => "debug",
+		"full" => "trace",
+		_ => return Err(Error::from_reason(format!("unknown otel level: {level}"))),
+	};
+
+	let handle = FILTER_RELOAD_HANDLE
+		.get()
+		.ok_or_else(|| Error::from_reason("tracing is not initialized"))?;
+
+	let scoped = std::env::var("RUST_LOG")
+		.unwrap_or_default()
+		.split(',')
+		.filter(|d| d.contains('='))
+		.collect::<Vec<_>>()
+		.join(",");
+	let directives = if scoped.is_empty() { directive.to_string() } else { format!("{directive},{scoped}") };
+
+	let filter = tracing_subscriber::EnvFilter::builder()
+		.parse(directives)
+		.map_err(|err| Error::from_reason(err.to_string()))?;
+	handle.reload(filter).map_err(|err| Error::from_reason(err.to_string()))
+}
+
 #[ctor::ctor(unsafe)]
 fn init() {
 	use tracing_subscriber::layer::SubscriberExt;
 	use tracing_subscriber::util::SubscriberInitExt;
 
 	let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or(tracing_subscriber::EnvFilter::new("info"));
+	let (env_filter, reload_handle) = tracing_subscriber::reload::Layer::new(env_filter);
+	let _ = FILTER_RELOAD_HANDLE.set(reload_handle);
 
 	let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
 		.with_sampler(opentelemetry_sdk::trace::Sampler::ParentBased(Box::new(

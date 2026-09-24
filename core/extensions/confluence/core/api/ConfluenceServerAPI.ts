@@ -184,10 +184,9 @@ export default class ConfluenceServerAPI implements ConfluenceAPI {
 
 	private async _api(url: string): Promise<{ status: number; body?: any }> {
 		try {
-			const res = await resolveModule("httpFetch")({
-				url: `${this._data.domain}${url}`,
-				auth: {
-					token: this._data.token,
+			const res = await resolveModule("httpFetch")(`${this._data.domain}${url}`, {
+				headers: {
+					Authorization: `Bearer ${this._data.token}`,
 				},
 			});
 
@@ -195,7 +194,11 @@ export default class ConfluenceServerAPI implements ConfluenceAPI {
 				return { status: res.status, body: null };
 			}
 
-			const body = res.body.type === "text" ? this._safeJsonParse(res.body.data) : new Uint8Array(res.body.data);
+			const contentType = res.headers.get("content-type");
+			const body =
+				contentType?.includes("application/json") || contentType?.includes("text")
+					? this._safeJsonParse(await res.text())
+					: new Uint8Array(await res.arrayBuffer());
 
 			return {
 				status: res.status,

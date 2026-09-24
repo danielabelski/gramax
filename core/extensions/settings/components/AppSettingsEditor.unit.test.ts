@@ -77,7 +77,11 @@ jest.mock("@ext/toggleFeatures/features", () => ({
 jest.mock("@ui-kit/Dialog", () => ({
 	Dialog: ({ children }: { children: ReactNode }) => require("react").createElement("div", null, children),
 	DialogBody: ({ children }: { children: ReactNode }) => require("react").createElement("div", null, children),
+	DialogClose: ({ children }: { children: ReactNode }) =>
+		require("react").createElement("button", { type: "button" }, children),
 	DialogContent: ({ children }: { children: ReactNode }) => require("react").createElement("div", null, children),
+	DialogDescription: ({ children }: { children: ReactNode }) => require("react").createElement("div", null, children),
+	DialogTitle: ({ children }: { children: ReactNode }) => require("react").createElement("div", null, children),
 }));
 
 jest.mock("@ui-kit/Form", () => ({
@@ -88,8 +92,19 @@ jest.mock("@ui-kit/Form", () => ({
 	FormFooter: () => null,
 	FormHeader: () => null,
 	FormStack: ({ children }: { children: ReactNode }) => require("react").createElement("div", null, children),
-	FormField: ({ labelSuffix }: { labelSuffix?: ReactNode }) =>
-		require("react").createElement("div", null, labelSuffix),
+	FormField: ({
+		control,
+		controlSuffix,
+	}: {
+		control?: (props: { field: { value: string; onChange: () => void } }) => ReactNode;
+		controlSuffix?: ReactNode;
+	}) =>
+		require("react").createElement(
+			"div",
+			null,
+			control?.({ field: { value: "", onChange: () => {} } }),
+			controlSuffix,
+		),
 }));
 
 jest.mock("@ui-kit/Select", () => ({
@@ -120,6 +135,7 @@ jest.mock("@ui-kit/Sidebar", () => ({
 	SidebarGroupContent: ({ children }: { children: ReactNode }) =>
 		require("react").createElement("div", null, children),
 	SidebarGroupLabel: ({ children }: { children: ReactNode }) => require("react").createElement("div", null, children),
+	SidebarHeader: ({ children }: { children: ReactNode }) => require("react").createElement("div", null, children),
 	SidebarMenu: ({ children }: { children: ReactNode }) => require("react").createElement("div", null, children),
 	SidebarMenuButton: ({ children }: { children: ReactNode }) =>
 		require("react").createElement("button", { type: "button" }, children),
@@ -155,6 +171,12 @@ jest.mock("@ext/workspace/components/EditWorkspaceFormBody", () => ({
 jest.mock("@ext/catalog/actions/propsEditor/components/Sections", () => ({
 	GitSettingsTabs: {},
 	SettingsTabs: {},
+}));
+
+jest.mock("@ext/security/logic/Permission/components/PermissionService", () => ({
+	// biome-ignore lint/style/useNamingConvention: Jest ESM mock marker
+	__esModule: true,
+	default: { useCheckPermission: () => false },
 }));
 
 describe("AppSettingsEditor", () => {

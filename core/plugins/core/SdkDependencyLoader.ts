@@ -1,9 +1,10 @@
 import { PlatformServiceNew } from "@core-ui/PlatformService";
 import type UiLanguage from "@ext/localization/core/model/Language";
 import tRaw, { getCurrentLanguage, type TranslationKey } from "@ext/localization/locale/translate";
-import { initializeSdk, pluginCommandExecutor } from "@plugins/api/sdk";
+import { initializeSdk } from "@plugins/api/sdk";
 import type { SdkDependencies } from "@plugins/api/sdk/core";
 import { type PluginContainer, ServiceKey } from "@plugins/core/PluginContainer";
+import { pluginCommandExecutor } from "@plugins/core/pluginCommandExecutor";
 import { PluginCommandRegistry } from "@plugins/registry";
 
 export class SdkDependencyLoader {

@@ -1,4 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: it's ok */
+
 import type Cookie from "../../../../cookie/Cookie";
 import { Encoder } from "../../../../encoder/Encoder";
 import type WorkspaceManager from "../../../../workspace/WorkspaceManager";

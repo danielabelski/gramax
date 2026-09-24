@@ -7,17 +7,22 @@
 		"codegen": "bun run codegen.ts",
 		"read-dir": "bun run read-dir-to-tree.ts",
 		"show-trace": "playwright show-trace",
+		"timings": "bun run scripts/timings-report.ts",
 
 		"ui": "playwright test --ui",
 		"ui:enterprise": "bun run --env-file ../scripts/enterprise/test-local/enterprise.env --env-file ../scripts/enterprise/test-local/.env.private playwright test --ui",
 
 		"ui:dev": "ROOT_PATH=$(pwd)/docportal-test-data PLAYWRIGHT_DEV=true playwright test --ui",
 
-		"web:dev": "PORT=6001 bun run --cwd ../apps/web dev",
+		"web:dev": "PORT=${GX_E2E_WEB_PORT:-6001} bun run --cwd ../apps/web dev",
 		"web:build": "bun run --cwd ../apps/web build",
-		"web:ci": "PLAYWRIGHT_CI=true playwright test --project web",
+		"web:ci": "PLAYWRIGHT_CI=true playwright test --project web --project web-stash",
 		"web:enterprise:ci": "PLAYWRIGHT_CI=true playwright test --project web-enterprise",
-		"web:start": "IP=127.0.0.1 PORT=6001 bun run --cwd ../apps/web start",
+		"web:start": "IP=127.0.0.1 PORT=${GX_E2E_WEB_PORT:-6001} bun run --cwd ../apps/web start",
+		"web:stash:ci": "PLAYWRIGHT_CI=true playwright test --project=web-stash",
+		"web:timings:ci": "PLAYWRIGHT_CI=true playwright test --project=web-stash-timings",
+		"web:timings:local": "PLAYWRIGHT_DEV=true bun run --env-file .env playwright test --project=web-stash-timings",
+		"web:stash:local": "PLAYWRIGHT_DEV=true bun run --env-file .env playwright test --project=web-stash",
 
 		"static:build": "echo 'not supported yet' && exit 1",
 		"static:ci": "PLAYWRIGHT_CI=true playwright test --project static",

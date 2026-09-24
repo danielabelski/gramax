@@ -2,7 +2,12 @@ import { createEventEmitter, type Event } from "@core/Event/EventEmitter";
 import gitMergeConverter from "@ext/git/actions/MergeConflictHandler/logic/GitMergeConverter";
 import type GitMergeResult from "@ext/git/actions/MergeConflictHandler/model/GitMergeResult";
 import type { GitRevisionsFilter } from "@ext/git/actions/Revisions/model/GitRevisionsFilter";
-import type { CommitAuthorInfo, ConfigValue } from "@ext/git/core/GitCommands/LibGit2IntermediateCommands";
+import type {
+	CommitAuthorInfo,
+	CommitRangeInfo,
+	ConfigValue,
+	StashInfo,
+} from "@ext/git/core/GitCommands/LibGit2IntermediateCommands";
 import type {
 	DiffConfig,
 	DiffTree2TreeInfo,
@@ -157,14 +162,14 @@ export default class GitVersionControl {
 		await this._events.emit("reset", { reason: "delete-branch" });
 	}
 
-	async stash(data: SourceData, doAddBeforeStash = true): Promise<GitStash> {
+	async stash(doAddBeforeStash = true): Promise<GitStash> {
 		if (doAddBeforeStash) await this.add();
 
-		// needed in case of dummy conflicts: when a file marked as conflited but no actual conflicts are present
-		// in other case stash will fail with error: cannot create a tree from a not fully merged index; class=Index (10); code=Unmerged (-10)
-		await this.reset({ mode: "mixed" });
-
-		const stash = await this._gitRepository.stash(data);
+		// The mixed reset that used to stand here — against phantom conflicts, where a file is marked
+		// conflicted while nothing actually conflicts — now happens inside the stash, and only when the
+		// index really is conflicted (`crates/git/src/actions/stash.rs`). Resetting unconditionally
+		// emptied the index of the very changes the stash is built from.
+		const stash = await this._gitRepository.stash();
 		if (stash) WebStashCache.setStashCache(this.getPath().value, stash.toString());
 		return stash;
 	}
@@ -174,12 +179,14 @@ export default class GitVersionControl {
 		{
 			restoreAfterStash = false,
 			deleteAfterApply = true,
-		}: { restoreAfterStash?: boolean; deleteAfterApply?: boolean } = {
+			againstIndex = false,
+		}: { restoreAfterStash?: boolean; deleteAfterApply?: boolean; againstIndex?: boolean } = {
 			restoreAfterStash: false,
 			deleteAfterApply: true,
+			againstIndex: false,
 		},
 	): Promise<GitMergeResult[]> {
-		const gitMergeResult = gitMergeConverter(await this._gitRepository.applyStash(stashHash));
+		const gitMergeResult = gitMergeConverter(await this._gitRepository.applyStash(stashHash, againstIndex));
 		if (restoreAfterStash) {
 			const status = (await this.getChanges()).map((x) => x.path);
 			await this.restore(true, status);
@@ -190,6 +197,11 @@ export default class GitVersionControl {
 
 	async deleteStash(stashHash: GitStash): Promise<void> {
 		await this._gitRepository.deleteStash(stashHash);
+	}
+
+	/** Every stash this repository holds, newest first. */
+	async listStashes(): Promise<StashInfo[]> {
+		return this._gitRepository.listStashes();
 	}
 
 	async stashParent(stashHash: GitStash): Promise<GitVersion> {
@@ -260,6 +272,10 @@ export default class GitVersionControl {
 		return gitMergeConverter(await this._gitRepository.merge(data, opts));
 	}
 
+	getUpstreamRef(): Promise<string> {
+		return this._gitRepository.getUpstreamRef();
+	}
+
 	async formatMergeMessage(data: SourceData, opts: MergeMessageFormatOptions): Promise<string> {
 		return this._gitRepository.formatMergeMessage(data, opts);
 	}
@@ -322,8 +338,12 @@ export default class GitVersionControl {
 		return await this._gitRepository.storageStats();
 	}
 
-	getCommitAuthors(): Promise<CommitAuthorInfo[]> {
-		return this._gitRepository.getCommitAuthors();
+	getCommitAuthors(pathspecs?: string[]): Promise<CommitAuthorInfo[]> {
+		return this._gitRepository.getCommitAuthors(pathspecs);
+	}
+
+	getCommitRange(pathspecs?: string[]): Promise<CommitRangeInfo | null> {
+		return this._gitRepository.getCommitRange(pathspecs);
 	}
 
 	haveConflictsWithBranch(branch: GitBranch | string, data: GitSourceData): Promise<boolean> {

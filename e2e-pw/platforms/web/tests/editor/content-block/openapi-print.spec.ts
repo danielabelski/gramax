@@ -30,12 +30,13 @@ const exportCatalogToPdf = async (sharedPage: Page) => {
 	await sharedPage.getByRole("menuitem", { name: /Export/i }).click();
 	await sharedPage.getByRole("menuitem", { name: /Catalog to PDF/i }).click();
 	await sharedPage.getByRole("button", { name: /Open print dialog/i }).click();
+	await expect(sharedPage.locator(".print-debug-preview")).toBeVisible({ timeout: 60_000 });
 };
 
 editorTest.describe("OpenApi in the PDF export", () => {
 	editorTest("pages end up on screen, not merely in the document", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 		await expect(sharedPage.locator('[data-testid="open-api"]')).toBeVisible();
 
 		await exportCatalogToPdf(sharedPage);
@@ -73,7 +74,7 @@ editorTest.describe("OpenApi in the PDF export", () => {
 
 	editorTest("every operation prints as its heading alone", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 		await expect(sharedPage.locator('[data-testid="open-api"]')).toBeVisible();
 
 		await exportCatalogToPdf(sharedPage);
@@ -97,7 +98,7 @@ editorTest.describe("OpenApi in the PDF export", () => {
 
 	editorTest("cards carry no shadow the page edge could slice", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 		await expect(sharedPage.locator('[data-testid="open-api"]')).toBeVisible();
 
 		await exportCatalogToPdf(sharedPage);
@@ -121,7 +122,7 @@ editorTest.describe("OpenApi in the PDF export", () => {
 
 	editorTest("card outlines survive the print stylesheet", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 		await expect(sharedPage.locator('[data-testid="open-api"]')).toBeVisible();
 
 		await exportCatalogToPdf(sharedPage);
@@ -156,7 +157,7 @@ editorTest.describe("OpenApi in the PDF export", () => {
 
 	editorTest("the debug preview can be dismissed", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "OpenAPI" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "OpenAPI" }).click();
 		await expect(sharedPage.locator('[data-testid="open-api"]')).toBeVisible();
 
 		await exportCatalogToPdf(sharedPage);

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ops::Deref;
 use std::path::Path;
+use std::path::PathBuf;
 
 use git2::*;
 
@@ -35,6 +36,21 @@ impl Deref for HistoryInfo {
 	}
 }
 
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitPointInfo {
+	pub date: i64,
+	pub oid: OidInfo,
+}
+
+/// the two ends of a history: its oldest and its newest commit
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitRangeInfo {
+	pub start: CommitPointInfo,
+	pub end: CommitPointInfo,
+}
+
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct CommitAuthorInfo {
@@ -56,7 +72,8 @@ pub struct CommitFilterOptions {
 	pub authors: Option<Vec<String>>,
 	pub before_date: Option<String>,
 	pub after_date: Option<String>,
-	pub paths: Option<Vec<String>>,
+	/// exact paths, not globs: renames are followed by rewriting these strings, see `PathFollower`
+	pub pathspecs: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -98,11 +115,47 @@ pub struct CommitInfo {
 pub trait History {
 	fn history<P: AsRef<Path>>(&self, path: P, offset: usize, limit: usize) -> Result<HistoryInfo>;
 
-	fn get_all_authors(&self) -> Result<Vec<CommitAuthorInfo>>;
+	/// authors of the commits of the whole catalog — or, when `pathspecs` is given, only of the
+	/// commits that edited these paths
+	fn get_commit_authors(&self, pathspecs: Option<Vec<String>>) -> Result<Vec<CommitAuthorInfo>>;
+
+	/// oldest and newest commit of the whole catalog — or, when `pathspecs` is given, of these paths;
+	/// `None` when nothing in history matches
+	fn get_commit_range(&self, pathspecs: Option<Vec<String>>) -> Result<Option<CommitRangeInfo>>;
 
 	fn get_branch_commits<S: AsRef<str>>(&self, ours: S, theirs: S, max: Option<usize>) -> Result<BranchCommitsInfo>;
 
 	fn get_commit_info(&self, oid: Oid, opts: CommitInfoOpts) -> Result<Vec<CommitInfo>>;
+}
+
+impl<C: Creds> Repo<'_, C> {
+	/// calls `f` for every commit that edited `pathspecs` — or for every commit of the catalog when
+	/// `pathspecs` is empty; renames are followed, so a path is seen under its older names too
+	fn walk_matching<F>(&self, pathspecs: Option<Vec<String>>, mut f: F) -> Result<()>
+	where
+		F: FnMut(&Commit) -> Result<()>,
+	{
+		let mut follower = pathspecs.filter(|p| !p.is_empty()).map(PathFollower::new);
+
+		// renames can only be followed along a single line of history, so the walk always starts at HEAD
+		let mut revwalk = self.0.revwalk()?;
+		revwalk.set_sorting(Sort::TOPOLOGICAL | Sort::TIME)?;
+		revwalk.push_head()?;
+
+		for oid in revwalk {
+			let commit = self.0.find_commit(oid?)?;
+
+			if let Some(follower) = follower.as_mut() {
+				if follower.diff_commit(&self.0, &commit)?.is_none() {
+					continue;
+				}
+			}
+
+			f(&commit)?;
+		}
+
+		Ok(())
+	}
 }
 
 impl<C: Creds> History for Repo<'_, C> {
@@ -131,25 +184,21 @@ impl<C: Creds> History for Repo<'_, C> {
 			.map(|dt| dt.with_timezone(&Utc).timestamp());
 
 		let include_changed_files = opts.include_changed_files.unwrap_or(false);
-		let filter_paths = opts.filters.as_ref().and_then(|f| f.paths.as_deref()).filter(|p| !p.is_empty());
 
-		let mut diff_opts = filter_paths.map(|paths| {
-			let mut opts = DiffOptions::new();
-			for path in paths {
-				opts.pathspec(path);
-			}
-			opts.skip_binary_check(true);
-			opts.include_typechange(false);
-			opts.ignore_blank_lines(true);
-			opts.patience(false);
-			return opts;
-		});
+		let mut follower = opts
+			.filters
+			.as_ref()
+			.and_then(|f| f.pathspecs.clone())
+			.filter(|p| !p.is_empty())
+			.map(PathFollower::new);
 
 		let mut revwalk = self.0.revwalk()?;
 		revwalk.set_sorting(Sort::TOPOLOGICAL | Sort::TIME)?;
 		revwalk.push(oid)?;
 
-		if opts.simplify {
+		// a first parent walk hides everything that came in through a merge, so paths — which have to
+		// find the commit that actually edited them — are followed over the whole graph instead
+		if opts.simplify && follower.is_none() {
 			revwalk.simplify_first_parent()?;
 		}
 
@@ -169,6 +218,15 @@ impl<C: Creds> History for Repo<'_, C> {
 				}
 			}
 
+			// pathspecs are followed before the other filters: a rename made by a filtered out commit still moves the trail
+			let path_diff = match follower.as_mut() {
+				Some(follower) => match follower.diff_commit(&self.0, &commit)? {
+					Some(diff) => Some(diff),
+					None => continue,
+				},
+				None => None,
+			};
+
 			if let Some(before) = filter_before {
 				if commit_time >= before {
 					continue;
@@ -183,11 +241,11 @@ impl<C: Creds> History for Repo<'_, C> {
 
 			let commit_tree = commit.tree()?;
 			let parent_tree = commit.parents().next().and_then(|p| p.tree().ok());
-			let diff = self.0.diff_tree_to_tree(parent_tree.as_ref(), Some(&commit_tree), diff_opts.as_mut())?;
 
-			if diff_opts.is_some() && diff.deltas().next().is_none() {
-				continue;
-			}
+			let diff = match path_diff {
+				Some(diff) => diff,
+				None => self.0.diff_tree_to_tree(parent_tree.as_ref(), Some(&commit_tree), None)?,
+			};
 
 			let diff_stats = diff.stats()?;
 
@@ -268,15 +326,11 @@ impl<C: Creds> History for Repo<'_, C> {
 		Ok(res)
 	}
 
-	fn get_all_authors(&self) -> Result<Vec<CommitAuthorInfo>> {
+	fn get_commit_authors(&self, pathspecs: Option<Vec<String>>) -> Result<Vec<CommitAuthorInfo>> {
 		let mut authors = HashMap::new();
-		let mut revwalk = self.0.revwalk()?;
-		revwalk.push_glob("refs/heads/*")?;
 
-		for oid in revwalk {
-			let commit = self.0.find_commit(oid?)?;
+		self.walk_matching(pathspecs, |commit| {
 			let author = commit.author();
-
 			let author_email = author.email().unwrap_or("<invalid-utf8>");
 
 			match authors.get_mut(author_email) {
@@ -285,9 +339,33 @@ impl<C: Creds> History for Repo<'_, C> {
 					authors.insert(author.short_info()?, 1);
 				}
 			}
-		}
+
+			Ok(())
+		})?;
 
 		Ok(authors.into_iter().map(|(author, count)| CommitAuthorInfo { author, count }).collect())
+	}
+
+	fn get_commit_range(&self, pathspecs: Option<Vec<String>>) -> Result<Option<CommitRangeInfo>> {
+		let mut range: Option<CommitRangeInfo> = None;
+
+		self.walk_matching(pathspecs, |commit| {
+			let point = CommitPointInfo { date: commit.time().seconds() * 1000, oid: commit.id().short_info()? };
+
+			// the ends are the oldest and the newest commit by date, not by walk order: after a rebase
+			// or an import these are not the same commits
+			range = Some(match range.take() {
+				Some(range) => CommitRangeInfo {
+					start: if point.date < range.start.date { point.clone() } else { range.start },
+					end: if point.date > range.end.date { point } else { range.end },
+				},
+				None => CommitRangeInfo { start: point.clone(), end: point },
+			});
+
+			Ok(())
+		})?;
+
+		Ok(range)
 	}
 
 	fn get_branch_commits<S: AsRef<str>>(&self, ours: S, theirs: S, limit: Option<usize>) -> Result<BranchCommitsInfo> {
@@ -324,123 +402,58 @@ impl<C: Creds> History for Repo<'_, C> {
 	}
 
 	fn history<P: AsRef<Path>>(&self, path: P, offset: usize, limit: usize) -> Result<HistoryInfo> {
-		let mut found = 0;
-		let mut history = vec![];
+		let path = path.as_ref().to_str().or_utf8_err()?.to_string();
+		let mut follower = PathFollower::new(vec![path.clone()]);
 
 		let mut revwalk = self.0.revwalk()?;
+		revwalk.set_sorting(Sort::TOPOLOGICAL | Sort::TIME)?;
 		revwalk.push_head()?;
 
-		let mut revwalk = revwalk.filter_map(|oid| oid.and_then(|oid| self.0.find_commit(oid)).ok());
-
-		let Some(mut older_commit) = revwalk.next() else {
-			return Ok(HistoryInfo(vec![]));
-		};
-
+		let mut history = vec![];
+		let mut found = 0;
 		let mut inspected = 0;
-		let mut path = path.as_ref().to_path_buf();
+		let mut current_path = path;
 		let total_needed = offset + limit;
 
-		for c in revwalk {
+		for oid in revwalk {
 			if found >= total_needed {
 				break;
 			}
 
-			let is_merge = c.parent_count() > 1;
-			let newer_commit = std::mem::replace(&mut older_commit, c);
-
-			if is_merge {
-				continue;
-			}
-
 			inspected += 1;
-			let newer_commit_tree = newer_commit.tree()?;
-			let older_commit_tree = older_commit.tree()?;
+			let commit = self.0.find_commit(oid?)?;
 
-			if newer_commit_tree.get_path(path.as_path()).is_err() {
+			let Some(diff) = follower.diff_commit(&self.0, &commit)? else {
 				continue;
-			}
-
-			let mut diff_opts = DiffOptions::new();
-			diff_opts
-				.enable_fast_untracked_dirs(true)
-				.pathspec(path.as_path())
-				.disable_pathspec_match(true)
-				.ignore_submodules(true);
-
-			match self
-				.0
-				.diff_tree_to_tree(Some(&older_commit_tree), Some(&newer_commit_tree), Some(&mut diff_opts))?
-				.deltas()
-				.next()
-			{
-				Some(delta) if delta.status() == Delta::Modified => {
-					found += 1;
-					if found > offset {
-						history.push(DiffFile::from_diff_delta(&newer_commit, &delta)?);
-					}
-					continue;
-				}
-				Some(_) => {}
-				None => {
-					continue;
-				}
 			};
 
-			let mut diff = self.0.diff_tree_to_tree(Some(&older_commit_tree), Some(&newer_commit_tree), None)?;
-			let mut find_opts = DiffFindOptions::new();
-			find_opts.renames(true).exact_match_only(true);
-			diff.find_similar(Some(&mut find_opts))?;
+			// the name the file has in this commit; the follower has already rewritten it to the older
+			// one, so it is the older name that goes to `parent_path`
+			let name = std::mem::replace(&mut current_path, follower.paths().first().cloned().unwrap_or_default());
 
-			if let Some(delta) = diff
-				.deltas()
-				.find(|delta| delta.new_file().path().is_some_and(|p| p.eq(&path)) && matches!(delta.status(), Delta::Modified | Delta::Renamed))
-			{
-				if let Some(p) = delta.old_file().path() {
-					path = p.to_path_buf();
-				}
-				found += 1;
-				if found > offset {
-					let diff = DiffFile::from_diff_delta(&newer_commit, &delta)?;
-					history.push(diff);
-				}
+			let Some(delta) = diff.deltas().find(|delta| delta.new_file().path().and_then(Path::to_str) == Some(&name))
+			else {
+				continue;
+			};
+
+			found += 1;
+			if found <= offset {
 				continue;
 			}
 
-			let mut diff = self.0.diff_tree_to_tree(Some(&older_commit_tree), Some(&newer_commit_tree), None)?;
-			let mut find_opts = DiffFindOptions::new();
-			find_opts.renames(true).exact_match_only(false);
-			diff.find_similar(Some(&mut find_opts))?;
+			let file = DiffFile::from_diff_delta(&commit, &delta)?;
+			let file = match current_path == name {
+				true => file,
+				false => file.with_parent_path(PathBuf::from(&current_path)),
+			};
 
-			if let Some(delta) = diff.deltas().find(|delta| delta.new_file().path().is_some_and(|p| p.eq(&path))) {
-				if let Some(p) = delta.old_file().path() {
-					path = p.to_path_buf();
-				}
-				found += 1;
-				if found > offset {
-					let diff = DiffFile::from_diff_delta(&newer_commit, &delta)?;
-					history.push(diff);
-				}
-				continue;
-			}
-		}
-
-		// collect the init commit if we've crawled to the end
-		if found < total_needed {
-			let diff = self.0.diff_tree_to_tree(None, Some(&older_commit.tree()?), None)?;
-
-			if let Some(delta) = diff.deltas().find(|delta| delta.new_file().path().is_some_and(|p| p.eq(&path))) {
-				found += 1;
-				if found > offset {
-					let diff = DiffFile::from_diff_delta(&older_commit, &delta)?;
-					history.push(diff);
-				}
-			}
+			history.push(file);
 		}
 
 		info!(
 			target: TAG,
 			"looked up for history of file {}; inspected {} commits & collected {}/{} history entries (offset: {})",
-			path.display(),
+			current_path,
 			inspected,
 			history.len(),
 			limit,
@@ -449,4 +462,143 @@ impl<C: Creds> History for Repo<'_, C> {
 
 		Ok(HistoryInfo(history))
 	}
+}
+
+/// Walks a set of paths back through history, rewriting them to their older names on every rename.
+///
+/// Commits must be fed in reverse chronological order (as a revwalk yields them) and the walk must
+/// cover every parent — a rename is only picked up if the commit that made it is seen, and merges
+/// are reported as no-ops on the assumption that the commit behind them is seen too.
+pub struct PathFollower {
+	paths: Vec<String>,
+}
+
+impl PathFollower {
+	pub fn new(paths: Vec<String>) -> Self {
+		Self { paths }
+	}
+
+	/// paths as they are named at the currently reached point in history
+	pub fn paths(&self) -> &[String] {
+		&self.paths
+	}
+
+	/// diff of the commit limited to the tracked paths; `None` when the commit doesn't change them
+	pub fn diff_commit<'r>(&mut self, repo: &'r Repository, commit: &Commit) -> Result<Option<Diff<'r>>> {
+		let commit_tree = commit.tree()?;
+		let mut parents = commit.parents();
+
+		let Some(first_parent) = parents.next() else {
+			return self.diff(repo, None, &commit_tree);
+		};
+
+		// a merge that brought the paths in unchanged from one side made no edit of its own — the
+		// commit that did is on that side and gets reported there
+		for parent in parents {
+			if !self.touches(repo, Some(&parent.tree()?), &commit_tree)? {
+				return Ok(None);
+			}
+		}
+
+		self.diff(repo, Some(&first_parent.tree()?), &commit_tree)
+	}
+
+	fn touches(&self, repo: &Repository, parent_tree: Option<&Tree>, commit_tree: &Tree) -> Result<bool> {
+		let mut diff_opts = path_diff_opts(&self.paths);
+		let diff = repo.diff_tree_to_tree(parent_tree, Some(commit_tree), Some(&mut diff_opts))?;
+
+		Ok(diff.deltas().next().is_some())
+	}
+
+	fn diff<'r>(&mut self, repo: &'r Repository, parent_tree: Option<&Tree>, commit_tree: &Tree) -> Result<Option<Diff<'r>>> {
+		let mut diff_opts = path_diff_opts(&self.paths);
+		let diff = repo.diff_tree_to_tree(parent_tree, Some(commit_tree), Some(&mut diff_opts))?;
+
+		if diff.deltas().next().is_none() {
+			return Ok(None);
+		}
+
+		// a tracked path added in this commit may be a rename — keep following it under its older name
+		let added: HashSet<String> = diff
+			.deltas()
+			.filter(|delta| delta.status() == Delta::Added)
+			.filter_map(|delta| delta.new_file().path()?.to_str().map(str::to_string))
+			.filter(|path| self.paths.contains(path))
+			.collect();
+
+		if added.is_empty() {
+			return Ok(Some(diff));
+		}
+
+		let renames = find_rename_sources(repo, parent_tree, commit_tree, &added)?;
+
+		if renames.is_empty() {
+			return Ok(Some(diff));
+		}
+
+		// diff again over both names so the commit's stat & changed files cover the whole move
+		let mut pathspec = self.paths.clone();
+		pathspec.extend(renames.values().cloned());
+
+		for (new_path, old_path) in &renames {
+			for path in self.paths.iter_mut().filter(|path| *path == new_path) {
+				*path = old_path.clone();
+			}
+		}
+
+		self.paths.sort();
+		self.paths.dedup();
+
+		let mut diff_opts = path_diff_opts(&pathspec);
+		Ok(Some(repo.diff_tree_to_tree(parent_tree, Some(commit_tree), Some(&mut diff_opts))?))
+	}
+}
+
+fn path_diff_opts(paths: &[String]) -> DiffOptions {
+	let mut opts = DiffOptions::new();
+	for path in paths {
+		opts.pathspec(path);
+	}
+	opts.skip_binary_check(true);
+	opts.include_typechange(false);
+	opts.ignore_blank_lines(true);
+	opts.patience(false);
+	opts
+}
+
+/// maps `added` paths that came from a rename to the path they were renamed from
+fn find_rename_sources(
+	repo: &Repository,
+	parent_tree: Option<&Tree>,
+	commit_tree: &Tree,
+	added: &HashSet<String>,
+) -> Result<HashMap<String, String>> {
+	let mut diff = repo.diff_tree_to_tree(parent_tree, Some(commit_tree), None)?;
+	let mut find_opts = DiffFindOptions::new();
+	find_opts.renames(true);
+	diff.find_similar(Some(&mut find_opts))?;
+
+	let mut sources = HashMap::new();
+
+	for delta in diff.deltas() {
+		if !matches!(delta.status(), Delta::Renamed | Delta::Copied) {
+			continue;
+		}
+
+		let (Some(new_path), Some(old_path)) = (delta.new_file().path(), delta.old_file().path()) else {
+			continue;
+		};
+
+		let (Some(new_path), Some(old_path)) = (new_path.to_str(), old_path.to_str()) else {
+			continue;
+		};
+
+		if !added.contains(new_path) {
+			continue;
+		}
+
+		sources.insert(new_path.to_string(), old_path.to_string());
+	}
+
+	Ok(sources)
 }

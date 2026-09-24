@@ -1,21 +1,23 @@
 import { SectionContainer } from "@ext/catalog/actions/propsEditor/components/Sections/SectionContainer";
 import UiLanguage from "@ext/localization/core/model/Language";
 import t from "@ext/localization/locale/translate";
+import SectionHeader from "@ext/settings/components/SectionHeader";
 import SettingField from "@ext/settings/components/SettingField";
-import type { AppSettingsFormData } from "@ext/settings/logic/formSchema";
+import SwitchSettingField from "@ext/settings/components/SwitchSettingField";
 import Theme from "@ext/Theme/Theme";
 import { FormDivider } from "@ui-kit/Form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui-kit/Select";
-import { SwitchField } from "@ui-kit/Switch";
-import { type UseFormReturn, useWatch } from "react-hook-form";
 
-type Props = { form: UseFormReturn<AppSettingsFormData> };
-
-const GeneralSection = ({ form }: Props) => {
-	const compressEnabled = useWatch({ control: form.control, name: "compress-images.enabled" }) ?? false;
-
+const GeneralSection = () => {
 	return (
-		<SectionContainer>
+		<SectionContainer
+			header={
+				<SectionHeader
+					description={t("app-settings.sections.general.description")}
+					title={t("app-settings.sections.general.title")}
+				/>
+			}
+		>
 			<SettingField
 				control={({ field }) => (
 					<Select onValueChange={field.onChange} value={field.value}>
@@ -28,8 +30,6 @@ const GeneralSection = ({ form }: Props) => {
 						</SelectContent>
 					</Select>
 				)}
-				labelClassName="w-max"
-				layout="vertical"
 				name="general.language"
 				title={t("app-settings.general.language.title")}
 			/>
@@ -45,19 +45,14 @@ const GeneralSection = ({ form }: Props) => {
 						</SelectContent>
 					</Select>
 				)}
-				labelClassName="w-max"
-				layout="vertical"
 				name="general.theme"
 				title={t("app-settings.general.theme.title")}
 			/>
 			<FormDivider />
-			<SwitchField
-				alignment="left"
-				checked={compressEnabled}
+			<SwitchSettingField
 				description={t("app-settings.compress-images.enabled-description")}
-				label={t("app-settings.compress-images.enabled")}
-				onCheckedChange={(value) => form.setValue("compress-images.enabled", value, { shouldDirty: true })}
-				size="sm"
+				name="compress-images.enabled"
+				title={t("app-settings.compress-images.enabled")}
 			/>
 		</SectionContainer>
 	);

@@ -5,7 +5,7 @@ import annotationListHandler from "@ext/markdown/elements/image/print/annotation
 import imageHandler from "@ext/markdown/elements/image/print/imageHandler";
 import listHandler from "@ext/markdown/elements/list/print/listHandler";
 import noteHandler from "@ext/markdown/elements/note/print/noteHandler";
-import openApiHandler from "@ext/markdown/elements/openApi/print/openApiHandler";
+import openApiHandler, { openApiPrepareHandler } from "@ext/markdown/elements/openApi/print/openApiHandler";
 import paragraphHandler from "@ext/markdown/elements/paragraph/print/paragraphHandler";
 import tableHandler from "@ext/markdown/elements/table/print/tableHandler";
 import tabsHandler from "@ext/markdown/elements/tabs/print/tabsHandler";
@@ -35,6 +35,7 @@ export interface PrintHandlerGroups {
 const printNodeHandlers: PrintNodeHandler[] = [
 	imageHandler,
 	headingHandler,
+	openApiPrepareHandler,
 	paragraphHandler,
 	tableHandler,
 	codeBlockHandler,

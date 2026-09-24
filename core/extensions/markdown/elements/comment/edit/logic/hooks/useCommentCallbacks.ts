@@ -3,7 +3,7 @@ import FetchService from "@core-ui/ApiServices/FetchService";
 import type { CommentBlock } from "@core-ui/CommentBlock";
 import ApiUrlCreator from "@core-ui/ContextServices/ApiUrlCreator";
 import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
-import { getEditorStore, setEditorStore } from "@core-ui/stores/EditorStore";
+import { getEditorStore } from "@core-ui/stores/EditorStore";
 import { addComment, deleteComment } from "@ext/markdown/elements/comment/edit/logic/stores/CommentsStore";
 import { addReviewItem, deleteReviewItem } from "@ext/review/logic/store/ReviewStore";
 import { resolveCommentDOMSelector } from "@ext/review/logic/utils/resolveCommentDOMSelector";
@@ -16,14 +16,17 @@ const useCommentCallbacks = (articlePropsRef: RefObject<ClientArticleProps>) => 
 	const pageData = PageDataContextService.value;
 	const apiUrlCreator = ApiUrlCreator.value;
 
-	const loadComment = useCallback(async (id: string) => {
-		const url = apiUrlCreator.getComment(id);
-		const res = await FetchService.fetch<CommentBlock>(url);
-		if (!res.ok) return;
+	const loadComment = useCallback(
+		async (id: string) => {
+			const url = apiUrlCreator.getComment(id, articlePropsRef.current?.ref?.path);
+			const res = await FetchService.fetch<CommentBlock>(url);
+			if (!res.ok) return;
 
-		const comment = await res.json();
-		return comment;
-	}, []);
+			const comment = await res.json();
+			return comment;
+		},
+		[articlePropsRef],
+	);
 
 	const toReviewItem = useCallback(
 		(id: string, comment: CommentBlock): CommentReviewListItem => ({
@@ -33,8 +36,8 @@ const useCommentCallbacks = (articlePropsRef: RefObject<ClientArticleProps>) => 
 			selector: resolveCommentDOMSelector(id),
 			date: comment?.comment?.dateTime ?? new Date().toISOString(),
 			author: {
-				email: comment?.comment?.user?.mail ?? pageData.userInfo.mail,
-				name: comment?.comment?.user?.name ?? pageData.userInfo.name,
+				email: comment?.comment?.user?.mail ?? pageData.user.info.mail,
+				name: comment?.comment?.user?.name ?? pageData.user.info.name,
 			},
 			commentBlock: comment,
 		}),
@@ -43,7 +46,7 @@ const useCommentCallbacks = (articlePropsRef: RefObject<ClientArticleProps>) => 
 
 	const onCommentSaved = useCallback(
 		(id: string, comment: CommentBlock) => {
-			addComment(articlePropsRef.current.pathname, pageData.userInfo, id, articlePropsRef.current.title);
+			addComment(articlePropsRef.current.pathname, pageData.user.info, id, articlePropsRef.current.title);
 			addReviewItem(toReviewItem(id, comment));
 		},
 		[articlePropsRef, toReviewItem],
@@ -52,19 +55,16 @@ const useCommentCallbacks = (articlePropsRef: RefObject<ClientArticleProps>) => 
 	const onMarkAdded = useCallback(
 		async (id: string) => {
 			const editor = getEditorStore().editor;
-			if (!editor) return;
+			if (!editor || editor.isDestroyed) return;
 
 			const storage = editor.storage.comment;
 			if (storage.comments.has(id)) return;
 
-			setEditorStore({ review: true });
 			const data: CommentBlock = storage.deleted.get(id);
 			if (!data) return;
 
 			storage.comments.set(id, data);
 			storage.deleted.delete(id);
-
-			await FetchService.fetch(apiUrlCreator.updateComment(id), JSON.stringify(data));
 
 			addComment(
 				articlePropsRef.current.pathname,
@@ -73,6 +73,11 @@ const useCommentCallbacks = (articlePropsRef: RefObject<ClientArticleProps>) => 
 				articlePropsRef.current.title,
 			);
 			addReviewItem(toReviewItem(id, data));
+
+			await FetchService.fetch(
+				apiUrlCreator.updateComment(id, articlePropsRef.current?.ref?.path),
+				JSON.stringify(data),
+			);
 		},
 		[articlePropsRef, toReviewItem],
 	);
@@ -80,7 +85,7 @@ const useCommentCallbacks = (articlePropsRef: RefObject<ClientArticleProps>) => 
 	const onMarkDeleted = useCallback(
 		async (id: string, positions: Range[]) => {
 			const editor = getEditorStore().editor;
-			if (!editor) return;
+			if (!editor || editor.isDestroyed) return;
 
 			const storage = editor.storage.comment;
 			const data: CommentBlock = storage.comments.get(id) ?? (await loadComment(id));
@@ -91,8 +96,8 @@ const useCommentCallbacks = (articlePropsRef: RefObject<ClientArticleProps>) => 
 
 			if (positions.length) return;
 
-			const user = (data?.comment?.user as UserInfo) || pageData.userInfo;
-			const url = apiUrlCreator.deleteComment(id);
+			const user = (data?.comment?.user as UserInfo) || pageData.user.info;
+			const url = apiUrlCreator.deleteComment(id, articlePropsRef.current?.ref?.path);
 			const res = await FetchService.fetch(url);
 			if (!res.ok) return;
 

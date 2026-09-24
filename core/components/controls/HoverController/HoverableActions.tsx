@@ -2,7 +2,9 @@ import ActionButtonContainer from "@components/controls/HoverController/ActionBu
 import { classNames } from "@components/libs/classNames";
 import { useDebounce } from "@core-ui/hooks/useDebounce";
 import { useOutsideClick } from "@core-ui/hooks/useOutsideClick";
+// biome-ignore lint/style/noRestrictedImports: pre-existing @emotion/styled import; the Tailwind migration is not this change's scope
 import styled from "@emotion/styled";
+import t from "@ext/localization/locale/translate";
 import {
 	type CSSProperties,
 	memo,
@@ -38,6 +40,7 @@ const shouldTippyHide = (target: HTMLElement, parent: HTMLElement) => {
 	const tippyElement = target?.closest("[data-tippy-root]");
 	if (!tippyElement) return false;
 
+	// biome-ignore lint/suspicious/noExplicitAny: pre-existing signature; typing it properly is unrelated to this change
 	const instance = (tippyElement as any)._tippy as Instance;
 	if (!instance) return false;
 	if (parent.contains(instance.reference)) return true;
@@ -66,11 +69,13 @@ const HoverableActions = (props: HoverProps) => {
 	const [isHideOnClick] = useState(hideOnClick);
 	const debounceHide = useDebounce((f: () => void) => f(), 150);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: pre-existing dependency list; changing it here would alter behaviour unrelated to this change
 	const handleHide = useCallback(() => {
 		actionsRef.current?.classList.remove("isHovered");
 		debounceHide.start(() => setIsHovered?.(false));
 	}, [actionsRef.current]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: pre-existing dependency list; changing it here would alter behaviour unrelated to this change
 	const onMouseEnter = useCallback(() => {
 		const actionsElement = actionsRef.current;
 		if (actionsElement?.classList.contains("isHovered") && isHovered) return;
@@ -82,6 +87,7 @@ const HoverableActions = (props: HoverProps) => {
 	if (isHideOnClick) useOutsideClick([hoverElementRef.current], handleHide);
 	const { Left, Right } = useDefaultActions(rightActions, leftActions, actionsOptions);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: pre-existing dependency list; changing it here would alter behaviour unrelated to this change
 	useEffect(() => {
 		const hoverElement = hoverElementRef.current;
 		const hoverable: Window | Element = hoverElement?.querySelector("[data-hover-target='true']");
@@ -112,6 +118,7 @@ const HoverableActions = (props: HoverProps) => {
 		};
 	}, [hoverElementRef.current, selected]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: pre-existing dependency list; changing it here would alter behaviour unrelated to this change
 	useEffect(() => {
 		window.addEventListener("blur", handleHide);
 
@@ -121,13 +128,15 @@ const HoverableActions = (props: HoverProps) => {
 	}, [actionsRef.current]);
 
 	return (
-		<>
+		<div className="relative">
 			<div
+				aria-label={t("actions")}
 				className={classNames(className, { isOver }, ["node-actions", placement])}
 				contentEditable={false}
 				data-drag-handle
 				data-qa="qa-node-actions"
 				ref={actionsRef}
+				role="toolbar"
 			>
 				<div className="actions-left" style={actionsStyle}>
 					{isHovered && Left && <ActionButtonContainer>{Left}</ActionButtonContainer>}
@@ -137,7 +146,7 @@ const HoverableActions = (props: HoverProps) => {
 				</div>
 			</div>
 			{children}
-		</>
+		</div>
 	);
 };
 

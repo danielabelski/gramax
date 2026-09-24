@@ -17,12 +17,13 @@ const makeItem = (relativePath: string, aliases?: AliasEntry[]): FakeItem =>
 		save: jest.fn(async () => {}),
 	}) as unknown as FakeItem;
 
-const makeAliases = (items: FakeItem[]) => {
+const makeAliases = (items: FakeItem[], props: { language?: string; supportedLanguages?: string[] } = {}) => {
 	const searcher = {
 		resetCache: jest.fn(),
 		findItemByLogicPath: jest.fn((_root, target: string) => items.find((i) => i.logicPath === target) ?? null),
 	};
 	const catalog = {
+		props,
 		getItems: () => items,
 		getRootCategory: () => ({ logicPath: "root" }),
 		relativeLogicPath: (logicPath: string) => (logicPath === "root" ? "" : logicPath.replace(/^root\//, "")),
@@ -63,11 +64,42 @@ describe("CatalogAliases", () => {
 			expect(() => aliases.assertFree("legacy/page", makeItem("editing"))).toThrow("already used by 'owner'");
 		});
 
+		test("the real path is named even when a stale claim stands earlier in the tree", () => {
+			const { aliases } = makeAliases([makeItem("claimant", ["guide/install"]), makeItem("guide/install")]);
+			expect(() => aliases.assertFree("guide/install", makeItem("editing"))).toThrow(
+				"equals the path of an existing item",
+			);
+		});
+
 		test("free alias passes; the edited item's own claim is not a conflict", () => {
 			const editing = makeItem("editing", ["legacy/page"]);
 			const { aliases } = makeAliases([editing, makeItem("bystander")]);
 			expect(() => aliases.assertFree("legacy/page", editing)).not.toThrow();
 			expect(() => aliases.assertFree("brand/new", editing)).not.toThrow();
+		});
+	});
+
+	describe("shadowsRealItem", () => {
+		test("true only when the alias is another item's real path", () => {
+			const editing = makeItem("editing", ["guide/install"]);
+			const { aliases } = makeAliases([editing, makeItem("guide/install"), makeItem("owner", ["claimed"])]);
+
+			expect(aliases.shadowsRealItem("guide/install", editing)).toBe(true);
+			// claimed by another item's alias, not by a real path
+			expect(aliases.shadowsRealItem("claimed", editing)).toBe(false);
+			expect(aliases.shadowsRealItem("nothing/here", editing)).toBe(false);
+			// the item's own path is not a shadow of itself
+			expect(aliases.shadowsRealItem("editing", editing)).toBe(false);
+		});
+
+		test("a stale claim standing earlier in the tree does not hide the real item", () => {
+			const editing = makeItem("editing", ["guide/install"]);
+			// on a catalog broken before the fix, the same path carries both an old auto claim
+			// and a real item; the claim comes first in tree order
+			const stale = makeItem("stale", [{ path: "guide/install", moved: "2026-01-01T00:00:00Z" }]);
+			const { aliases } = makeAliases([stale, makeItem("guide/install"), editing]);
+
+			expect(aliases.shadowsRealItem("guide/install", editing)).toBe(true);
 		});
 	});
 
@@ -93,6 +125,16 @@ describe("CatalogAliases", () => {
 			expect(manualHolder.props.aliases).toEqual(["legacy/page"]);
 			expect(manualHolder.save).not.toHaveBeenCalled();
 			expect(unrelated.save).not.toHaveBeenCalled();
+		});
+
+		test("an empty alias touches nothing — a root item has no relative path", async () => {
+			const holder = makeItem("holder", [{ path: "legacy/page", moved: "2026-01-01T00:00:00Z" }]);
+			const { aliases } = makeAliases([holder]);
+
+			await aliases.stealAuto("", makeItem("new-owner"));
+
+			expect(holder.props.aliases).toEqual([{ path: "legacy/page", moved: "2026-01-01T00:00:00Z" }]);
+			expect(holder.save).not.toHaveBeenCalled();
 		});
 	});
 
@@ -136,6 +178,48 @@ describe("CatalogAliases", () => {
 			expect(arrival.props.aliases).toEqual(["unique/alias"]);
 			expect(arrival.save).not.toHaveBeenCalled();
 			expect(searcher.resetCache).not.toHaveBeenCalled();
+		});
+	});
+
+	// PRD §6: aliases are stored in the main-language file only, the redirect is mirrored
+	// into every language URL space — so a translation owns no aliases of its own
+	describe("multilingual catalog", () => {
+		const multilingual = (items: FakeItem[]) =>
+			makeAliases(items, { language: "ru", supportedLanguages: ["ru", "en"] });
+
+		test("an alias set on a translation is stored on its main-language twin", async () => {
+			const ru = makeItem("setup");
+			const en = makeItem("en/setup");
+			const { aliases } = multilingual([ru, en]);
+
+			await aliases.apply(en, ["install"]);
+
+			expect(ru.props.aliases).toEqual(["install"]);
+			expect(ru.save).toHaveBeenCalled();
+			expect(en.props.aliases).toBeUndefined();
+		});
+
+		test("alias paths are main-language relative, whichever language they were typed in", () => {
+			const { aliases } = multilingual([makeItem("setup"), makeItem("en/setup")]);
+
+			expect(aliases.relativePath("root/en/setup")).toBe("setup");
+			expect(aliases.relativePath("root/setup")).toBe("setup");
+		});
+
+		test("a translation shows the aliases of its twin", () => {
+			const { aliases } = multilingual([makeItem("setup", ["install"]), makeItem("en/setup")]);
+
+			expect(aliases.listFor(makeItem("en/setup"))).toEqual(["install"]);
+		});
+
+		test("a language root category has no twin, so it keeps its own aliases", async () => {
+			const enRoot = makeItem("en");
+			const { aliases } = multilingual([makeItem("setup"), enRoot]);
+
+			await aliases.apply(enRoot, ["legacy"]);
+
+			expect(enRoot.props.aliases).toEqual(["legacy"]);
+			expect(enRoot.save).not.toHaveBeenCalled();
 		});
 	});
 

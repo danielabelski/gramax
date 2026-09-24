@@ -4,7 +4,6 @@ import { uniqueName } from "@core/utils/uniqueName";
 import ApiUrlCreator from "@core-ui/ContextServices/ApiUrlCreator";
 import ResourceService from "@core-ui/ContextServices/ResourceService/ResourceService";
 import { isActive } from "@core-ui/hooks/useAudioRecorder";
-import styled from "@emotion/styled";
 import AudioRecorderService from "@ext/ai/components/Audio/AudioRecorderService";
 import Visualizer, { type VisualizerProps } from "@ext/ai/components/Audio/Visualizer/Visualizer";
 import createNameForFile from "@ext/ai/logic/helpers/createNameForFile";
@@ -14,42 +13,18 @@ import t from "@ext/localization/locale/translate";
 import ToolbarWrapper from "@ext/markdown/core/edit/components/Menu/ToolbarWrapper";
 import createFile from "@ext/markdown/elements/file/edit/logic/createFile";
 import type { Editor } from "@tiptap/core";
-import { Toolbar } from "@ui-kit/Toolbar";
+import { GlassToolbar } from "@ui-kit/GlassToolbar";
 import { memo, useCallback } from "react";
-
-const Wrapper = styled(ToolbarWrapper)`
-	width: 100%;
-	margin-bottom: 0.5em;
-	opacity: 0;
-	animation: fadeIn var(--transition-time) ease-in-out forwards;
-
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-		}
-		to {
-			opacity: 1;
-		}
-	}
-`;
-
-const GlobalWrapper = styled.div`
-	position: absolute;
-	bottom: 3%;
-	left: 50%;
-	transform: translateX(-50%);
-	z-index: var(--z-index-popover);
-`;
 
 const AudioToolbar = memo((props: VisualizerProps) => {
 	return (
-		<Wrapper>
-			<Toolbar>
+		<ToolbarWrapper className="mb-[0.5em] w-full animate-in fade-in-0 duration-[var(--transition-time)]">
+			<GlassToolbar>
 				<ToolbarWrapper className="w-full">
 					<Visualizer maxDurationMs={MAX_AUDIO_DURATION_MS} {...props} />
 				</ToolbarWrapper>
-			</Toolbar>
-		</Wrapper>
+			</GlassToolbar>
+		</ToolbarWrapper>
 	);
 });
 
@@ -66,7 +41,7 @@ const GlobalAudioToolbar = () => {
 	};
 
 	return (
-		<GlobalWrapper>
+		<div className="absolute bottom-[3%] left-1/2 z-[var(--z-index-popover)] -translate-x-1/2">
 			<AudioToolbar
 				onReset={onReset}
 				onTimeChange={onTimeChange}
@@ -74,7 +49,7 @@ const GlobalAudioToolbar = () => {
 				sendTooltipText={t("ai.transcribe.warningHomeSend")}
 				startTime={startTime.current}
 			/>
-		</GlobalWrapper>
+		</div>
 	);
 };
 

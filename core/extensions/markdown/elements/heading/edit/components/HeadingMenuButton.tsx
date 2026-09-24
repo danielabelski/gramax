@@ -2,7 +2,7 @@ import type { IconCode } from "@components/Atoms/Icon/LucideIcon";
 import t from "@ext/localization/locale/translate";
 import type { Level } from "@ext/markdown/elements/heading/edit/model/heading";
 import type { Editor } from "@tiptap/core";
-import { ToolbarIcon, ToolbarToggleItem } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleItem } from "@ui-kit/GlassToolbar";
 
 interface HeadingMenuButtonProps {
 	level: Level;
@@ -11,7 +11,7 @@ interface HeadingMenuButtonProps {
 
 const HeadingMenuButton = ({ level, editor }: HeadingMenuButtonProps) => {
 	return (
-		<ToolbarToggleItem
+		<GlassToolbarToggleItem
 			active={editor?.isActive("heading", { level })}
 			data-testid={`tb-heading-${level}`}
 			hotKey={`Mod-Alt-${level}`}
@@ -19,8 +19,8 @@ const HeadingMenuButton = ({ level, editor }: HeadingMenuButtonProps) => {
 			tooltipText={`${t("editor.heading")} ${level}`}
 			value={level.toString()}
 		>
-			<ToolbarIcon icon={`heading-${level}-custom` as IconCode} />
-		</ToolbarToggleItem>
+			<GlassToolbarIcon icon={`heading-${level}-custom` as IconCode} />
+		</GlassToolbarToggleItem>
 	);
 };
 

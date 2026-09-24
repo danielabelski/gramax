@@ -4,7 +4,10 @@ import type { Tag } from "@ext/markdown/core/render/logic/Markdoc";
 const parse = async (text: string) => {
 	const { parser, parseContext } = await getParserTestData();
 	const content = await parser.parse(text, parseContext, "requestURL.com");
-	return { renderTree: JSON.stringify(content.renderTree), html: await content.getHtmlValue.get() };
+	return {
+		renderTree: JSON.stringify(content.renderTree),
+		html: parser.getHtml(content.renderTree, parseContext, "requestURL.com"),
+	};
 };
 
 const findKbd = (node: unknown): Tag | null => {

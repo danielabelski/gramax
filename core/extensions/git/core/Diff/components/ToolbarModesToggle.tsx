@@ -37,7 +37,7 @@ export const ToolbarModesToggle = () => {
 		>
 			<Icon icon={"columns-2" as IconCode} />
 			{t("diff.double-panel")}
-			<Switch checked={isDoublePanel} disabled={disabled || !sidebarData} size="sm" />
+			<Switch checked={isDoublePanel} disabled={disabled || !sidebarData} size="xs" />
 		</DropdownMenuItem>
 	);
 };

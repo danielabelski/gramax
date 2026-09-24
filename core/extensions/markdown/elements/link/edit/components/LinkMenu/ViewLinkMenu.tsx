@@ -11,12 +11,13 @@ import t from "@ext/localization/locale/translate";
 import type { LinkMenuMode } from "@ext/markdown/elements/link/edit/components/LinkMenu/LinkMenu";
 import { getLinkToHeading } from "@ext/markdown/elements/link/edit/logic/getLinkToHeading";
 import { getCachedSetting } from "@ext/settings/logic/cachedSettingsStore";
-import { Toolbar, ToolbarIcon, ToolbarText, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbar, GlassToolbarIcon, GlassToolbarText, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
+import type { IconCode } from "@ui-kit/Icon";
 import { type ComponentProps, type HTMLAttributes, memo, useState } from "react";
 
 interface ButtonViewProps {
 	href: string;
-	icon: string;
+	icon: IconCode;
 	itemName: string;
 	isExternalLink: boolean;
 }
@@ -35,8 +36,8 @@ const Container = styled.div`
 	}
 `;
 
-const TooltipToolbarButton = (props: ComponentProps<typeof ToolbarToggleButton> & { tooltipText: string }) => {
-	return <ToolbarToggleButton tooltipText={props.tooltipText} {...props}></ToolbarToggleButton>;
+const TooltipToolbarButton = (props: ComponentProps<typeof GlassToolbarToggleButton> & { tooltipText: string }) => {
+	return <GlassToolbarToggleButton tooltipText={props.tooltipText} {...props}></GlassToolbarToggleButton>;
 };
 
 const CopyButton = (props: HTMLAttributes<HTMLButtonElement> & { href: string }) => {
@@ -59,7 +60,7 @@ const CopyButton = (props: HTMLAttributes<HTMLButtonElement> & { href: string })
 			onMouseLeave={() => setIsCopied(false)}
 			tooltipText={isCopied ? `${t("copied")}!` : t("copy")}
 		>
-			<ToolbarIcon icon={isCopied ? "check" : "copy"} />
+			<GlassToolbarIcon icon={isCopied ? "check" : "copy"} />
 		</TooltipToolbarButton>
 	);
 };
@@ -79,10 +80,13 @@ const ButtonView = ({ href, icon, itemName, isExternalLink }: ButtonViewProps) =
 
 	const toolbarButton = (
 		<Container>
-			<ToolbarToggleButton className="text-left flex-1 min-w-0 overflow-hidden justify-start" focusable>
-				<ToolbarIcon className="flex-shrink-0" icon={icon} />
-				<ToolbarText className="truncate min-w-0 text-xs">{itemName}</ToolbarText>
-			</ToolbarToggleButton>
+			<GlassToolbarToggleButton
+				className="text-left flex-1 min-w-0 overflow-hidden justify-start w-full"
+				focusable
+			>
+				<GlassToolbarIcon className="flex-shrink-0" icon={icon} />
+				<GlassToolbarText className="truncate min-w-0 text-xs">{itemName}</GlassToolbarText>
+			</GlassToolbarToggleButton>
 		</Container>
 	);
 
@@ -110,22 +114,20 @@ export const ViewLinkMenu = memo(({ href, icon, onDelete, setMode, itemName, isE
 	const isMobile = useMediaQuery(cssMedia.JSnarrow);
 
 	return (
-		<div className="rounded-lg lg:shadow-hard-base">
-			{/** biome-ignore lint/a11y/useValidAriaRole: expected */}
-			<Toolbar
-				className="flex overflow-hidden"
-				role="link-toolbar"
-				style={{ width: isMobile ? "100%" : "18.75rem" }}
-			>
-				<ButtonView href={href} icon={icon} isExternalLink={isExternalLink} itemName={itemName} />
-				<TooltipToolbarButton onClick={() => setMode("edit")} tooltipText={t("edit2")}>
-					<ToolbarIcon icon="pencil" />
-				</TooltipToolbarButton>
-				<CopyButton href={href} />
-				<TooltipToolbarButton onClick={() => onDelete()} tooltipText={t("remove-link")}>
-					<ToolbarIcon icon="unlink" />
-				</TooltipToolbarButton>
-			</Toolbar>
-		</div>
+		// biome-ignore lint/a11y/useValidAriaRole: expected
+		<GlassToolbar
+			className="flex overflow-hidden shadow-glass-xl"
+			role="link-toolbar"
+			style={{ width: isMobile ? "100%" : "18.75rem" }}
+		>
+			<ButtonView href={href} icon={icon} isExternalLink={isExternalLink} itemName={itemName} />
+			<TooltipToolbarButton onClick={() => setMode("edit")} tooltipText={t("edit2")}>
+				<GlassToolbarIcon icon="pencil" />
+			</TooltipToolbarButton>
+			<CopyButton href={href} />
+			<TooltipToolbarButton onClick={() => onDelete()} tooltipText={t("remove-link")}>
+				<GlassToolbarIcon icon="unlink" />
+			</TooltipToolbarButton>
+		</GlassToolbar>
 	);
 });

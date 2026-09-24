@@ -70,10 +70,13 @@ const callFs = async <O>(cmd: string, args: Record<string, unknown>): Promise<O>
 			const message = error.message ?? "";
 			throw new LibGit2Error(`git (${cmd}, ${subset}, ${klass}, ${code})`, message, subset, klass, code, cmd);
 		}
+		// fs commands serialize as `{name, message}`, core commands (scan_workspace, scan_catalog)
+		// as `{kind, message}`. Read both, or a refusal from a scan loses its discriminant.
+		const code = error?.name ?? error?.kind;
 		throw new IoError({
 			name: `IO (${cmd})`,
-			code: error?.name,
-			message: `${error?.name ?? "Error"}: ${error?.message ?? error};\nargs: ${JSON.stringify(args, null, 4)}`,
+			code,
+			message: `${code ?? "Error"}: ${error?.message ?? error};\nargs: ${JSON.stringify(args, null, 4)}`,
 		});
 	}
 };
@@ -129,3 +132,9 @@ export const call = async <O>(command: string, args: any = {}): Promise<O> => {
 	const [namespace, cmd] = parseCommand(command);
 	return namespace === "git" ? callGit<O>(cmd, args) : callFs<O>(cmd, args);
 };
+
+/**
+ * Reload the native `EnvFilter` to the given Gramax level (`off`|`commands`|…|`full`).
+ * Not a namespaced rust command — a direct native call, like Tauri's `set_otel_level` invoke.
+ */
+export const setOtelLevel = (level: string): void => (native as any).set_otel_level(level);

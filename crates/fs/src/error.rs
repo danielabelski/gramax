@@ -10,6 +10,7 @@ pub type Result<T> = std::result::Result<T, IoError>;
 pub enum IoError {
 	Exists { message: String },
 	NotFound { message: String },
+	PermissionDenied { message: String },
 	Timeout { message: String },
 	WouldEscape { message: String },
 	NotSupported { message: String },
@@ -44,6 +45,10 @@ impl From<io::Error> for IoError {
 		match value.kind() {
 			ErrorKind::AlreadyExists => IoError::Exists { message },
 			ErrorKind::NotFound => IoError::NotFound { message },
+			// macOS answers `EPERM` for a TCC-protected folder and `EACCES` for one the mode bits
+			// hide; both land here, and both have to keep their name so the frontend can offer
+			// System Settings instead of claiming the folder is missing.
+			ErrorKind::PermissionDenied => IoError::PermissionDenied { message },
 			ErrorKind::TimedOut => IoError::Timeout { message },
 			_ => IoError::Other { message },
 		}

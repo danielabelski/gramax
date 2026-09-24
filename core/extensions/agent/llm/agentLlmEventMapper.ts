@@ -39,7 +39,7 @@ export class AgentLlmEventMapper {
 		const messages: ChatCompletionMessage[] = [
 			{
 				role: "system",
-				content: await getSystemPrompt(app, ctx, commands, catalogName, skills, browserAllowed),
+				content: await getSystemPrompt(app, ctx, catalogName, skills, browserAllowed),
 			},
 		];
 		const partialAssistantByTurn = new Map<string, string>();
@@ -102,8 +102,20 @@ export class AgentLlmEventMapper {
 					flushToolStep();
 					messages.push({
 						role: "user",
-						content: await getUserMessage(app, ctx, commands, event, skills),
+						content: await getUserMessage(app, ctx, event, skills),
 					});
+					break;
+				case "context_compacted":
+					flushToolStep();
+					partialAssistantByTurn.clear();
+					messages.length = 1;
+					for (const tailEvent of event.tailUserMessages) {
+						messages.push({
+							role: "user",
+							content: await getUserMessage(app, ctx, tailEvent, skills),
+						});
+					}
+					messages.push({ role: "user", content: event.summary });
 					break;
 				case "assistant_delta":
 					partialAssistantByTurn.set(
@@ -215,6 +227,7 @@ export class AgentLlmEventMapper {
 						turnId,
 						ts: nextTs++,
 						content,
+						contentPreview: content,
 						reasoningContent: message.reasoning_content ?? undefined,
 					});
 				}
@@ -271,6 +284,7 @@ export class AgentLlmEventMapper {
 				turnId,
 				ts: nextTs++,
 				content,
+				contentPreview: content,
 				reasoningContent: message.reasoning_content ?? undefined,
 			});
 		}

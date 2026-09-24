@@ -13,7 +13,7 @@ import {
 } from "@core-ui/ContextServices/ResourceService/utils/utils";
 import { useCatalogPropsStore } from "@core-ui/stores/CatalogPropsStore/CatalogPropsStore.provider";
 import type { ArticleProviderType } from "@ext/articleProvider/logic/ArticleProvider";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { shallow } from "zustand/shallow";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 
@@ -67,11 +67,12 @@ const ResourceServiceProvider = ({ children, id, provider }: ResourceServiceProv
 	const apiUrlCreator = ApiUrlCreatorService.value;
 	const catalogName = useCatalogPropsStore((state) => state.data?.name);
 
-	const { update, get, clear, data } = useResourceStore(
-		(state) => ({ update: state.update, get: state.get, clear: state.clear, data: state.data }),
-		"shallow",
-	);
+	const store = useResourceStoreContext();
+	const update = useResourceStore((state) => state.update);
+	const get = useResourceStore((state) => state.get);
+	const clear = useResourceStore((state) => state.clear);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: apiUrlCreator comes from context and changes per catalog; dropping it would leave a stale creator in the closure
 	const setResource: SetResource = useCallback(
 		async (name, file, path, force) => {
 			const fullResourcePath = new Path([path, name]);
@@ -88,6 +89,7 @@ const ResourceServiceProvider = ({ children, id, provider }: ResourceServiceProv
 		[apiUrlCreator, update, provider, id],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: apiUrlCreator comes from context and changes per catalog; dropping it would leave a stale creator in the closure
 	const deleteResource: DeleteResource = useCallback(
 		async (src: string) => {
 			const url = apiUrlCreator.deleteArticleResource(src, id, provider);
@@ -103,6 +105,7 @@ const ResourceServiceProvider = ({ children, id, provider }: ResourceServiceProv
 		[get],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: apiUrlCreator comes from context and changes per catalog; dropping it would leave a stale creator in the closure
 	const getResource = useCallback(
 		async (src: string): Promise<ResourceFetchResult> => {
 			const cached = get(src);
@@ -123,37 +126,46 @@ const ResourceServiceProvider = ({ children, id, provider }: ResourceServiceProv
 		},
 		[id, provider, catalogName, apiUrlCreator, get],
 	);
-
-	return (
-		<ResourceServiceContext.Provider
-			value={{
-				data,
-				id,
-				provider,
-				getResource,
-				setResource,
-				deleteResource,
-				getBuffer,
-				clear,
-				update,
-			}}
-		>
-			{children}
-		</ResourceServiceContext.Provider>
+	const value = useMemo<ResourceServiceType>(
+		() => ({
+			get data() {
+				return store.getState().data;
+			},
+			id,
+			provider,
+			getResource,
+			setResource,
+			deleteResource,
+			getBuffer,
+			clear,
+			update,
+		}),
+		[store, id, provider, getResource, setResource, deleteResource, getBuffer, clear, update],
 	);
+
+	return <ResourceServiceContext.Provider value={value}>{children}</ResourceServiceContext.Provider>;
 };
 
 export const ResourceStoreProvider = (props: ResourceStoreProviderProps) => {
 	const { children, id, provider } = props;
+	const catalogName = useCatalogPropsStore((state) => state.data?.name);
 	const storeRef = useRef<ResourceStoreApi>(null);
+	const scopeRef = useRef({ catalogName, id, provider });
 
 	if (storeRef.current === null) {
 		storeRef.current = createResourceStore({ id, provider });
 	}
 
+	// Resource buffers are cached by path, and the store outlives navigation. A file replaced outside the app
+	// while the user was in another catalog would otherwise keep showing its cached version, so drop the cache
+	// whenever the catalog changes — including on the way back into it.
 	useEffect(() => {
+		const previousScope = scopeRef.current;
+		if (previousScope.id === id && previousScope.provider === provider && previousScope.catalogName === catalogName)
+			return;
+		scopeRef.current = { catalogName, id, provider };
 		storeRef.current.getState().reset(id, provider);
-	}, [id, provider]);
+	}, [id, provider, catalogName]);
 
 	return (
 		<ResourceStoreContext.Provider value={storeRef.current}>

@@ -1,8 +1,9 @@
 import { MinimizedArticleStyled } from "@components/Article/MiniArticle";
 import Icon from "@components/Atoms/Icon";
-import Tooltip, { DEFAULT_TOOLTIP_SHOW_DELAY } from "@components/Atoms/Tooltip";
+import Tooltip from "@components/Atoms/Tooltip";
 import { classNames } from "@components/libs/classNames";
 import ArticleContextWrapper from "@core-ui/ScopedContextWrapper/ArticleContextWrapper";
+import { tooltipDelay } from "@core-ui/timings";
 import getIsSafari from "@core-ui/utils/isSafari";
 import { css } from "@emotion/react";
 // biome-ignore lint/style/noRestrictedImports: will be removed soon
@@ -106,7 +107,7 @@ const ProsemirrorDiffLineContent = (props: ProsemirrorDiffLineContentProps) => {
 		if (visible) {
 			timeoutRef.current = setTimeout(() => {
 				setTooltipVisible(true);
-			}, DEFAULT_TOOLTIP_SHOW_DELAY);
+			}, tooltipDelay.standard);
 		} else {
 			if (timeoutRef.current) clearTimeout(timeoutRef.current);
 			setTooltipVisible(false);

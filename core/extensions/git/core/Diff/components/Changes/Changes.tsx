@@ -1,4 +1,4 @@
-import calculateTabWrapperHeight from "@components/Layouts/StatusBar/Extensions/logic/calculateTabWrapperHeight";
+import calculateTabWrapperHeight from "@components/Layouts/LeftNavigationTabs/logic/calculateTabWrapperHeight";
 import useSetArticleDiffView from "@core-ui/hooks/diff/useSetArticleDiffView";
 import useWatch from "@core-ui/hooks/useWatch";
 import { DiffEntries, DiffEntriesLoadStage } from "@ext/git/core/Diff/components/Changes/DiffEntries";

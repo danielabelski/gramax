@@ -10,7 +10,7 @@ import createNewFilePathUtils from "@core/utils/createNewFilePathUtils";
 import { RwLock } from "@core/utils/rwlock";
 import type { InboxProps } from "@ext/inbox/models/types";
 import { addEvent, Level } from "@ext/loggers/opentelemetry";
-import type { ParsedContext } from "@ext/markdown/core/Parser/ParserContext/ParsedContext";
+import type PrivateParserContext from "@ext/markdown/core/Parser/ParserContext/PrivateParserContext";
 import { FileStatus } from "@ext/Watchers/model/FileStatus";
 import type { JSONContent } from "@tiptap/core";
 import type { RenderableTreeNode } from "../../../extensions/markdown/core/render/logic/Markdoc";
@@ -226,9 +226,8 @@ export class Article<P extends ArticleProps = ArticleProps> extends Item<P> {
 }
 
 export interface Content {
-	getHtmlValue: { get: () => Promise<string> };
 	tocItems: TocItem[];
 	editTree: JSONContent;
 	renderTree: RenderableTreeNode;
-	parsedContext: ParsedContext;
+	parsedContext: PrivateParserContext;
 }

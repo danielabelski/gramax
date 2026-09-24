@@ -1,4 +1,4 @@
-import Icon from "@components/Atoms/Icon";
+import { WithTooltip } from "@ext/serach/components/WithTooltip";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -6,7 +6,7 @@ import {
 	DropdownMenuRadioItem,
 	DropdownMenuTriggerButton,
 } from "@ui-kit/Dropdown";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
+import { Icon } from "@ui-kit/Icon";
 
 export interface SearchFilterDropdownProps<T extends string> {
 	value: T;
@@ -21,16 +21,18 @@ export const SearchFilterDropdown = <T extends string>(props: SearchFilterDropdo
 
 	return (
 		<DropdownMenu>
-			<TooltipWrapper tooltip={tooltip}>
-				<DropdownMenuTriggerButton asChild className="bottom-content-filter-dropdown-trigger" variant="text">
+			<WithTooltip tooltip={tooltip}>
+				<DropdownMenuTriggerButton className="rounded-lg h-7 py-1.5 px-2.5 font-normal -shadow-soft-sm pr-2">
 					{labels[value]}
-					<Icon code="chevron-down" />
+					<Icon className="text-primary-fg" icon="chevron-down" />
 				</DropdownMenuTriggerButton>
-			</TooltipWrapper>
-			{/* .bottom-content-filter-dropdown-trigger removes padding */}
-			{/* alignOffset is used to compensate, so text inside dropdown is vertically aligned with text outside */}
-			<DropdownMenuContent align="start" alignOffset={-13}>
-				<DropdownMenuRadioGroup onValueChange={(v) => onSelect(v as T)} value={value}>
+			</WithTooltip>
+			<DropdownMenuContent align="start" className="font-sans">
+				<DropdownMenuRadioGroup
+					indicatorIconPosition="start"
+					onValueChange={(v) => onSelect(v as T)}
+					value={value}
+				>
 					{values.map((value) => (
 						<DropdownMenuRadioItem key={value} value={value}>
 							{labels[value]}
@@ -39,20 +41,5 @@ export const SearchFilterDropdown = <T extends string>(props: SearchFilterDropdo
 				</DropdownMenuRadioGroup>
 			</DropdownMenuContent>
 		</DropdownMenu>
-	);
-};
-
-const TooltipWrapper = ({ tooltip, children }: { tooltip?: string; children: React.ReactNode }) => {
-	if (!tooltip) {
-		return children;
-	}
-
-	return (
-		<Tooltip>
-			<TooltipContent>
-				<p>{tooltip}</p>
-			</TooltipContent>
-			<TooltipTrigger asChild>{children}</TooltipTrigger>
-		</Tooltip>
 	);
 };

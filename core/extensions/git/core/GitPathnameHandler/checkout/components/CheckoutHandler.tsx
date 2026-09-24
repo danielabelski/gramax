@@ -5,6 +5,7 @@ import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import ModalToOpenService from "@core-ui/ContextServices/ModalToOpenService/ModalToOpenService";
 import BranchUpdaterService from "@ext/git/actions/Branch/BranchUpdaterService/logic/BranchUpdaterService";
 import t from "@ext/localization/locale/translate";
+import { executePluginGuardedAction } from "@plugins/logic/executePluginGuardedAction";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -17,6 +18,7 @@ import {
 	AlertDialogTitle,
 } from "@ui-kit/AlertDialog";
 import { Loader } from "@ui-kit/Loader";
+import { toast } from "@ui-kit/Toast";
 import { useState } from "react";
 
 const BranchElement = ({ branchName }: { branchName: string }) => (
@@ -28,9 +30,11 @@ const BranchElement = ({ branchName }: { branchName: string }) => (
 const CheckoutHandler = ({
 	currentBranchName,
 	branchToCheckout,
+	catalogName,
 }: {
 	currentBranchName: string;
 	branchToCheckout: string;
+	catalogName: string;
 }) => {
 	const apiUrlCreator = ApiUrlCreatorService.value;
 	const [isOpen, setIsOpen] = useState(true);
@@ -47,10 +51,19 @@ const CheckoutHandler = ({
 	};
 
 	const onActionButtonClick = async () => {
-		const url = apiUrlCreator.getVersionControlCheckoutBranchUrl(branchToCheckout);
-
 		setCheckoutProcess(true);
-		const res = await FetchService.fetch(url);
+		const checkout = await executePluginGuardedAction(
+			"git:branch:before-checkout",
+			{ catalogName, currentBranch: currentBranchName, targetBranch: branchToCheckout },
+			() => FetchService.fetch(apiUrlCreator.getVersionControlCheckoutBranchUrl(branchToCheckout)),
+		);
+		if (checkout.allowed === false) {
+			if (checkout.reason === "error") toast(t("app.error.something-went-wrong"), { status: "error" });
+			setCheckoutProcess(false);
+			return;
+		}
+
+		const res = checkout.result;
 		setCheckoutProcess(false);
 
 		if (!res.ok) {

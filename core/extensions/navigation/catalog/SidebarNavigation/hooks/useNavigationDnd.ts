@@ -46,7 +46,7 @@ export const useNavigationDnd = (containerRef: RefObject<HTMLDivElement | null>)
 		if (autoScrollFrameRef.current !== null) return;
 
 		const tick = () => {
-			const scrollContainer = containerRef.current?.closest<HTMLElement>(".left-navigation-content");
+			const scrollContainer = containerRef.current?.closest<HTMLElement>('[data-sidebar="content"]');
 			if (!scrollContainer) {
 				autoScrollFrameRef.current = null;
 				return;
@@ -168,17 +168,24 @@ export const useNavigationDnd = (containerRef: RefObject<HTMLDivElement | null>)
 			const rect = over?.rect;
 			if (!rect) return;
 
-			const mode = getDropMode(pointerY, rect);
-			const parentId = mode === DropMode.Into ? null : (parentMap[overId] ?? null);
-			setDragTarget({ anchorId: overId, parentId, mode });
-
+			// Top strip `before`, middle `into`, bottom strip `after` — the same reading on every row. The one
+			// exception is an open container: its row ends right above its own children, so an `after` line there
+			// would be drawn between the row and its content while meaning "after the whole subtree". That strip
+			// reads as `into` instead, which draws nothing there. Dropping after the subtree stays reachable from
+			// the top strip of the row that follows it.
 			const hasChildren = (childrenMap[overId]?.length ?? 0) > 0;
-			const isCollapsed = !expanded.has(overId);
-			if (mode === DropMode.Into && hasChildren && isCollapsed) {
-				scheduleAutoExpand(overId);
-			} else {
-				cancelAutoExpand();
-			}
+			const isOpenContainer = hasChildren && expanded.has(overId);
+			const pointerMode = getDropMode(pointerY, rect);
+			const mode = pointerMode === DropMode.After && isOpenContainer ? DropMode.Into : pointerMode;
+
+			setDragTarget({
+				anchorId: overId,
+				parentId: mode === DropMode.Into ? null : (parentMap[overId] ?? null),
+				mode,
+			});
+
+			if (mode === DropMode.Into && hasChildren && !isOpenContainer) scheduleAutoExpand(overId);
+			else cancelAutoExpand();
 		},
 		[containerRef, setDragTarget, cancelAutoExpand, scheduleAutoExpand, startAutoScroll],
 	);

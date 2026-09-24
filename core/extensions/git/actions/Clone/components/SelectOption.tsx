@@ -1,5 +1,6 @@
 import Icon from "@components/Atoms/Icon";
 import { classNames } from "@components/libs/classNames";
+// biome-ignore lint/style/noRestrictedImports: pre-existing @emotion/styled import; the Tailwind migration is not this change's scope
 import styled from "@emotion/styled";
 import t from "@ext/localization/locale/translate";
 import { STORAGE_GET_ICON } from "@ext/storage/logic/SourceDataProvider/logic/getStorageIconByData";
@@ -104,8 +105,10 @@ const CustomSelectOption = (props: CustomSelectOptionProps) => {
 				</SelectItemText>
 				{(onDelete || onEdit) && (
 					<DropdownMenu onOpenChange={setOpen} open={open}>
-						<DropdownMenuTrigger className="ml-auto">
+						{/* `asChild`, or the trigger renders a second button around this one. */}
+						<DropdownMenuTrigger asChild>
 							<MenuItemIconButton
+								aria-label={t("storage-actions")}
 								className="ml-auto right-extensions"
 								data-qa="option-menu"
 								icon="ellipsis-vertical"

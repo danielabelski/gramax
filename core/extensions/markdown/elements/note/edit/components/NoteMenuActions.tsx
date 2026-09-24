@@ -63,7 +63,7 @@ const NoteMenuActions = (props: NoteMenuActionsProps) => {
 		<>
 			<ActionButton icon="heading" onClick={toggleHeadEditor} selected={hasTitle} tooltipText={t("title")} />
 			<DropdownMenu>
-				<DropdownMenuTrigger>
+				<DropdownMenuTrigger asChild>
 					<ActionButton icon={noteIcons[node.attrs.type]} tooltipText={t("type")} />
 				</DropdownMenuTrigger>
 				<DropdownMenuContent>

@@ -1,4 +1,4 @@
-import { ToolbarText } from "@ui-kit/Toolbar";
+import { GlassToolbarText } from "@ui-kit/GlassToolbar";
 import { useEffect, useState } from "react";
 
 interface TimerProps {
@@ -20,12 +20,12 @@ const Timer = ({ formatTime, maxDurationMs, accumulatedTimeMs, paused, onTimeCha
 			onTimeChange?.(newTime);
 		}, 100);
 		return () => clearInterval(interval);
-	}, [currentTime, paused]);
+	}, [currentTime, paused, onTimeChange]);
 
 	return (
-		<ToolbarText className="whitespace-nowrap font-medium text-xs">
+		<GlassToolbarText className="whitespace-nowrap font-medium text-xs">
 			{formatTime(currentTime)} / {formatTime(maxDurationMs)}
-		</ToolbarText>
+		</GlassToolbarText>
 	);
 };
 

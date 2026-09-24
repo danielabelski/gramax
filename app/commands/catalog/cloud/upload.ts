@@ -27,8 +27,7 @@ const uploadStatic: Command<{ ctx: Context; catalogName: string }, void> = Comma
 
 			const catalog = await workspace.getContextlessCatalog(baseCatalogName);
 			const zipFileProvider = await ZipFileProvider.create();
-			const workspaceConfig = await workspace.config();
-			const cloudServiceUrl = workspaceConfig.services?.cloud?.url;
+			const cloudServiceUrl = this._app.conf.services.cloud.url;
 			if (!cloudServiceUrl) throw new Error("Cloud service URL is not set");
 			const cloudApi = new VersionedCloudApi(cloudServiceUrl);
 			if (!(await cloudApi.getServerState())) throw new DefaultError(t("cloud.error.failed-to-connect"));

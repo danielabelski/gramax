@@ -3,6 +3,7 @@ import useDragScrolling from "@core-ui/hooks/useDragScrolling";
 import useMediaQuery from "@core-ui/hooks/useMediaQuery";
 import { cssMedia } from "@core-ui/utils/cssUtils";
 import scrollUtils from "@core-ui/utils/scrollUtils";
+// biome-ignore lint/style/noRestrictedImports: migrating this legacy component's dynamic shadows is a separate change.
 import styled from "@emotion/styled";
 import {
 	type CSSProperties,
@@ -10,7 +11,6 @@ import {
 	type MutableRefObject,
 	type ReactNode,
 	useEffect,
-	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
@@ -43,53 +43,75 @@ const Scrollable = forwardRef((props: ScrollableProps, ref: MutableRefObject<HTM
 	const [containerWidth, setContainerWidth] = useState(0);
 	const containerRef = ref || useRef<HTMLDivElement>(null);
 	const [hasElementScroll, setHasElementScroll] = useState(false);
+	const hasScrollRef = useRef(hasScroll);
+	const lastHasScrollRef = useRef<boolean | null>(null);
 	const narrowMedia = useMediaQuery(cssMedia.JSnarrow);
 
 	const [isBottom, setIsBottom] = useState(false);
 	const [isTop, setIsTop] = useState(true);
 	const [dragScrollingState] = useState(dragScrolling);
 
-	useLayoutEffect(() => {
-		setContainerWidth(containerRef.current?.getBoundingClientRect().width);
-	}, []);
+	hasScrollRef.current = hasScroll;
 
 	useEffect(() => {
 		const container = containerRef.current;
 		if (!container) return;
 
-		const contentElement = container.firstElementChild?.firstElementChild;
-		if (!contentElement) return;
+		const contentWrapper = container.firstElementChild;
+		if (!contentWrapper) return;
 
-		const onResize = () => {
+		let frameId: number | null = null;
+		let contentElements = new Set(contentWrapper.children);
+
+		const measure = () => {
+			frameId = null;
+
 			const rect = container.getBoundingClientRect();
-			setContainerWidth(rect.width);
+			const { clientHeight, scrollHeight, scrollTop } = container;
 
-			const scroll = scrollUtils.hasScroll(container);
-			setHasElementScroll(scroll);
-			hasScroll?.(scroll);
+			const scroll = scrollHeight > 0 && clientHeight > 0 && Math.abs(scrollHeight - clientHeight) > 1;
+			const nextIsTop = scrollTop < 2;
+			const nextIsBottom = scrollHeight - scrollTop - clientHeight < 2;
 
-			const isTop = scrollUtils.scrollPositionIsTop(container);
-			const isBottom = scrollUtils.scrollPositionIsBottom(container);
-			setIsTop(isTop);
-			setIsBottom(isBottom);
+			setContainerWidth((current) => (current === rect.width ? current : rect.width));
+			setHasElementScroll((current) => (current === scroll ? current : scroll));
+			setIsTop((current) => (current === nextIsTop ? current : nextIsTop));
+			setIsBottom((current) => (current === nextIsBottom ? current : nextIsBottom));
+
+			if (lastHasScrollRef.current !== scroll) {
+				lastHasScrollRef.current = scroll;
+				hasScrollRef.current?.(scroll);
+			}
 		};
 
-		const resizeObserver = new ResizeObserver(onResize);
+		const scheduleMeasure = () => {
+			if (frameId !== null) return;
+			frameId = requestAnimationFrame(measure);
+		};
+
+		const resizeObserver = new ResizeObserver(scheduleMeasure);
+		const mutationObserver = new MutationObserver(() => {
+			const nextContentElements = new Set(contentWrapper.children);
+			for (const element of contentElements) {
+				if (!nextContentElements.has(element)) resizeObserver.unobserve(element);
+			}
+			for (const element of nextContentElements) {
+				if (!contentElements.has(element)) resizeObserver.observe(element);
+			}
+			contentElements = nextContentElements;
+			scheduleMeasure();
+		});
 
 		resizeObserver.observe(container);
-		resizeObserver.observe(contentElement);
+		for (const element of contentElements) resizeObserver.observe(element);
+		mutationObserver.observe(contentWrapper, { childList: true });
 
 		return () => {
 			resizeObserver.disconnect();
+			mutationObserver.disconnect();
+			if (frameId !== null) cancelAnimationFrame(frameId);
 		};
-	}, [containerRef.current]);
-
-	useEffect(() => {
-		if (!containerRef.current) return;
-		const scroll = scrollUtils.hasScroll(containerRef.current);
-		setHasElementScroll(scroll);
-		hasScroll?.(scroll);
-	}, [children]);
+	}, [containerRef]);
 
 	if (dragScrollingState) useDragScrolling(containerRef, 30);
 

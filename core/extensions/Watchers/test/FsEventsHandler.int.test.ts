@@ -631,7 +631,9 @@ describe("FsEventsHandler", () => {
 		});
 
 		expect(result.navChanged).toBe(false);
-		expect(result.modifiedArticleProps).toEqual([{ path: "notes/keep.md", props: { title: "Keep Retitled" } }]);
+		expect(result.modifiedArticleProps).toEqual([
+			{ ref: expect.objectContaining({ path: "notes/keep.md" }), props: { title: "Keep Retitled" } },
+		]);
 
 		await dfp.write(p("notes/keep.md"), article("Keep"));
 	});
@@ -773,6 +775,62 @@ describe("FsEventsHandler", () => {
 		expect(result.currentArticleRedirectTo).not.toContain("section/inside");
 
 		await dfp.move(p("notes/chapter"), p("notes/section"));
+	});
+
+	test("rescan rebuilds nav: the changes it stands for were never delivered as events", async () => {
+		await setupApp();
+
+		// The backend dropped whatever happened in its overflow window — here, a new category.
+		// No per-path event exists for it, so only the rescan can bring it back.
+		await dfp.write(p("notes/dropped-category/_index.md"), article("Dropped"));
+		PendingSelfWrites.clearAll();
+
+		const result = await handleFsEvents({
+			ctx: new TestContext(),
+			catalogName: "notes",
+			events: [{ relPath: "", kind: { type: "rescan" } }],
+			workspace: app.wm.maybeCurrent(),
+			sitePresenterFactory: app.sitePresenterFactory,
+		});
+
+		expect(result.navChanged).toBe(true);
+		const paths = collectRefPaths(result.itemLinks ?? []);
+		expect(paths).toContain("notes/dropped-category/_index.md");
+
+		await dfp.delete(p("notes/dropped-category"));
+	});
+
+	test("rescan refreshes the open article too (its content may have changed unseen)", async () => {
+		await setupApp();
+
+		const result = await handleFsEvents({
+			ctx: new TestContext(),
+			catalogName: "notes",
+			currentPath: "notes/keep.md",
+			events: [{ relPath: "", kind: { type: "rescan" } }],
+			workspace: app.wm.maybeCurrent(),
+			sitePresenterFactory: app.sitePresenterFactory,
+		});
+
+		expect(result.navChanged).toBe(true);
+		expect(result.changedArticles).toContain("notes/keep.md");
+	});
+
+	test("rescan is not suppressed by a pending self-write", async () => {
+		await setupApp();
+
+		// dfp.write marks a self-write; that mark covers one path, never the whole tree.
+		await dfp.write(p("notes/keep.md"), article("Keep saved by app"));
+
+		const result = await handleFsEvents({
+			ctx: new TestContext(),
+			catalogName: "notes",
+			events: [{ relPath: "", kind: { type: "rescan" } }],
+			workspace: app.wm.maybeCurrent(),
+			sitePresenterFactory: app.sitePresenterFactory,
+		});
+
+		expect(result.navChanged).toBe(true);
 	});
 });
 

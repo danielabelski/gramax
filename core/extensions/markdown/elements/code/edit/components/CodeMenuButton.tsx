@@ -3,7 +3,7 @@ import t from "@ext/localization/locale/translate";
 import { useIsOneNodeSelected } from "@ext/markdown/core/edit/logic/hooks/useIsOneNodeSelected";
 import getIsSelected from "@ext/markdown/elementsUtils/getIsSelected";
 import type { Editor } from "@tiptap/core";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 import { memo, useCallback } from "react";
 
 interface CodeMenuButtonProps {
@@ -24,7 +24,7 @@ const CodeMenuButton = ({ editor, isInline = false }: CodeMenuButtonProps) => {
 	}, [isSelected, editor]);
 
 	return (
-		<ToolbarToggleButton
+		<GlassToolbarToggleButton
 			active={isActiveCode}
 			data-testid="tb-code"
 			disabled={isDisabledCode}
@@ -32,8 +32,8 @@ const CodeMenuButton = ({ editor, isInline = false }: CodeMenuButtonProps) => {
 			onClick={toggleCode}
 			tooltipText={isSelected ? t("editor.code") : t("editor.code-block")}
 		>
-			<ToolbarIcon icon={"code-xml"} />
-		</ToolbarToggleButton>
+			<GlassToolbarIcon icon={"code-xml"} />
+		</GlassToolbarToggleButton>
 	);
 };
 

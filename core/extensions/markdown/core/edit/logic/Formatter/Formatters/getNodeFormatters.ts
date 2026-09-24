@@ -27,6 +27,7 @@ import inlineMdComponentFormatter from "@ext/markdown/elements/md/edit/logic/inl
 import OpenApiFormatter from "@ext/markdown/elements/openApi/edit/logic/OpenApiFormatter";
 import paragraphFormatter from "@ext/markdown/elements/paragraph/edit/logic/paragraphFormatter";
 import { questionFormatter } from "@ext/markdown/elements/question/edit/logic/questionFormatter";
+import secretFormatter from "@ext/markdown/elements/secret/edit/logic/secretFormatter";
 import tableBodyRowSimple from "@ext/markdown/elements/table/edit/logic/formatters/tableBodyRowSimpleFormatter";
 import tableCellSimple from "@ext/markdown/elements/table/edit/logic/formatters/tableCellSimpleFormatter";
 import tableFormatter from "@ext/markdown/elements/table/edit/logic/formatters/tableFormatter";
@@ -66,6 +67,7 @@ const getNodeFormatters = (
 		bulletList: bulletList,
 		listItem: listItemFormatter,
 		"inline-property": inlinePropertyFormatter(formatter),
+		secret: secretFormatter,
 		"block-field": blockFieldFormatter(formatter),
 		"block-property": blockPropertyFormatter(formatter),
 		// biome-ignore lint/style/useNamingConvention: node type registry keys
@@ -94,6 +96,7 @@ const getNodeFormatters = (
 		paragraph: paragraphFormatter,
 		hard_break: brFormatter,
 		br: brFormatter,
+		soft_break: (state) => state.write("\n"),
 		text: textFormatter,
 		...htmlTagNodeFormatters,
 		questionAnswer: questionAnswerFormatter(formatter),

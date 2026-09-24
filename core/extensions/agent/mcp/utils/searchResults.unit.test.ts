@@ -49,20 +49,19 @@ describe("compactSearchResults", () => {
 		const raw = [articleHit("docs/section/a.md", [{ searchText: "match one" }])];
 
 		await expect(compactSearchResults(defaultApp, ctx, raw, 5, 2)).resolves.toEqual([
-			{ catalogName: "docs", itemPath: "section/a.md", title: "", link: "", snippets: ["match one"] },
+			{ catalogName: "docs", itemPath: "section/a", title: "", snippets: ["match one"] },
 		]);
 	});
 
-	test("resolves title and link from catalog item", async () => {
+	test("resolves title from catalog item", async () => {
 		const raw = [articleHit("docs/section/a.md", [{ searchText: "match one" }])];
 		const app = appWithItem("docs", "section/a.md", "Article A", "source/-/repo/branch/docs/section/a.md");
 
 		await expect(compactSearchResults(app, ctx, raw, 5, 2)).resolves.toEqual([
 			{
 				catalogName: "docs",
-				itemPath: "section/a.md",
+				itemPath: "section/a",
 				title: "Article A",
-				link: "source/-/repo/branch/docs/section/a.md",
 				snippets: ["match one"],
 			},
 		]);
@@ -75,7 +74,7 @@ describe("compactSearchResults", () => {
 		];
 
 		const result = await compactSearchResults(defaultApp, ctx, raw, 5, 2);
-		expect(result.map((h) => h.itemPath)).toEqual(["low.md", "high.md"]);
+		expect(result.map((h) => h.itemPath)).toEqual(["low", "high"]);
 	});
 
 	test("limits number of hits", async () => {
@@ -114,7 +113,7 @@ describe("compactSearchResults", () => {
 
 		const result = await compactSearchResults(defaultApp, ctx, raw, 5, 2);
 		expect(result).toHaveLength(1);
-		expect(result[0]?.itemPath).toBe("ok.md");
+		expect(result[0]?.itemPath).toBe("ok");
 	});
 
 	test("skips refPath without item segment", async () => {
@@ -122,6 +121,6 @@ describe("compactSearchResults", () => {
 
 		const result = await compactSearchResults(defaultApp, ctx, raw, 5, 2);
 		expect(result).toHaveLength(1);
-		expect(result[0]?.itemPath).toBe("ok.md");
+		expect(result[0]?.itemPath).toBe("ok");
 	});
 });

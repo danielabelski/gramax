@@ -109,8 +109,8 @@ export const Suggestion = Mark.create({
 						let haveSug = false;
 						if (node.isText) {
 							haveSug = node.marks.some((mark) => {
-								if (mark.type.name == Suggestion.name) {
-									if (start == -1 || originalText !== mark.attrs.originalText) {
+								if (mark.type.name === Suggestion.name) {
+									if (start === -1 || originalText !== mark.attrs.originalText) {
 										if (start !== -1 && text !== originalText) {
 											tr.removeMark(start, pos, currentType);
 										}

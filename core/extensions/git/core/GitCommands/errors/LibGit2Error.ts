@@ -2,6 +2,16 @@ import GitErrorCode from "@ext/git/core/GitCommands/errors/model/GitErrorCode";
 
 export const JSErrorClass = 100;
 
+/** Rust subset for `Error::Network` — see `crates/git/src/error.rs`. */
+const NETWORK_SUBSET = 5;
+
+/**
+ * Synthetic status the wasm http layer records when the request never reached the server —
+ * XHR reports status 0 there, which means nothing downstream. See
+ * `apps/web/crates/gramax-wasm/js/httpError.ts`.
+ */
+const UNREACHABLE_STATUS = 999;
+
 export class LibGit2Error extends Error {
 	code?: GitErrorCode;
 	data?: { [key: string]: string };
@@ -77,6 +87,12 @@ export const fromRaw = (
 
 		case [413, 431, 422].some((c) => code === c || message.includes(`unexpected http status code: ${c}`)):
 			return GitErrorCode.ContentTooLargeError;
+
+		// The request never left the browser: no DNS, no route, or CORS refused it. Without this
+		// the synthetic 999 would fall into `code > 299` below and be reported as a git-server
+		// error, sending people off to re-issue tokens for a problem in their own network.
+		case subset === NETWORK_SUBSET && code === UNREACHABLE_STATUS:
+			return GitErrorCode.NetworkConntectionError;
 
 		case eq(34, 16):
 		case eq(34, 0):

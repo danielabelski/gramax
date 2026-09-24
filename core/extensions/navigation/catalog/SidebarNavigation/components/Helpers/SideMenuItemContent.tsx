@@ -3,6 +3,10 @@ import Url from "@core-ui/ApiServices/Types/Url";
 import { cn } from "@core-ui/utils/cn";
 import type { DraggableAttributes, DraggableSyntheticListeners } from "@dnd-kit/core";
 import { useNavigationItemClick } from "@ext/navigation/catalog/SidebarNavigation/hooks/useNavigationItemClick";
+import {
+	NAVIGATION_HOVER_ID_ATTR,
+	NAVIGATION_ROW_SELECTOR,
+} from "@ext/navigation/catalog/SidebarNavigation/store/navigationTreeStore";
 import type { ItemLink } from "@ext/navigation/NavigationLinks";
 import { SidebarMenuItem, SidebarMenuSubButton, SidebarMenuSubItem } from "@ui-kit/Sidebar";
 import { TextOverflowTooltip } from "@ui-kit/Tooltip";
@@ -37,8 +41,10 @@ interface SideMenuItemBodyProps {
 
 const SideMenuItemBody = ({ data, trigger, onAddChild }: SideMenuItemBodyProps) => (
 	<>
-		<span className="flex min-w-0 flex-1 items-center gap-2">
-			<TextOverflowTooltip>{data?.title || data?.external || <>&nbsp;</>}</TextOverflowTooltip>
+		<span className={cn("flex min-w-0 flex-1 items-center", trigger ? "gap-1.5" : "gap-2")}>
+			<TextOverflowTooltip offsetBoundarySelector={NAVIGATION_ROW_SELECTOR} side="right">
+				{data?.title || data?.external || <>&nbsp;</>}
+			</TextOverflowTooltip>
 			<NavigationItemCommentCounter pathname={data.pathname} />
 			{trigger}
 		</span>
@@ -66,7 +72,11 @@ const SideMenuItemContentInner = (props: SideMenuItemContentProps) => {
 	const ButtonComponent = isNested ? SidebarMenuSubButton : SidebarMenuButton;
 	const isLinkInsideButton = isNested && !isSelected;
 
-	const handleItemClick = useNavigationItemClick({ itemPath: data?.pathname, isSelected, onSelect });
+	const handleItemClick = useNavigationItemClick({
+		itemPath: data?.pathname,
+		isSelected,
+		onSelect,
+	});
 
 	const body = <SideMenuItemBody data={data} onAddChild={onAddChild} trigger={trigger} />;
 
@@ -79,9 +89,11 @@ const SideMenuItemContentInner = (props: SideMenuItemContentProps) => {
 			>
 				{data.ref.path && <NavigationIndicator level={level} path={data.ref.path} />}
 				<ButtonComponent
+					{...{ [NAVIGATION_HOVER_ID_ATTR]: data.ref.path }}
+					aria-label={data?.title || data?.external}
 					className={cn(
-						"group/nav h-7 py-1.5 pr-1.5 data-[active=true]:font-medium font-light",
-						"data-[active=true]:hover:bg-primary-bg-hover data-[active=true]:hover:text-primary-accent",
+						"group/nav h-7 rounded-lg py-1.5 pr-1.5 font-light data-[active=true]:font-normal text-primary-fg",
+						"data-[active=true]:hover:bg-primary-bg-hover data-[active=true]:hover:text-primary-accent select-none",
 						isHighlighted && "bg-secondary-bg-hover",
 						data?.external && "text-secondary-fg/60",
 					)}

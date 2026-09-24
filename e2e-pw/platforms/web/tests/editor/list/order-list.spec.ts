@@ -17,7 +17,7 @@ editorTest.describe("Ordered List", () => {
 
 	editorTest("create via toolbar", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("lists");
-		await sharedPage.getByRole("menuitem", { name: "Numbered" }).click();
+		await sharedPage.locator('[data-list-type="ordered"]').click();
 		await editor.type("text");
 		await editor.assertMarkdown("1. text");
 	});
@@ -83,7 +83,7 @@ editorTest.describe("Ordered List", () => {
 			   1. text
 		`);
 		await editor.clickToolbar("lists");
-		await sharedPage.getByRole("menuitem", { name: "Numbered" }).click();
+		await sharedPage.locator('[data-list-type="ordered"]').click();
 		await editor.assertMarkdown(md`
 			1. text
 

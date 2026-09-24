@@ -5,14 +5,14 @@ import {
 } from "@ext/serach/components/propertyFilter/propertyFilterModel";
 import type { PropertyFilter } from "@ext/serach/Searcher";
 
-export const buildPropertyFilter = (filteredProperties: FilterablePropertyItem[]): PropertyFilter | undefined => {
-	if (filteredProperties.length === 0) {
+export const buildPropertyFilter = (selectedProperties: FilterablePropertyItem[]): PropertyFilter | undefined => {
+	if (selectedProperties.length === 0) {
 		return undefined;
 	}
 
 	return {
 		op: "and",
-		filters: filteredProperties.map(filterableItemToPropertyFilter),
+		filters: selectedProperties.map(filterableItemToPropertyFilter),
 	};
 };
 

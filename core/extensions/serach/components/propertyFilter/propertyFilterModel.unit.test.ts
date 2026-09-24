@@ -42,10 +42,11 @@ const makeSelectedItem = (args: {
 	return {
 		property: args.property,
 		selection: {
-			options: values.map((value) => ({ value, selected: selectedValues.has(value) })),
+			options: values.map((value) => ({ value, selected: selectedValues.has(value), shown: true })),
 			emptySelected,
 			allSelected: emptySelected && values.every((v) => selectedValues.has(v)),
 		},
+		shown: true,
 	};
 };
 
@@ -109,15 +110,12 @@ describe("propertyFilterModel", () => {
 			);
 
 			expect(result.filterableProperties.array.map((x) => x.property.name)).toEqual(["status", "priority"]);
-			expect(result.filterableProperties.map.get("status")?.selection.options).toEqual([
-				{ value: "Open", selected: false },
-				{ value: "Closed", selected: true },
+			expect(result.filterableProperties.array.filter((x) => x.shown).map((x) => x.property.name)).toEqual([
+				"status",
 			]);
-
-			// shown list is filtered by propertyQuery and per-property values query
-			expect(result.shownFilterableProperties.array.map((x) => x.property.name)).toEqual(["status"]);
-			expect(result.shownFilterableProperties.map.get("status")?.selection.options).toEqual([
-				{ value: "Closed", selected: true },
+			expect(result.filterableProperties.map.get("status")?.selection.options).toEqual([
+				{ value: "Open", selected: false, shown: false },
+				{ value: "Closed", selected: true, shown: true },
 			]);
 		});
 
@@ -127,8 +125,11 @@ describe("propertyFilterModel", () => {
 
 			const result = buildFilterableProperties([status, priority], [], "", new Map());
 
-			expect(result.shownFilterableProperties.array.map((x) => x.property.name)).toEqual(["status", "priority"]);
-			expect([...result.shownFilterableProperties.map.keys()]).toEqual(["status", "priority"]);
+			expect(result.filterableProperties.array.filter((x) => x.shown).map((x) => x.property.name)).toEqual([
+				"status",
+				"priority",
+			]);
+			expect([...result.filterableProperties.map.keys()]).toEqual(["status", "priority"]);
 		});
 
 		it("filters only by property name substring (lowercase compare)", () => {
@@ -137,9 +138,13 @@ describe("propertyFilterModel", () => {
 
 			const result = buildFilterableProperties([status, priority], [], "sta", new Map());
 
-			expect(result.shownFilterableProperties.array.map((x) => x.property.name)).toEqual(["Status"]);
+			expect(result.filterableProperties.array.filter((x) => x.shown).map((x) => x.property.name)).toEqual([
+				"Status",
+			]);
 			const result2 = buildFilterableProperties([status, priority], [], "prio", new Map());
-			expect(result2.shownFilterableProperties.array.map((x) => x.property.name)).toEqual(["priority"]);
+			expect(result2.filterableProperties.array.filter((x) => x.shown).map((x) => x.property.name)).toEqual([
+				"priority",
+			]);
 		});
 
 		it("does not filter values when propertyValuesQueries has no entry for property", () => {
@@ -147,9 +152,9 @@ describe("propertyFilterModel", () => {
 
 			const result = buildFilterableProperties([status], [], "", new Map([["other", "clo"]]));
 
-			expect(result.shownFilterableProperties.map.get("status")?.selection.options).toEqual([
-				{ value: "Open", selected: false },
-				{ value: "Closed", selected: false },
+			expect(result.filterableProperties.map.get("status")?.selection.options).toEqual([
+				{ value: "Open", selected: false, shown: true },
+				{ value: "Closed", selected: false, shown: true },
 			]);
 		});
 
@@ -172,20 +177,18 @@ describe("propertyFilterModel", () => {
 				new Map<string, string>([["status", "pro"]]),
 			);
 
-			// Full list keeps all values
+			// Full list keeps all values, but only matching values are marked shown for status
 			expect(result.filterableProperties.map.get("status")?.selection.options).toEqual([
-				{ value: "Open", selected: false },
-				{ value: "Closed", selected: true },
-				{ value: "In Progress", selected: true },
+				{ value: "Open", selected: false, shown: false },
+				{ value: "Closed", selected: true, shown: false },
+				{ value: "In Progress", selected: true, shown: true },
 			]);
-
-			// Shown list filters values for "status" only
-			expect(result.shownFilterableProperties.map.get("status")?.selection.options).toEqual([
-				{ value: "In Progress", selected: true },
+			expect(result.filterableProperties.map.get("status")?.selection.options.filter((x) => x.shown)).toEqual([
+				{ value: "In Progress", selected: true, shown: true },
 			]);
-			expect(result.shownFilterableProperties.map.get("priority")?.selection.options).toEqual([
-				{ value: "High", selected: false },
-				{ value: "Low", selected: false },
+			expect(result.filterableProperties.map.get("priority")?.selection.options).toEqual([
+				{ value: "High", selected: false, shown: true },
+				{ value: "Low", selected: false, shown: true },
 			]);
 		});
 

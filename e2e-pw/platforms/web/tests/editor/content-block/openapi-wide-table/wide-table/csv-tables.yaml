@@ -1,0 +1,46 @@
+openapi: 3.1.0
+info:
+  title: Массовый импорт конфигураций через CSV-файлы
+  version: '1.0'
+  description: |
+    Оркестратор создаёт сущности из заранее подготовленных файлов **`.csv`** (разделитель — `;`).
+
+    ## Примеры CSV
+
+    ### cpes_input.csv
+
+    |        cpe_name        |             wan            |   wan_public_ip  |     wan_gateway       | cpe_type |    cpe_template   |    description   |
+    |:----------------------:|:--------------------------:|:----------------:|:---------------------:|:--------:|:-----------------:|:----------------:|
+    | bankomat-ce20n-HUB-1   | 10.0.3.10/24, 10.0.4.10/24 | 1.1.1.1, 2.2.2.2 |10.0.3.10, 10.0.4.10   | HUB      | sdwan-ce20n-3t2mw | первое устройство|
+    | bankomat-ce20n-HUB-50  | 10.0.3.11/24, 10.0.4.11/24 | 1.1.1.2, 2.2.2.3 |10.0.3.11, 10.0.4.11   | HUB      | sdwan-ce20n-3t2mw |                  |
+    | bankomat-ce10b-SPOKE-1 | 10.0.8.7/24                | 10.0.8.7         |10.0.8.7               | SPOKE    | sdwan-ce10b-5tw   |                  |
+
+    ### networks_input.csv
+
+    |       cpe_name       | zone | vlan |     prefix    | name | dhcp_server_mode |   dhcp_relay_servers   |     sip    |     eip    |        dns       |                     target_gw                    |
+    |:--------------------:|:----:|:----:|:-------------:|:----:|:----------------:|:----------------------:|:----------:|:----------:|:----------------:|:------------------------------------------------:|
+    | bankomat-ce20n-HUB-1 | LAN  | 1    | 10.10.1.55/30 | lan  | Relay            | 10.10.2.55, 10.10.3.55 |            |            |                  | 10.11.55.1/30-10.10.1.1, 10.11.55.2/30-10.10.2.1 |
+    | bankomat-ce20n-HUB-2 | LAN  | 1    | 10.10.2.55/30 | lan  | Enabled          |                        | 10.10.2.55 | 10.10.2.56 | 1.1.1.1, 2.2.2.2 | 10.11.55.1/30-10.10.1.1, 10.11.55.2/30-10.10.2.1 |
+    | bankomat-ce20n-HUB-3 | LAN  | 1    | 10.10.3.10/30 | wan  | Disabled         |                        |            |            |                  | 10.11.55.1/30-10.10.1.1, 10.11.55.2/30-10.10.2.1 |
+
+    ### rules_input.csv
+
+    |       cpe_name       |   name  | src_zone |            src            |   dst_zone  |            dst            |     services     | action |     snat     |             to_range             | sto_prefix | in_iface | out_iface |       dnat       | to_ip | to_ip_with_port |  dto_prefix  |  log  |
+    |:--------------------:|:-------:|:--------:|:-------------------------:|:-----------:|:-------------------------:|:----------------:|:------:|:------------:|:--------------------------------:|:----------:|:--------:|:---------:|:----------------:|:-----:|:---------------:|:------------:|:-----:|
+    | bankomat-ce20n-HUB-1 | lan2wan | LAN      | 10.10.1.0/24              | WAN,Overlay | 10.10.2.0/24              | ANY              | NAT    | All to range | 192.168.1.1 - 192.168.1.2, 22-23 |            |          |           | Prefix to prefix |       |                 | 10.50.0.0/24 | true  |
+    | bankomat-ce20n-HUB-1 | wan2lan | WAN      | 10.10.4.0/24,10.10.3.0/24 | LAN         | 10.10.1.0/24,10.10.2.0/24 | IPIP, Bad length | Drop   |              |                                  |            |          |           |                  |       |                 |              | false |
+paths:
+  /cpes:
+    post:
+      summary: Массовая регистрация устройств
+      operationId: CPES_FILE_ADD
+      responses:
+        '200':
+          description: Операция запланирована
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sagaId:
+                    type: integer

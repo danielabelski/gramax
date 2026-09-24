@@ -1,32 +1,49 @@
-import FetchService from "@core-ui/ApiServices/FetchService";
-import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
+import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
+import { RequestStatus, useApi } from "@core-ui/hooks/useApi";
 import type { CommitAuthorInfo } from "@ext/git/core/GitCommands/LibGit2IntermediateCommands";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 export type UseGitCommitAuthors = {
 	authors: CommitAuthorInfo[];
+	isLoading: boolean;
 };
 
-const useGitCommitAuthors = (shouldFetch: boolean) => {
-	const apiUrlCreator = ApiUrlCreatorService.value;
+const commitAuthorsUrl = (api: ApiUrlCreator) => api.getGitCommitAuthors();
 
-	const [authors, setAuthors] = useState<CommitAuthorInfo[]>([]);
+/**
+ * authors of the commits of the whole catalog — or, when `pathspecs` is given, only of the commits
+ * that edited these paths
+ */
+const useGitCommitAuthors = (shouldFetch: boolean, pathspecs?: string[]) => {
+	const requested = useRef<string>(null);
+	const key = pathspecs?.length ? pathspecs.join("\n") : "";
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: key stands for pathspecs
+	const opts = useMemo(
+		() => ({ body: pathspecs?.length ? { pathspecs } : undefined, parse: "json" as const }),
+		[key],
+	);
+
+	const { data, status, call } = useApi<CommitAuthorInfo[]>({
+		url: commitAuthorsUrl,
+		opts,
+		map: (authors) => [...(authors ?? [])].sort((a, b) => b.count - a.count),
+	});
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: key stands for pathspecs, call is new every render
 	useEffect(() => {
-		if (!shouldFetch || authors.length > 0) return;
+		// requests never overlap: a set picked while one is running is taken up once the status leaves Loading
+		if (!shouldFetch || status === RequestStatus.Loading || requested.current === key) return;
 
-		const fetchAuthors = async () => {
-			const url = apiUrlCreator.getGitCommitAuthors();
-			const response = await FetchService.fetch<CommitAuthorInfo[]>(url);
-			const data = await response.json();
+		requested.current = key;
+		void call();
+	}, [shouldFetch, key, status]);
 
-			setAuthors(data?.sort((a, b) => b.count - a.count) || []);
-		};
-
-		void fetchAuthors();
-	}, [shouldFetch]);
-
-	return { authors: authors || [] };
+	// on a failed request useApi reports the error itself; here it is enough not to keep the previous authors
+	return {
+		authors: status === RequestStatus.Error ? [] : (data ?? []),
+		isLoading: shouldFetch && (status === RequestStatus.Init || status === RequestStatus.Loading),
+	};
 };
 
 export default useGitCommitAuthors;

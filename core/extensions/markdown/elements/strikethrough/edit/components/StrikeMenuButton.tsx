@@ -1,12 +1,12 @@
 import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/ButtonStateService";
 import t from "@ext/localization/locale/translate";
 import type { Editor } from "@tiptap/core";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 
 const StrikeMenuButton = ({ editor }: { editor: Editor }) => {
 	const { disabled, isActive } = ButtonStateService.useCurrentAction({ mark: "s" });
 	return (
-		<ToolbarToggleButton
+		<GlassToolbarToggleButton
 			active={isActive}
 			data-testid="tb-strikethrough"
 			disabled={disabled}
@@ -14,8 +14,8 @@ const StrikeMenuButton = ({ editor }: { editor: Editor }) => {
 			onClick={() => editor.chain().focus().toggleStrike().run()}
 			tooltipText={t("strike")}
 		>
-			<ToolbarIcon icon={"strikethrough"} />
-		</ToolbarToggleButton>
+			<GlassToolbarIcon icon={"strikethrough"} />
+		</GlassToolbarToggleButton>
 	);
 };
 

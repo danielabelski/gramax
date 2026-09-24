@@ -1,11 +1,10 @@
 import Item from "@components/Layouts/LeftNavigationTabs/Item";
-import calculateTabWrapperHeight from "@components/Layouts/StatusBar/Extensions/logic/calculateTabWrapperHeight";
-import styled from "@emotion/styled";
+import calculateTabWrapperHeight from "@components/Layouts/LeftNavigationTabs/logic/calculateTabWrapperHeight";
 import type { ArticleProviderType } from "@ext/articleProvider/logic/ArticleProvider";
 import type { ProviderItemProps } from "@ext/articleProvider/models/types";
 import t from "@ext/localization/locale/translate";
 import { ScrollShadowContainer } from "@ui-kit/ScrollShadowContainer";
-import { type ReactNode, type RefObject, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import BaseRightExtensions from "./BaseRightExtensions";
 
 interface ItemListProps<T = ProviderItemProps> {
@@ -24,10 +23,29 @@ interface ItemListProps<T = ProviderItemProps> {
 	rightActions?: (id: string) => ReactNode;
 }
 
-const ItemContainer = styled(ScrollShadowContainer)`
-	max-height: 40vh;
-	overflow-x: hidden;
-`;
+type ItemRowProps = {
+	id: string;
+	title: string;
+	isSelected: boolean;
+	onItemClick: (id: string, target: HTMLElement) => void;
+	rightActions: (onOpenChange: (open: boolean) => void) => ReactNode;
+};
+
+const ItemRow = ({ id, title, isSelected, onItemClick, rightActions }: ItemRowProps) => {
+	const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+	return (
+		<Item
+			id={id}
+			isMenuOpen={isMenuOpen}
+			isSelected={isSelected}
+			onItemClick={onItemClick}
+			rightActions={rightActions(setIsMenuOpen) as JSX.Element}
+			rightActionsWidth="0.85em"
+			title={title}
+		/>
+	);
+};
 
 const ItemList = <T extends ProviderItemProps>(props: ItemListProps<T>) => {
 	const {
@@ -56,12 +74,12 @@ const ItemList = <T extends ProviderItemProps>(props: ItemListProps<T>) => {
 
 	const itemList = useMemo(() => {
 		return items.map((item) => (
-			<Item
+			<ItemRow
 				id={item.id}
 				isSelected={Array.isArray(selectedId) ? selectedId.includes(item.id) : selectedId === item.id}
 				key={item.id}
 				onItemClick={onItemClick}
-				rightActions={
+				rightActions={(onOpenChange) =>
 					onMarkdownChange &&
 					onDelete && (
 						<BaseRightExtensions
@@ -70,12 +88,12 @@ const ItemList = <T extends ProviderItemProps>(props: ItemListProps<T>) => {
 							items={rightActions}
 							onDelete={onDelete}
 							onMarkdownChange={onMarkdownChange}
+							onOpenChange={onOpenChange}
 							preDelete={preDelete}
 							providerType={providerType}
 						/>
 					)
 				}
-				rightActionsWidth="0.85em"
 				title={item.title.length ? item.title : t("article.no-name")}
 			/>
 		));
@@ -94,9 +112,9 @@ const ItemList = <T extends ProviderItemProps>(props: ItemListProps<T>) => {
 	if (!show) return;
 
 	return (
-		<ItemContainer ref={ref}>
+		<ScrollShadowContainer className="max-h-[40vh] overflow-x-hidden" ref={ref}>
 			{items.length ? itemList : <div style={{ paddingLeft: "1rem", paddingRight: "1rem" }}>{noItemsText}</div>}
-		</ItemContainer>
+		</ScrollShadowContainer>
 	);
 };
 

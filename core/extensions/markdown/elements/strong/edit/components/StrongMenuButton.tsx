@@ -1,13 +1,13 @@
 import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/ButtonStateService";
 import t from "@ext/localization/locale/translate";
 import type { Editor } from "@tiptap/core";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 
 const StrongMenuButton = ({ editor }: { editor: Editor }) => {
 	const { disabled, isActive } = ButtonStateService.useCurrentAction({ mark: "strong" });
 
 	return (
-		<ToolbarToggleButton
+		<GlassToolbarToggleButton
 			active={isActive}
 			data-testid="tb-bold"
 			disabled={disabled}
@@ -15,8 +15,8 @@ const StrongMenuButton = ({ editor }: { editor: Editor }) => {
 			onClick={() => editor.chain().focus().toggleStrong().run()}
 			tooltipText={t("editor.bold")}
 		>
-			<ToolbarIcon icon={"bold"} />
-		</ToolbarToggleButton>
+			<GlassToolbarIcon icon={"bold"} />
+		</GlassToolbarToggleButton>
 	);
 };
 

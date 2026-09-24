@@ -1,46 +1,33 @@
-import { TextSize } from "@components/Atoms/Button/Button";
+import CatalogActions from "@components/Actions/CatalogActions/CatalogActions";
+import { TooltipIconButton } from "@components/Atoms/TooltipIconButton";
+import { LeftNavigationTab } from "@components/Layouts/LeftNavigationTabs/LeftNavigationTab";
 import NavigationTabsService from "@components/Layouts/LeftNavigationTabs/NavigationTabsService";
-import { LeftNavigationTab } from "@components/Layouts/StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
-import ButtonLink from "@components/Molecules/ButtonLink";
-import IsMacService from "@core-ui/ContextServices/IsMac";
-import SidebarsIsOpenService from "@core-ui/ContextServices/Sidebars/SidebarsIsOpenContext";
+import { useSidebarsPinStore } from "@core-ui/ContextServices/Sidebars/SidebarsPinStore";
 import ArticleViewService from "@core-ui/ContextServices/views/articleView/ArticleViewService";
-import useMediaQuery from "@core-ui/hooks/useMediaQuery";
 import { usePlatform } from "@core-ui/hooks/usePlatform";
 import { useCatalogPropsStore } from "@core-ui/stores/CatalogPropsStore/CatalogPropsStore.provider";
-import { cssMedia } from "@core-ui/utils/cssUtils";
-// biome-ignore lint/style/noRestrictedImports: out of scope
-import styled from "@emotion/styled";
 import AgentSkillService from "@ext/agent/components/skills/AgentSkillService";
-import AgentSkillTab from "@ext/agent/components/skills/Tab/AgentSkillTab";
 import PromptTab from "@ext/ai/components/Tab/PromptTab";
-import FavoriteArticlesTab from "@ext/article/Favorite/components/FavoriteArticlesTab";
 import BranchUpdaterService from "@ext/git/actions/Branch/BranchUpdaterService/logic/BranchUpdaterService";
 import OnBranchUpdateCaller from "@ext/git/actions/Branch/BranchUpdaterService/model/OnBranchUpdateCaller";
-import InboxTab from "@ext/inbox/components/InboxTab";
+import t from "@ext/localization/locale/translate";
 import FragmentService from "@ext/markdown/elements/fragment/edit/components/Tab/FragmentService";
-import FragmentsTab from "@ext/markdown/elements/fragment/edit/components/Tab/FragmentsTab";
-import TemplateTab from "@ext/templates/components/Tab/TemplateTab";
 import TemplateService from "@ext/templates/components/TemplateService";
+import { useSidebar } from "@ui-kit/Sidebar";
 import { useEffect } from "react";
 import TopBarContent from "../../../ArticlePage/Bars/TopBarContent";
-import BarLayout from "../../BarLayout";
 
-const PADDING = "0.875rem";
+interface LeftNavigationTopProps {
+	forceDesktop?: boolean;
+	onClose?: () => void;
+}
 
-const LeftNavigationTop = ({ className }: { className?: string }) => {
-	const leftNavIsOpen = SidebarsIsOpenService.value.left;
+const LeftNavigationTop = ({ forceDesktop, onClose }: LeftNavigationTopProps) => {
+	const setLeftPinned = useSidebarsPinStore((state) => state.setLeftPinned);
 	const catalogNotFound = useCatalogPropsStore((state) => state.data.notFound);
-	const narrowMedia = useMediaQuery(cssMedia.JSnarrow);
-	const { isTauri, isWeb, isStaticCli } = usePlatform();
+	const { isMobile, toggleSidebar } = useSidebar();
+	const { isTauri, isWeb } = usePlatform();
 	const { topTab } = NavigationTabsService.value;
-
-	const isMacDesktop = IsMacService.value && isTauri;
-
-	const getPadding = () => {
-		if (narrowMedia) return `0 ${PADDING}`;
-		return leftNavIsOpen ? `0 ${PADDING}` : "0 30px";
-	};
 
 	useEffect(() => {
 		const onBranchChange = (_, caller: OnBranchUpdateCaller) => {
@@ -63,59 +50,26 @@ const LeftNavigationTop = ({ className }: { className?: string }) => {
 
 	return (
 		<>
-			<BarLayout
-				className={className}
-				height={isMacDesktop ? null : "var(--top-bar-height)"}
-				padding={getPadding()}
-			>
-				<div className="top-bar-content-wrapper" style={{ paddingTop: isMacDesktop ? "1.3rem" : "0" }}>
-					{narrowMedia && (
-						<ButtonLink
-							iconCode={leftNavIsOpen ? "arrow-left-from-line" : "arrow-right-from-line"}
-							onClick={() => {
-								SidebarsIsOpenService.value = { left: !leftNavIsOpen };
-							}}
-							textSize={TextSize.L}
+			<div className="flex h-[52px] items-center gap-1 px-2.5 py-2.5" data-testid="left-navigation-top">
+				<TopBarContent forceDesktop={forceDesktop} toggleSidebar={toggleSidebar} />
+				<div className="flex items-center">
+					{(!isMobile || forceDesktop) && (
+						<TooltipIconButton
+							className="shrink-0"
+							icon="panel-left"
+							iconClassName="size-4"
+							onClick={isMobile ? onClose : () => setLeftPinned(false)}
+							size="sm"
+							tooltip={t("left-navigation.collapse")}
+							variant="ghost"
 						/>
 					)}
-					<TopBarContent currentTab={topTab} isMacDesktop={isMacDesktop} />
+					<CatalogActions currentTab={topTab} isCatalogExist={!catalogNotFound} />
 				</div>
-			</BarLayout>
-			{(isTauri || isWeb) && !catalogNotFound && (
-				<>
-					<InboxTab show={topTab === LeftNavigationTab.Inbox} />
-					<TemplateTab show={topTab === LeftNavigationTab.Template} />
-					<FragmentsTab show={topTab === LeftNavigationTab.Fragments} />
-					<AgentSkillTab show={topTab === LeftNavigationTab.AgentSkills} />
-					<PromptTab show={topTab === LeftNavigationTab.Prompt} />
-				</>
-			)}
-			{!isStaticCli && !catalogNotFound && (
-				<FavoriteArticlesTab show={topTab === LeftNavigationTab.FavoriteArticles} />
-			)}
+			</div>
+			{(isTauri || isWeb) && !catalogNotFound && <PromptTab show={topTab === LeftNavigationTab.Prompt} />}
 		</>
 	);
 };
 
-export default styled(LeftNavigationTop)`
-	.top-bar-content-wrapper {
-		width: 100%;
-		gap: inherit;
-		display: flex;
-		align-items: center;
-	}
-
-	i {
-		width: 1em !important;
-	}
-
-	${cssMedia.narrow} {
-		border-bottom: 0.5px var(--color-line) solid;
-		gap: ${PADDING};
-
-		.buttonLink {
-			margin: calc(${PADDING} / -2);
-			padding: calc(${PADDING} / 2);
-		}
-	}
-`;
+export default LeftNavigationTop;

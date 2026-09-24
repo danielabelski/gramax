@@ -16,7 +16,7 @@ const setDefaultPath: Command<{ path: Path }, void> = Command.create({
 		const workspacePath = await wm.addWorkspace(path.value, null, true, true);
 		if (!workspacePath) return this._app.wm.setDefaultPath(path);
 		await wm.setWorkspace(workspacePath);
-		applyWorkspaceServices(await wm.current().config());
+		applyWorkspaceServices(this._app.settings, wm.current());
 	},
 
 	params(_ctx, q) {

@@ -2,8 +2,7 @@ import FileInput from "@components/Atoms/FileInput/FileInput";
 import getCodeLensDefaultText from "@components/Atoms/FileInput/getCodeLenseDefaultText";
 import getFileInputDefaultLanguage from "@components/Atoms/FileInput/getFileInputDefaultLanguage";
 import SidebarArticleElement from "@components/Layouts/Sidebar";
-import StatusBarElement from "@components/Layouts/StatusBar/StatusBarElement";
-import styled from "@emotion/styled";
+import { cn } from "@core-ui/utils/cn";
 import getCodeLensReversedText from "@ext/git/actions/MergeConflictHandler/error/logic/getCodeLensReversedText";
 import reverseMergeStatus from "@ext/git/actions/MergeConflictHandler/logic/GitMergeStatusReverse";
 import haveConflictWithFileDelete from "@ext/git/actions/MergeConflictHandler/logic/haveConflictWithFileDelete";
@@ -14,6 +13,7 @@ import { GitMarkers } from "@ext/git/actions/MergeConflictHandler/Monaco/logic/m
 import GitMergeStatus from "@ext/git/actions/MergeConflictHandler/model/GitMergeStatus";
 import t from "@ext/localization/locale/translate";
 import { Button } from "@ui-kit/Button";
+import { Icon } from "@ui-kit/Icon";
 import { Loader } from "@ui-kit/Loader";
 import {
 	Sidebar,
@@ -26,6 +26,7 @@ import {
 	SidebarMenuItem,
 	SidebarProvider,
 } from "@ui-kit/Sidebar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 import type { editor } from "monaco-editor";
 import type * as monacoType from "monaco-editor/esm/vs/editor/editor.api";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -40,46 +41,6 @@ interface MergeFileModel {
 		viewState: editor.ICodeEditorViewState;
 	};
 }
-
-const IconWrapper = styled.div<{ haveConflict: boolean }>`
-	svg,
-	span {
-		color: ${({ haveConflict }) => (haveConflict ? "red" : "green")};
-	}
-
-	span {
-		font-size: 10px;
-		display: flex;
-	}
-`;
-
-const SidebarWrapper = styled.div<{ isLoading: boolean }>`
-	overflow: hidden;
-`;
-
-const SidebarWithIcon = styled.div`
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	justify-content: space-between;
-	width: 100%;
-`;
-
-const SidebarContainer = styled(SidebarProvider)`
-	height: 100%;
-	min-height: unset;
-	max-height: 100%;
-	overflow: hidden;
-
-	ul {
-		list-style: none !important;
-	}
-
-	li {
-		line-height: unset;
-		margin-bottom: unset;
-	}
-`;
 
 const makeDeleteConflictContent = (content: string): string => {
 	return `${GitMarkers.startHeader} Deleted content\n\n${GitMarkers.splitter}\n${content}\n${GitMarkers.endFooter} Added content`;
@@ -213,7 +174,7 @@ const MergeConflictHandler = ({
 	};
 
 	return (
-		<SidebarContainer>
+		<SidebarProvider className="h-full min-h-[unset] max-h-full overflow-hidden [&_li]:mb-0 [&_li]:leading-[unset] [&_ul]:!list-none">
 			<Sidebar className="h-full" collapsible="none" data-qa={`article-git-modal`}>
 				<SidebarContent className="left-sidebar">
 					<SidebarGroup>
@@ -222,17 +183,26 @@ const MergeConflictHandler = ({
 								{mergeFilesModel.map((model, idx) => {
 									const isLoading = model.conflictsCount === null;
 									const haveConflict = model.conflictsCount > 0;
-									const conflictCounterOrCheck = (
-										<IconWrapper haveConflict={haveConflict} key={model.mergeFile.path}>
-											<StatusBarElement
-												changeBackgroundOnHover={false}
-												iconCode={haveConflict ? "circle-x" : "check"}
-												iconStrokeWidth="1.6"
-												tooltipText={haveConflict ? t("git.merge.conflict.conflicts") : null}
-											>
-												{haveConflict && <span>{model.conflictsCount}</span>}
-											</StatusBarElement>
-										</IconWrapper>
+									const conflictIndicator = (
+										<span
+											className={cn(
+												"flex items-center gap-0.5",
+												haveConflict ? "text-status-error" : "text-status-success",
+											)}
+										>
+											<Icon icon={haveConflict ? "circle-x" : "check"} size="sm" />
+											{haveConflict && (
+												<span className="text-[10px]">{model.conflictsCount}</span>
+											)}
+										</span>
+									);
+									const conflictCounterOrCheck = haveConflict ? (
+										<Tooltip>
+											<TooltipTrigger asChild>{conflictIndicator}</TooltipTrigger>
+											<TooltipContent>{t("git.merge.conflict.conflicts")}</TooltipContent>
+										</Tooltip>
+									) : (
+										conflictIndicator
 									);
 									return (
 										<SidebarMenuItem key={model.mergeFile.path}>
@@ -241,13 +211,13 @@ const MergeConflictHandler = ({
 												isActive={selectedIdx === idx}
 												onClick={() => handleSidebarItemClick(idx)}
 											>
-												<SidebarWithIcon>
-													<SidebarWrapper isLoading={isLoading}>
+												<div className="flex w-full items-center justify-between gap-2">
+													<div className="overflow-hidden">
 														<SidebarArticleElement title={model.mergeFile.title} />
 														<SidebarArticleLink filePath={{ path: model.mergeFile.path }} />
-													</SidebarWrapper>
+													</div>
 													{isLoading ? null : conflictCounterOrCheck}
-												</SidebarWithIcon>
+												</div>
 											</SidebarMenuButton>
 										</SidebarMenuItem>
 									);
@@ -309,7 +279,7 @@ const MergeConflictHandler = ({
 					/>
 				</div>
 			</main>
-		</SidebarContainer>
+		</SidebarProvider>
 	);
 };
 

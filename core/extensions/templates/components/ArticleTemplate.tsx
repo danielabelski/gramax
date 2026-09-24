@@ -1,31 +1,42 @@
 import BaseArticleView from "@ext/articleProvider/components/BaseArticleView";
-import type { ProviderItemProps } from "@ext/articleProvider/models/types";
 import t from "@ext/localization/locale/translate";
-import getArticleWithTitle from "@ext/markdown/elements/article/edit/logic/getArticleWithTitle";
 import { Placeholder } from "@ext/markdown/elements/placeholder/placeholder";
+import NavigationEvents from "@ext/navigation/NavigationEvents";
 import TemplateService from "@ext/templates/components/TemplateService";
+import type { TemplateItemProps } from "@ext/templates/components/TemplatesPanel/types/constants";
+import { updateTemplateItem } from "@ext/templates/logic/updateTemplateItem";
 import type { JSONContent } from "@tiptap/core";
+import { useEffect } from "react";
 
 interface ArticleTemplateProps {
-	item: ProviderItemProps;
+	item: TemplateItemProps;
 }
 
 const ArticleTemplate = ({ item }: ArticleTemplateProps) => {
 	const { templates } = TemplateService.value;
 
+	useEffect(() => {
+		const listener = () => TemplateService.closeItem();
+		const clickToken = NavigationEvents.on("item-click", listener);
+		const createToken = NavigationEvents.on("item-create", listener);
+		const deleteToken = NavigationEvents.on("item-delete", listener);
+
+		return () => {
+			NavigationEvents.off(clickToken);
+			NavigationEvents.off(createToken);
+			NavigationEvents.off(deleteToken);
+		};
+	}, []);
+
 	const updateContent = (id: string, content: JSONContent, title: string) => {
-		const newTemplate = templates.get(id);
-		if (!newTemplate) return;
+		const template = templates.get(id);
+		if (!template) return;
 
-		if (newTemplate.title !== title) {
-			newTemplate.title = title.trim();
-		}
-
-		let newContent = { ...content };
-		newContent.content.shift();
-		newContent = getArticleWithTitle(title, newContent);
-
-		TemplateService.setItems(Array.from(templates.values()));
+		TemplateService.setItems(
+			Array.from(templates.values()).map((current) =>
+				current.id === id ? updateTemplateItem(template, content, title) : current,
+			),
+		);
 	};
 
 	const onCloseClick = () => {

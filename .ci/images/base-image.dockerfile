@@ -28,7 +28,12 @@ RUN apt-get update && \
 ARG RUNNER_HTTPS_PROXY
 
 RUN export HTTPS_PROXY=$RUNNER_HTTPS_PROXY && \
-	curl -fsSL https://bun.com/install | bash -s "bun-v1.3.13"; \
+	mkdir -p /root/.bun/bin && \
+	curl -fsSL -o /tmp/bun.zip https://github.com/oven-sh/bun/releases/download/bun-v1.3.13/bun-linux-x64-baseline.zip && \
+	unzip -q -o /tmp/bun.zip -d /tmp/bun-extract && \
+	mv /tmp/bun-extract/bun-linux-x64-baseline/bun /root/.bun/bin/bun && \
+	chmod +x /root/.bun/bin/bun && \
+	rm -rf /tmp/bun.zip /tmp/bun-extract && \
 	bun --version
 
 RUN export HTTPS_PROXY=$RUNNER_HTTPS_PROXY && \

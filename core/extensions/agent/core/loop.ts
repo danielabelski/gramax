@@ -2,6 +2,8 @@ import type { CommandTree } from "@app/commands";
 import type Application from "@app/types/Application";
 import type Context from "@core/Context/Context";
 import type { AgentLlmClient, ChatCompletionToolCall, ChatCompletionUsage } from "../llm";
+import { agentLlmConfig } from "../llm";
+import { LinkAdapter } from "../mcp/parser/adapters/linkAdapter";
 import { buildToolPreview } from "../mcp/toolPreview";
 import { agentConfig } from "./agentConfig";
 import { AgentErrorType } from "./agentError";
@@ -31,9 +33,30 @@ export async function runAgentTurn(options: {
 	const session = app.agentManager.sessions.get(sessionId);
 	const catalogName = session?.openCatalogName ?? undefined;
 
-	const tools = llmClient.mapper.toolsToLlmFormat(await toolRegistry.getTools(app, ctx, commands, sessionId));
+	const tools = llmClient.mapper.toolsToLlmFormat(toolRegistry.getTools(app));
+	const compactionTriggerTokens = (agentLlmConfig.contextWindowTokens * agentConfig.compactionTriggerPercent) / 100;
 
 	for (let step = 0; maxSteps === null || step < maxSteps; step++) {
+		const overThreshold = !!session && session.usage.contextTokensUsed >= compactionTriggerTokens;
+		if (overThreshold) {
+			await executeOneToolCall({
+				tc: {
+					id: `compact-${globalThis.crypto.randomUUID()}`,
+					type: "function",
+					function: { name: "compact_context", arguments: "{}" },
+				},
+				turnId,
+				app,
+				ctx,
+				commands,
+				sessionId,
+				llmClient,
+				push,
+				previewMax,
+				onLlmUsage,
+			});
+		}
+
 		const messages = await llmClient.mapper.eventsToMessages(app, ctx, commands, events, catalogName);
 		const streamed = await llmClient.chat.streamIteration(
 			llmClient.adapter,
@@ -59,11 +82,13 @@ export async function runAgentTurn(options: {
 		}
 
 		if (textOut || streamed.reasoning_content) {
+			const contentPreview = await LinkAdapter.toChat(textOut, app.wm).catch(() => textOut);
 			push({
 				type: "assistant_message",
 				turnId,
 				ts: Date.now(),
 				content: textOut,
+				contentPreview,
 				reasoningContent: streamed.reasoning_content ?? undefined,
 			});
 		}
@@ -77,8 +102,10 @@ export async function runAgentTurn(options: {
 					ctx,
 					commands,
 					sessionId,
+					llmClient,
 					push,
 					previewMax,
+					onLlmUsage,
 				});
 			}
 			continue;
@@ -103,14 +130,16 @@ async function executeOneToolCall(options: {
 	ctx: Context;
 	commands: CommandTree;
 	sessionId: string;
+	llmClient: AgentLlmClient;
 	push: (e: AgentEvent) => void;
 	previewMax: number;
+	onLlmUsage?: (usage: ChatCompletionUsage) => void;
 }): Promise<void> {
-	const { tc, turnId, app, ctx, commands, sessionId, push, previewMax } = options;
+	const { tc, turnId, app, ctx, commands, sessionId, llmClient, push, previewMax, onLlmUsage } = options;
 	const toolRegistry = app.agentManager.toolRegistry;
 	const name = tc.function.name;
-	let args: unknown = {};
 	const argumentsText = tc.function.arguments ?? "{}";
+	let args: unknown;
 	try {
 		args = argumentsText ? JSON.parse(argumentsText) : {};
 	} catch {
@@ -154,7 +183,7 @@ async function executeOneToolCall(options: {
 		return;
 	}
 
-	const toolResult = await toolRegistry.executeTool(name, args, app, ctx, commands, sessionId);
+	const toolResult = await toolRegistry.executeTool(name, args, app, ctx, commands, sessionId, llmClient, onLlmUsage);
 	let text: string;
 	if (toolResult.ok) {
 		text = JSON.stringify(toolResult.data ?? null, null, 2);
@@ -166,6 +195,7 @@ async function executeOneToolCall(options: {
 	const contentPreview =
 		text.length <= previewMax ? text : `${text.slice(0, previewMax)}… [truncated, ${text.length} characters total]`;
 	const shouldRefreshPage = toolResult.ok && toolResult.refreshPage === true;
+	const catalogMutated = toolResult.ok && toolResult.navChanged === true;
 
 	push({
 		type: "tool_result",
@@ -178,5 +208,20 @@ async function executeOneToolCall(options: {
 		fullLength: text.length,
 		isError: !toolResult.ok,
 		refreshPage: shouldRefreshPage,
+		catalogMutated,
 	});
+
+	if (name === "compact_context" && toolResult.ok) {
+		const data = toolResult.data as {
+			summary: string;
+			tailUserMessages: Extract<AgentEvent, { type: "user_message" }>[];
+		};
+		push({
+			type: "context_compacted",
+			turnId,
+			ts: Date.now(),
+			summary: data.summary,
+			tailUserMessages: data.tailUserMessages,
+		});
+	}
 }

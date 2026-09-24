@@ -21,7 +21,7 @@ editorTest.describe("Task List", () => {
 
 	editorTest("create via toolbar", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("lists");
-		await sharedPage.getByRole("menuitem", { name: "Task" }).click();
+		await sharedPage.locator('[data-list-type="task"]').click();
 		await editor.type("checkbox");
 		await editor.assertMarkdown("* [ ] checkbox");
 	});
@@ -89,7 +89,7 @@ editorTest.describe("Task List", () => {
 			-  (*)
 		`);
 		await editor.clickToolbar("lists");
-		await sharedPage.getByRole("menuitem", { name: "Task" }).click();
+		await sharedPage.locator('[data-list-type="task"]').click();
 		await editor.assertMarkdown(md`
 			* [ ] parsley
 

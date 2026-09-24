@@ -9,10 +9,15 @@ import UiLanguage, { ContentLanguage } from "@ext/localization/core/model/Langua
 import t from "@ext/localization/locale/translate";
 import NavigationEventsService from "@ext/navigation/NavigationEvents";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { NO_PRINT_KEY, PAGE_HEIGHT_PDF, PAGE_WIDTH_PDF } from "../const";
+import { createPortal } from "react-dom";
+import { A4_WIDTH_MM, NO_PRINT_KEY, PAGE_HEIGHT_PDF, PAGE_WIDTH_PDF } from "../const";
 import type { PdfExportProgress, PdfPrintParams } from "../types";
+import { runPrint } from "../utils/runPrint";
 import { usePaginationTask } from "./hooks/usePaginationTask";
 import PrintPages from "./PrintPages";
+
+/** One factor for both sides of the page box: it has the sheet's proportions, so fitting its width fits its height. */
+const PAGE_TO_SHEET = (A4_WIDTH_MM * 96) / 25.4 / PAGE_WIDTH_PDF;
 
 type PrintViewProps = {
 	itemPath?: string;
@@ -81,22 +86,15 @@ const PrintView = ({
 	const [showDebugPreview, setShowDebugPreview] = useState(false);
 
 	const handleDone = useCallback(async () => {
-		try {
-			onProgress?.({ stage: "printing", ratio: 1, cliMessage: "done" });
-			// The dev switch stops here: no browser dialog, and since onComplete is what tears the view down,
-			// the paginated pages stay on screen to be looked at. Closing is the button below. Read at call
-			// time, so flipping the switch takes effect on the next export without a reload.
-			if (isPrintDialogDisabled()) {
-				setShowDebugPreview(true);
-				return;
-			}
-			await new Promise<void>((resolve) => setTimeout(resolve, 50));
-			window.print();
-			onComplete?.();
-		} catch (error) {
-			onError(error);
+		onProgress?.({ stage: "printing", ratio: 1, cliMessage: "done" });
+		// The dev switch stops here: no browser dialog, and since onComplete is what tears the view down,
+		// the paginated pages stay on screen to be looked at. Closing is the button below. Read at call
+		// time, so flipping the switch takes effect on the next export without a reload.
+		if (isPrintDialogDisabled()) {
+			setShowDebugPreview(true);
 			return;
 		}
+		await runPrint({ onComplete, onError });
 	}, [onError, onComplete, onProgress]);
 
 	useEffect(() => {
@@ -126,36 +124,51 @@ const PrintView = ({
 		};
 	}, [cancel, onCancelRef]);
 
-	return (
-		<div className={`article-body ${className}${showDebugPreview ? " print-debug-preview" : ""}`}>
-			{showDebugPreview && (
-				<button
-					aria-label={t("close")}
-					className="print-debug-close"
-					onClick={() => ArticleViewService.setDefaultBottomView()}
-					type="button"
-				>
-					×
-				</button>
-			)}
-			<PrintPages
-				apiUrlCreator={apiUrlCreator}
-				catalogProps={catalogProps}
-				exportSignal={exportSignal}
-				isCategory={isCategory}
-				itemPath={itemPath}
-				onCancelPagination={cancel}
-				onProgress={onProgress}
-				onStartPagination={start}
-				params={printParams}
-			/>
-		</div>
+	// Keep the same portal throughout pagination: moving it only when ready would remount
+	// PrintPages and discard the pages the paginator appended. The article scope preserves typography.
+	return createPortal(
+		<div className="article absolute inset-x-0 top-0">
+			<div className={`article-body ${className}${showDebugPreview ? " print-debug-preview" : ""}`}>
+				{showDebugPreview && (
+					<button
+						aria-label={t("close")}
+						className="print-debug-close"
+						onClick={() => ArticleViewService.setDefaultBottomView()}
+						type="button"
+					>
+						×
+					</button>
+				)}
+				<PrintPages
+					apiUrlCreator={apiUrlCreator}
+					catalogProps={catalogProps}
+					exportSignal={exportSignal}
+					isCategory={isCategory}
+					itemPath={itemPath}
+					onCancelPagination={cancel}
+					onProgress={onProgress}
+					onStartPagination={start}
+					params={printParams}
+				/>
+			</div>
+		</div>,
+		document.body,
 	);
 };
 
 export default styled(PrintView)`
 	overflow: auto;
-	visibility: visible;
+	/* The copy the paginator measures is a second, full-size rendering of the catalog, and it lives in the
+	   document beside the app the reader is still looking at -- portalled onto body and positioned, so it
+	   paints through everything the export dialog's 20%-alpha overlay lets through. For the length of an
+	   export they watched their own catalog being dealt out page by page behind the dialog.
+
+	   Hidden rather than moved off-screen or made transparent: the paginator measures what it sees, and this
+	   is the one way to stop the painting that leaves the layout untouched -- offsetHeight, getComputedStyle
+	   and getBoundingClientRect, which is everything NodeDimensions reads, answer exactly as before, while
+	   display: none would leave nothing to measure at all. Print media turns it back on, and so does the
+	   debug preview, which is scaffolding meant to be looked at. */
+	visibility: hidden;
 	height: auto !important;
 
 	&,
@@ -166,7 +179,7 @@ export default styled(PrintView)`
 	/* Scoped to direct children on purpose. A page box is always one: PrintPages renders .render-body > .page
 	   for measuring, and the paginator appends .page to .print-body. Written as a bare .page this also caught
 	   any .page inside the article content -- @gramax/openapi-viewer names its own document container
-	   <main class="page">, and it was being forced to 900x1350 with a page's padding, so an OpenAPI block
+	   <main class="page">, and it was being forced to the page box's size and padding, so an OpenAPI block
 	   reserved a full sheet of empty space no matter how short it was, and the export ended on a blank page. */
 	& :is(.render-body, .print-body) > .page {
 		margin: 0;
@@ -179,6 +192,9 @@ export default styled(PrintView)`
 		height: ${PAGE_HEIGHT_PDF}px;
 		padding-top: ${isSafari() ? "90px" : "2rem"} !important;
 		padding-bottom: ${isSafari() ? "90px" : "2rem"} !important;
+		/* The side margins of the sheet: the box is scaled to the paper's full width, and without them the text
+		   and the page number are printed against its edges. */
+		padding-inline: 2rem;
 		display: flex;
 		flex-direction: column;
 
@@ -200,7 +216,11 @@ export default styled(PrintView)`
 				}
 			}
 
-			h1 {
+			/* "A new article starts a new page", written as the article title itself. ArticlePrintPreview
+			   renders that title as a direct child of .page-content; every other h1 on a page -- one from
+			   an OpenAPI description, which is rendered by markdown-it and keeps its level where article
+			   Markdown would have been demoted to h2 -- sits deeper and is content, not a new article. */
+			& > h1 {
 				break-before: page;
 			}
 		}
@@ -301,23 +321,15 @@ export default styled(PrintView)`
 		}
 	}
 
-	/* Under NO_PRINT the paginated pages stay on screen instead of going to the printer -- which means
-	   everything the print stylesheet would have done has to be done here, because @media print never runs.
-
-	   Fixed positioning does all of it at once. In the flow this element is a flex item of the article
-	   column, and the article above has already claimed the full height: the box collapses to zero and its
-	   own overflow clips all 1350px of every page out of sight. That is the "nothing happens" a reader
-	   reports -- and it is invisible to a query, because the pages inside still report honest geometry.
-	   Taking the element out of the flow also lets it paint over the two things printing removes rather
-	   than reflows: the export dialog's full-screen overlay, which paper drops via its print:hidden, and
-	   the article itself. Covering the viewport opaquely settles all three.
-
-	   No backticks in this comment: it lives inside a template literal, and one would end it. */
+	/* NO_PRINT keeps the pages on screen, where print media rules do not apply. The body portal escapes
+	   article containment; fixed positioning covers the viewport above the article, panels and dialog. */
 	&.print-debug-preview {
 		position: fixed;
 		inset: 0;
-		/* Above the dialog overlay's z-50; the close button sits above this in turn. */
-		z-index: 60;
+		z-index: var(--z-index-article-modal);
+		/* The one state in which this copy is meant to be seen on screen, and so the one that takes back the
+		   visibility the export hides it with. */
+		visibility: visible;
 		overflow: auto;
 		background: var(--color-article-bg);
 
@@ -329,7 +341,7 @@ export default styled(PrintView)`
 			position: fixed;
 			top: 1rem;
 			right: 1rem;
-			z-index: 100;
+			z-index: 49;
 			width: 2rem;
 			height: 2rem;
 			font-size: 1.25rem;
@@ -348,6 +360,13 @@ export default styled(PrintView)`
 		height: auto !important;
 		overflow: visible !important;
 
+		/* The 900px minimum is for pagination on screen. Pages already fit A4 via zoom below;
+		   keeping this minimum on paper makes the browser shrink the entire document again. */
+		&,
+		.print-body {
+			min-width: 0 !important;
+		}
+
 		/* The debug preview is scaffolding for the screen. On paper it must leave no trace, so that pressing
 		   Cmd+P on it -- or emulating print media in a test -- shows the real output and not the scaffolding. */
 		&.print-debug-preview {
@@ -364,17 +383,28 @@ export default styled(PrintView)`
 			break-before: unset !important;
 		}
 
+		/* Named, so the sheet is not whatever the print dialog happened to default to.
+
+		   Not for the CLI: its exporter passes format "A4" as well as preferCSSPageSize, and the format wins
+		   when the stylesheet names nothing -- measured without this line, 596x843, one sheet per page box. It
+		   is for the reader who prints from the browser, where the paper is the dialog's default: the page box
+		   is shaped and scaled for A4, and on shorter paper the strip carrying the page number falls off the
+		   bottom of every sheet. Asking for the CSS page size and getting nothing was measured too:
+		   612x792, nine sheets for eight boxes. */
 		@page {
+			size: A4;
 			margin: 0;
 			padding: 0;
 		}
 
 		& :is(.render-body, .print-body) > .page {
 			border: none;
+			/* Pagination lays the box out at 900px; on paper it takes the whole sheet, one box to one sheet. */
+			zoom: ${PAGE_TO_SHEET};
+		}
 
-			.page-bottom {
-				margin-top: -36px;
-			}
+		& :is(.render-body, .print-body) > .page:not(:last-child) {
+			break-after: page;
 		}
 
 		.render-body {

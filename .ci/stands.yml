@@ -1,0 +1,102 @@
+# .ci/stands.yml — MR-стенды Gramax Web.
+# Подключить в .gitlab-ci.yml:  include: { local: .ci/stands.yml }
+#
+# Что делает: собирает apps/web, кладёт dist в S3 по префиксу
+# public/gramax-stands/mr-<IID>/ и отдаёт ревьюеру ссылку
+# https://mr-<IID>-app.gram.ax/ . Никаких подов и бэкенда.
+#
+# Инфраструктура (Angie, DNS, S3-политика) поднята на стороне DevOps,
+# от репозитория нужны только две CI-переменные:
+#   S3_STANDS_ACCESS_KEY / S3_STANDS_SECRET_KEY (masked, не protected)
+# Это ОТДЕЛЬНЫЙ ключ: писать он умеет только в gramax-stands/, к public/gramax/
+# (продовые десктоп-сборки) доступа не имеет. Не заменять на S3_ACCESS_KEY.
+
+.gramax-stand-s3: &gramax-stand-s3
+  - |
+    # В playwright-образе mc нет. Тянем через прокси раннера; если DevOps
+    # зеркалит mc в бакет bin/ (как vector), источник станет локальным.
+    if ! command -v mc >/dev/null 2>&1; then
+      HTTPS_PROXY=$RUNNER_HTTPS_PROXY curl -fsSL https://dl.min.io/aistor/mc/release/linux-amd64/mc -o /usr/local/bin/mc
+      chmod +x /usr/local/bin/mc
+    fi
+    mc alias set s3 "$S3_HOST" "$S3_STANDS_ACCESS_KEY" "$S3_STANDS_SECRET_KEY"
+
+deploy-web-stand-mr:
+  stage: build
+  interruptible: true
+  # Стадия build идёт после test, а e2e тут занимают десятки минут.
+  # Смысл preview-стенда в том, чтобы ссылка была у ревьюера сразу,
+  # поэтому не ждём тесты. Побочный эффект осознанный: стенд соберётся
+  # и на красных тестах — как раз тогда в него и хочется заглянуть.
+  needs: []
+  image: gitlab.ics-it.ru:4567/ics/doc-reader/playwright:$USE_IMAGE_TAG
+  tags:
+    # Не -5ghz: те ноды держат e2e, очередь длинная — джоба простояла
+    # 10 минут и не получила раннер. Здесь обычная сборка фронтенда.
+    - kubernetes01-gramax
+  rules:
+    # Форк-MR исключён намеренно: CI-переменные в пайплайн форка не передаются,
+    # джоба всё равно упадёт на mc alias set.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $DRAFT_MR == "true"
+      when: manual
+      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID
+  variables:
+    STAND_NAME: mr-$CI_MERGE_REQUEST_IID
+    PRODUCTION: 'false'
+    KUBERNETES_MEMORY_REQUEST: '4Gi'
+    KUBERNETES_CPU_REQUEST: '1'
+    KUBERNETES_CPU_LIMIT: '2'
+  environment:
+    name: review/mr-$CI_MERGE_REQUEST_IID
+    url: https://mr-$CI_MERGE_REQUEST_IID-app.gram.ax
+    on_stop: stop-web-stand-mr
+    auto_stop_in: 30 days
+  before_script:
+    - !reference [.template.github-ssh-key, before_script]
+    - HTTPS_PROXY=$RUNNER_HTTPS_PROXY ./install-deps.sh --ci
+  script:
+    - bun run --cwd apps/web build
+
+    # index.html жёстко тянет /env.js, который в проде генерит рантайм-сервер
+    # spa. В статике его нет — генерим тем же генератором, что и spa, чтобы
+    # список переменных не разъезжался. Скрипт печатает результат в stderr.
+    # SHARE_ACCESS_TOKEN гасим намеренно. В проде env.js генерит рантайм
+    # spa из переменных пода, и там этот токен null. Здесь генератор берёт
+    # окружение CI-джобы, где переменная проекта есть, — и токен уезжает в
+    # файл, который лежит в публичном бакете и отдаётся без авторизации.
+    # Проверено на живом стенде mr-3805: токен был виден снаружи.
+    - env -u SHARE_ACCESS_TOKEN bun crates/spa/static_env_gen.js 2> apps/web/dist/env.js
+    #
+    # Ревьюеру: GIT_PROXY_SERVICE_URL и DIAGRAM_RENDERER_SERVICE_URL на
+    # стенде получаются null, в проде заданы (приезжают из манифеста k8s,
+    # не из CI). Если стенду они нужны — задать здесь явно, но учесть, что
+    # это другой origin, а на стенде COEP: require-corp.
+    - head -3 apps/web/dist/env.js
+
+    - *gramax-stand-s3
+    # --remove, чтобы удалённые в MR файлы не оставались от прошлой сборки.
+    - mc mirror --overwrite --remove apps/web/dist "s3/public/gramax-stands/$STAND_NAME/"
+    - echo "стенд https://$STAND_NAME-app.gram.ax/"
+
+stop-web-stand-mr:
+  stage: build
+  needs: []
+  image: gitlab.ics-it.ru:4567/ics/doc-reader/playwright:$USE_IMAGE_TAG
+  tags:
+    # Не -5ghz: те ноды держат e2e, очередь длинная — джоба простояла
+    # 10 минут и не получила раннер. Здесь обычная сборка фронтенда.
+    - kubernetes01-gramax
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID
+      when: manual
+      allow_failure: true
+  variables:
+    STAND_NAME: mr-$CI_MERGE_REQUEST_IID
+    GIT_STRATEGY: none
+  environment:
+    name: review/mr-$CI_MERGE_REQUEST_IID
+    action: stop
+  script:
+    - *gramax-stand-s3
+    - mc rm --recursive --force "s3/public/gramax-stands/$STAND_NAME/"

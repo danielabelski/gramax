@@ -1,4 +1,4 @@
-ARG CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX=docker.io
+ARG NEXUS_DOCKERHUB=docker.io
 ARG USE_IMAGE_TAG="latest-dev"
 
 FROM --platform=$BUILDPLATFORM gitlab.ics-it.ru:4567/ics/doc-reader/base-image:${USE_IMAGE_TAG:-latest-dev} AS deps
@@ -24,14 +24,19 @@ RUN n install 23
 
 COPY . .
 
-RUN ./install-deps.sh --ci --node && \
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
+
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
+  --mount=type=secret,id=github-token \
+  if [ -s /run/secrets/github-token ]; then git config --global credential."https://github.com".helper '!f() { echo username=x-access-token; echo "password=$(cat /run/secrets/github-token)"; }; f'; fi && \
+  ./install-deps.sh --ci --node && \
   npm rebuild better-sqlite3 --build-from-source && \
   node -e "const Database = require('better-sqlite3'); const db = new Database(':memory:'); db.close();" && \
   node ./scripts/generateVersion.mjs && \
   npm --prefix apps/next run build && \
-  rm -fr .npm ./target ./apps/next/.next/cache ./.git
+  rm -fr .npm ./target ./apps/next/.next/cache ./.git ~/.gitconfig
 
-FROM --platform=$TARGETPLATFORM ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/node:23-bookworm-slim AS run
+FROM --platform=$TARGETPLATFORM ${NEXUS_DOCKERHUB}/node:23-bookworm-slim AS run
 
 WORKDIR /app
 

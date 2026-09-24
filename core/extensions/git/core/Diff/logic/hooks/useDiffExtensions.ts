@@ -27,7 +27,7 @@ export const useDiffExtensions = ({
 	oldContent,
 	newContent,
 	type,
-	isPin,
+	isLeftPinned,
 	oldScope,
 	newScope,
 	articlePath,
@@ -61,7 +61,7 @@ export const useDiffExtensions = ({
 	const diffExtensions = useMemo(() => {
 		const baseline = isOldEditor ? newContent : oldContent;
 		return [
-			OldDiffExtension.configure({ ...diffProps, isPin, oldScope, newScope, articlePath, isOldEditor }),
+			OldDiffExtension.configure({ ...diffProps, isLeftPinned, oldScope, newScope, articlePath, isOldEditor }),
 			newDiffsEnabled
 				? DiffExtension.configure({
 						baseline,
@@ -74,7 +74,7 @@ export const useDiffExtensions = ({
 					})
 				: undefined,
 		].filter(Boolean);
-	}, [isOldEditor, isPin, oldScope, newScope, articlePath, newDiffsEnabled]);
+	}, [isOldEditor, isLeftPinned, oldScope, newScope, articlePath, newDiffsEnabled]);
 
 	const updateSettings = useCallback(
 		(settings: Partial<DiffOptions>) => {

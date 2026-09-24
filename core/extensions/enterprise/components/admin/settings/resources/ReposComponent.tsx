@@ -77,6 +77,7 @@ const ReposComponent = () => {
 					onClose={card.bulk.close}
 					open={card.bulk.isOpen}
 					repos={card.bulk.data}
+					showEnterpriseElements={true}
 				/>
 			)}
 
@@ -88,6 +89,7 @@ const ReposComponent = () => {
 				open={card.single.isOpen}
 				repo={card.single.data}
 				repoCandidates={data.candidates}
+				showEnterpriseElements={true}
 			/>
 
 			<DeleteConfirmationDialog

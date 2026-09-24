@@ -6,6 +6,7 @@ import t from "@ext/localization/locale/translate";
 import assert from "assert";
 import type { ISectionOptions } from "docx";
 import type JSZip from "jszip";
+import { NUMBERING_PLACEHOLDER_REGEX, NUMBERING_TEMPLATE_STYLE_LINKS } from "./lists/numberingReferences";
 import { fitIndentedContentWidth } from "./templateProcessing/contentScaler";
 import { applyTemplateListIndents } from "./templateProcessing/listIndentApplier";
 import { normalizeStyleMapping, readTemplateStyles } from "./templateProcessing/stylesReader";
@@ -194,7 +195,7 @@ class TemplateProcessor {
 		const numIdNodes = Array.from(doc.getElementsByTagName("w:numId"));
 		for (const node of numIdNodes as any[]) {
 			const val = node.getAttribute("w:val");
-			if (val && /\{(?:bulletList|orderedList|taskList)-\d+\}/.test(val)) {
+			if (val && NUMBERING_PLACEHOLDER_REGEX.test(val)) {
 				placeholders.add(val);
 			}
 		}
@@ -213,12 +214,6 @@ class TemplateProcessor {
 	} {
 		const { placeholders, templateAbstractNums, startAbstractId, startNumId } = params;
 
-		const typeToStyleLink: Record<string, string> = {
-			orderedList: "OrderedList",
-			bulletList: "BulletList",
-			taskList: "TaskList",
-		};
-
 		const placeholderToNewId = new Map<string, string>();
 		let newAbstractNumElements = "";
 		let newNumElements = "";
@@ -226,11 +221,10 @@ class TemplateProcessor {
 		let currentNumId = startNumId;
 
 		for (const placeholder of placeholders) {
-			const typeMatch = placeholder.match(/\{(bulletList|orderedList|taskList)-/);
+			const typeMatch = placeholder.match(NUMBERING_PLACEHOLDER_REGEX);
 			if (!typeMatch) continue;
 
-			const listType = typeMatch[1];
-			const styleName = typeToStyleLink[listType];
+			const styleName = NUMBERING_TEMPLATE_STYLE_LINKS[typeMatch[1]];
 			const templateXml = templateAbstractNums.get(styleName);
 
 			assert.ok(

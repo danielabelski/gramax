@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: legacy Git error payloads are intentionally untyped */
 import type GitErrorProps from "@ext/git/core/GitCommands/errors/model/GitErrorProps";
 import DefaultError from "../../../../errorHandlers/logic/DefaultError";
 import ErrorType from "../../../../errorHandlers/model/ErrorTypes";
@@ -8,7 +9,7 @@ import type GitErrorContextProps from "./model/GitErrorContextProps";
 
 export default class GitError extends DefaultError {
 	private _caller: Caller;
-	protected declare _props: GitErrorProps;
+	declare protected _props: GitErrorProps;
 	constructor(
 		private _errorCode: GitErrorCode,
 		private _defaultError: any,

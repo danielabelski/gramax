@@ -38,6 +38,7 @@ interface PlusMenuProps {
 	className?: string;
 	tableSheet?: TableNodeSheet;
 	dataQa?: string;
+	onOpenChange?: (open: boolean) => void;
 }
 
 export const TriggerParent = ({ className, ...props }: HTMLAttributes<HTMLDivElement>) => (
@@ -62,7 +63,7 @@ const TableHeaderCheckbox = ({ headerType, node, setHeader, label }: TableHeader
 
 const PlusMenu = (props: PlusMenuProps) => {
 	const openRef = useRef(false);
-	const { vertical, className, index, pos, node, editor, tableSheet, dataQa } = props;
+	const { vertical, className, index, pos, node, editor, tableSheet, dataQa, onOpenChange: reportOpen } = props;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	const cell = useMemo(() => {
@@ -178,6 +179,7 @@ const PlusMenu = (props: PlusMenuProps) => {
 
 	const onOpenChange = (open: boolean) => {
 		openRef.current = open;
+		reportOpen?.(open);
 		if (open) onOpen();
 		else onClose();
 	};

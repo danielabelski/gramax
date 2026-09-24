@@ -36,9 +36,21 @@ export const SignOut = () => {
 		</>
 	);
 };
+
+export const OpenSettings = () => {
+	return (
+		<>
+			<Icon code="settings" />
+			{t("app-settings.title")}
+		</>
+	);
+};
+
 interface UserAvatarProps {
 	logoutComponent: React.ReactNode;
 	onLogoutClick?: () => void;
+	settingsComponent?: React.ReactNode;
+	onSettingsClick?: () => void;
 }
 
 const getCode = (user: UserInfo): string => {
@@ -48,8 +60,8 @@ const getCode = (user: UserInfo): string => {
 	return code.toUpperCase();
 };
 
-export const UserAvatar = ({ logoutComponent, onLogoutClick }: UserAvatarProps) => {
-	const userInfo = PageDataContextService.value?.userInfo;
+export const UserAvatar = ({ logoutComponent, onLogoutClick, settingsComponent, onSettingsClick }: UserAvatarProps) => {
+	const userInfo = PageDataContextService.value?.user?.info;
 	const code = getCode(userInfo);
 
 	return (
@@ -71,6 +83,9 @@ export const UserAvatar = ({ logoutComponent, onLogoutClick }: UserAvatarProps) 
 						</AvatarLabel>
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
+					{settingsComponent && (
+						<DropdownMenuItem onSelect={onSettingsClick}>{settingsComponent}</DropdownMenuItem>
+					)}
 					<DropdownMenuItem onSelect={onLogoutClick}>{logoutComponent}</DropdownMenuItem>
 				</DropdownMenuGroup>
 			</DropdownMenuContent>

@@ -5,7 +5,7 @@ editorTest.describe("Tabs", () => {
 	editorTest("create tabs", async ({ editor, sharedPage }) => {
 		await editorTest.step("create first tab", async () => {
 			await editor.clickToolbar("semiBlocks");
-			await sharedPage.getByRole("menuitem", { name: "Tab" }).click();
+			await sharedPage.getByRole("menuitemradio", { name: "Tab" }).click();
 			await editor.type("first");
 			await editor.assertMarkdown(
 				md`
@@ -72,7 +72,7 @@ editorTest.describe("Tabs", () => {
 
 	editorTest("delete tabs", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "Tab" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "Tab" }).click();
 		await sharedPage.locator('[data-qa="qa-delete-tabs"]').click();
 		await editor.assertMarkdown("");
 	});

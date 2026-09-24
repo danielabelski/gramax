@@ -22,11 +22,12 @@ export interface UseAccessDraftArgs<T extends RoleAccessRow> {
 	rowsMap: Map<string, T>;
 	setRowsMap: Dispatch<SetStateAction<Map<string, T>>>;
 	roleRules: RoleRules;
+	getRoleRules?: (row: T) => RoleRules;
 	getId: (row: T) => string;
 }
 
 export const useAccessDraft = <T extends RoleAccessRow>(args: UseAccessDraftArgs<T>) => {
-	const { repoId, roleRules, rowsMap, setRowsMap, getId } = args;
+	const { repoId, roleRules, getRoleRules, rowsMap, setRowsMap, getId } = args;
 	const { searchBranches } = useSettings();
 	const [branchErrors, setBranchErrors] = useState<Map<string, string>>(new Map());
 
@@ -102,7 +103,7 @@ export const useAccessDraft = <T extends RoleAccessRow>(args: UseAccessDraftArgs
 	const columns = useMemo(
 		() => [
 			roleColumn<T>({
-				getRules: () => roleRules,
+				getRules: (row) => getRoleRules?.(row) ?? roleRules,
 				getValue: (row) => row.role,
 				onChange: (row, role) => setRole([getId(row)], role),
 			}),
@@ -114,7 +115,7 @@ export const useAccessDraft = <T extends RoleAccessRow>(args: UseAccessDraftArgs
 				getError: (row) => branchErrors?.get(getId(row)),
 			}),
 		],
-		[roleRules, setRole, setBranches, searchBranches, branchErrors, getId, repoId],
+		[roleRules, getRoleRules, setRole, setBranches, searchBranches, branchErrors, getId, repoId],
 	);
 
 	const validate = useCallback(() => {

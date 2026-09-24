@@ -1,17 +1,11 @@
 import { cn } from "@core-ui/utils/cn";
 // biome-ignore lint/style/noRestrictedImports: tailwind migration is out of scope
 import styled from "@emotion/styled";
+import type { ReactNode } from "react";
 
-const CatalogLayout = styled(
-	({ catalogNav, article, className }: { catalogNav: JSX.Element; article: JSX.Element; className?: string }) => {
-		return (
-			<div className={cn("catalog-layout", className)}>
-				{catalogNav}
-				{article}
-			</div>
-		);
-	},
-)`
+const CatalogLayout = styled(({ children, className }: { children: ReactNode; className?: string }) => {
+	return <div className={cn("catalog-layout", className)}>{children}</div>;
+})`
 	width: 100%;
 	height: 100%;
 	display: flex;

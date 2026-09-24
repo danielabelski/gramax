@@ -1,6 +1,7 @@
 import isNavigatorAvailable from "@core-ui/isNavigatorAvailable";
 import { tryCopyToClipboard } from "@core-ui/utils/clipboard";
 import { cn } from "@core-ui/utils/cn";
+import { isTouchClick, keepTooltipOpen } from "@core-ui/utils/copyTooltip";
 import t from "@ext/localization/locale/translate";
 import { IconButton } from "@ui-kit/Button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
@@ -18,31 +19,34 @@ export const CopyAnswerButton = ({ text }: CopyAnswerButtonProps) => {
 		(event: MouseEvent<HTMLButtonElement>) => {
 			if (!copyAllowed) return;
 			event.preventDefault();
-			tryCopyToClipboard(text, { showPopover: false }).then((copied) => setIsCopied(copied));
+			// On touch there is no tooltip to switch to "copied", so confirm with a popover.
+			tryCopyToClipboard(text, { showPopover: isTouchClick(event) }).then((copied) => setIsCopied(copied));
 		},
 		[text, copyAllowed],
 	);
 
-	const onOpenChange = useCallback((open: boolean) => {
-		if (!open) return;
-		setIsCopied(false);
-	}, []);
+	// The tooltip opens after a hover delay, so a quick click lands before it is shown.
+	// Resetting on the way in instead of on open keeps that click's "copied" visible. Focus counts as
+	// a way in too: without it a keyboard user who tabs back reads a stale "copied".
+	const resetCopied = useCallback(() => setIsCopied(false), []);
 
 	return (
-		<div className="-ml-1 flex">
-			<Tooltip delayDuration={0} onOpenChange={onOpenChange}>
+		<div className="flex">
+			<Tooltip>
 				<TooltipTrigger asChild>
 					<IconButton
 						className={cn(
-							"p-1 opacity-60 transition-all duration-150",
+							"opacity-60 transition-all duration-150",
 							"hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
 							isCopied && "opacity-100",
 						)}
 						icon={isCopied ? "Check" : "Copy"}
-						iconClassName="size-4"
 						onClick={onClickHandler}
+						onFocus={resetCopied}
+						onPointerDown={keepTooltipOpen}
+						onPointerEnter={resetCopied}
 						size="xs"
-						variant="text"
+						variant="ghost"
 					/>
 				</TooltipTrigger>
 				<TooltipContent>{isCopied ? t("copied") : t("click-to-copy")}</TooltipContent>

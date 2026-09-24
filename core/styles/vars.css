@@ -24,7 +24,7 @@
 	--top-bar-height: 48px;
 	--scroll-width: 7px;
 	--big-icon-size: 20px;
-	--left-nav-width: 20rem;
+	--left-nav-width: 293px;
 	--narrow-nav-width: 260px;
 	--distance-i-span: 0.5em;
 	--distance-i-span-min: 0.35em;
@@ -81,13 +81,14 @@
 	--z-index-foreground: 1;
 	--z-index-selected-cell: 2;
 	--z-index-card-overflow: 10;
-	--z-index-toolbar: 48;
-	--z-index-nav-layout: 49;
+	--z-index-toolbar: 47;
+	--z-index-nav-layout: 48;
+	--z-index-floating-panel: 49;
 	--z-index-overlay: 50;
-	--z-index-top-menu: 50;
+	--z-index-top-menu: 5;
 	--z-index-ui-kit-modal: 50;
-	--z-index-top-menu-dragable-area: 50;
-	--z-index-header-navigation: 50;
+	--z-index-top-menu-dragable-area: 46;
+	--z-index-header-navigation: 48;
 	--z-index-forward-backward: 51;
 	--z-index-base: 100;
 	--z-index-popover: 150;

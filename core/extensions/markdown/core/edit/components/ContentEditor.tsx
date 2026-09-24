@@ -1,7 +1,6 @@
 import type { ClientArticleProps } from "@core/SitePresenter/SitePresenter";
 import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/ButtonStateService";
-import ResourceService from "@core-ui/ContextServices/ResourceService/ResourceService";
 import useWatch from "@core-ui/hooks/useWatch";
 import { useCatalogPropsStore } from "@core-ui/stores/CatalogPropsStore/CatalogPropsStore.provider";
 import {
@@ -9,6 +8,7 @@ import {
 	bindEditor,
 	type EditorContext as EditorContextType,
 	type EditorPasteHandler,
+	getEditorStore,
 	setEditorStore,
 } from "@core-ui/stores/EditorStore";
 import { updateEditorExtensions } from "@ext/git/core/Diff/components/store/EditorExtensionsStore";
@@ -26,7 +26,9 @@ import CopyArticles from "@ext/markdown/elements/copyArticles/copyArticles";
 import { InlineLinkMenu } from "@ext/markdown/elements/link/edit/components/LinkMenu/InlineLinkMenu";
 import Placeholder from "@ext/markdown/elements/placeholder/placeholder";
 import { useIsStorageConnected } from "@ext/storage/logic/utils/useStorage";
+import type { Range } from "@tiptap/core";
 import Document from "@tiptap/extension-document";
+import type { Mark, Node } from "@tiptap/pm/model";
 import { EditorContent, EditorContext, type Extensions, type JSONContent, useEditor } from "@tiptap/react";
 import { type RefObject, useEffect, useMemo, useRef } from "react";
 import { highlightFragmentInEditorByUrl } from "../../../../../components/Article/SearchHandler/ArticleSearchFragmentHander";
@@ -36,9 +38,13 @@ import OnDeleteMark from "../../../elements/onDocChange/OnDeleteMark";
 import OnDeleteNode from "../../../elements/onDocChange/OnDeleteNode";
 import useEditorContext from "../../../elementsUtils/editorContext/useEditorContext";
 import { useGetEditorProps } from "../logic/useGetEditorProps";
+import useSyncEditorDocument from "../logic/useSyncEditorDocument";
+import EditorDestroyGuard from "./EditorDestroyGuard";
+import ProseMirrorMountGuard from "./ProseMirrorMountGuard";
 export const ContentEditorId = "ContentEditorId";
 
 interface ContentEditorProps {
+	articleId: string;
 	content: string;
 	extensions: Extensions;
 	handlePaste: EditorPasteHandler;
@@ -49,10 +55,18 @@ interface ContentEditorProps {
 }
 
 const ContentEditor = (props: ContentEditorProps) => {
-	const { content, extensions, onTitleLoseFocus, onUpdate, handlePaste, articlePropsRef, apiUrlCreatorRef } = props;
+	const {
+		articleId,
+		content,
+		extensions,
+		onTitleLoseFocus,
+		onUpdate,
+		handlePaste,
+		articlePropsRef,
+		apiUrlCreatorRef,
+	} = props;
 
 	const catalogProps = useCatalogPropsStore((state) => state.data);
-	const resourceService = ResourceService.value;
 	const pageDataContext = PageDataContextService.value;
 	const isStorageConnected = useIsStorageConnected();
 
@@ -64,6 +78,27 @@ const ContentEditor = (props: ContentEditorProps) => {
 		onMarkDeleted: onMarkDeletedComment,
 		onCommentSaved,
 	} = useCommentCallbacks(articlePropsRef);
+	const callbacksRef = useRef({
+		handlePaste,
+		onAddMarks,
+		onDeleteMarks,
+		onDeleteNodes,
+		onMarkAddedComment,
+		onMarkDeletedComment,
+		onTitleLoseFocus,
+		onUpdate,
+	});
+	callbacksRef.current = {
+		handlePaste,
+		onAddMarks,
+		onDeleteMarks,
+		onDeleteNodes,
+		onMarkAddedComment,
+		onMarkDeletedComment,
+		onTitleLoseFocus,
+		onUpdate,
+	};
+	catalogPropsRef.current = catalogProps;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
 	const ext = useMemo(
@@ -72,31 +107,22 @@ const ContentEditor = (props: ContentEditorProps) => {
 			Placeholder,
 			Document.extend({ content: `paragraph ${ElementGroups.block}+` }),
 			Controllers.configure({ editable: articlePropsRef.current?.template?.length > 0 }),
-			OnDeleteNode.configure({ onDeleteNodes }),
-			OnAddMark.configure({ onAddMarks }),
+			OnDeleteNode.configure({ onDeleteNodes: (nodes: Node[]) => callbacksRef.current.onDeleteNodes(nodes) }),
+			OnAddMark.configure({ onAddMarks: () => callbacksRef.current.onAddMarks() }),
 			Comment.configure({
 				enabled: isStorageConnected,
-				onMarkAdded: onMarkAddedComment,
-				onMarkDeleted: onMarkDeletedComment,
+				onMarkAdded: (id: string) => callbacksRef.current.onMarkAddedComment(id),
+				onMarkDeleted: (id: string, positions: Range[]) =>
+					callbacksRef.current.onMarkDeletedComment(id, positions),
 			}),
-			CopyArticles.configure({ resourceService }),
-			OnDeleteMark.configure({ onDeleteMarks }),
+			CopyArticles,
+			OnDeleteMark.configure({ onDeleteMarks: (marks: Mark[]) => callbacksRef.current.onDeleteMarks(marks) }),
 			ArticleTitleHelpers.configure({
 				onTitleLoseFocus: ({ newTitle, articleProps, apiUrlCreator }) =>
-					onTitleLoseFocus({ newTitle, apiUrlCreator, articleProps }),
+					callbacksRef.current.onTitleLoseFocus({ newTitle, apiUrlCreator, articleProps }),
 			}),
 		],
-		[
-			extensions,
-			onTitleLoseFocus,
-			onDeleteNodes,
-			onAddMarks,
-			onDeleteMarks,
-			resourceService,
-			onMarkAddedComment,
-			onMarkDeletedComment,
-			isStorageConnected,
-		],
+		[extensions, isStorageConnected],
 	);
 
 	const extensionsList = ext;
@@ -117,7 +143,7 @@ const ContentEditor = (props: ContentEditorProps) => {
 			editorProps: {
 				...editorProps,
 				handlePaste: (view, event, slice) =>
-					handlePaste(
+					callbacksRef.current.handlePaste(
 						view,
 						event,
 						slice,
@@ -127,10 +153,14 @@ const ContentEditor = (props: ContentEditorProps) => {
 					),
 			},
 			onUpdate: ({ editor }) =>
-				onUpdate({ editor, apiUrlCreator: apiUrlCreatorRef.current, articleProps: articlePropsRef.current }),
+				callbacksRef.current.onUpdate({
+					editor,
+					apiUrlCreator: apiUrlCreatorRef.current,
+					articleProps: articlePropsRef.current,
+				}),
 			editable: true,
 		},
-		[content, extensions],
+		[extensionsList],
 	);
 
 	useWatch(() => {
@@ -148,6 +178,7 @@ const ContentEditor = (props: ContentEditorProps) => {
 	}, [articlePropsRef.current?.template, editor]);
 
 	useEditorContext(editor);
+	useSyncEditorDocument(editor, articleId, content, extensionsList);
 
 	useEffect(() => {
 		if (!editor || editor.isDestroyed || !editor.isEditable) return;
@@ -158,6 +189,12 @@ const ContentEditor = (props: ContentEditorProps) => {
 			if (typeof window !== "undefined" && window.debug) window.debug.editor = editor;
 			editor.on("create", () => highlightFragmentInEditorByUrl());
 		}
+
+		// The store is global and outlives this component: without this the last editor stays
+		// there after unmount, destroyed, and every getEditorStore().editor consumer gets it.
+		return () => {
+			if (getEditorStore().editor === editor) setEditorStore({ editor: null });
+		};
 	}, [editor]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
@@ -172,16 +209,24 @@ const ContentEditor = (props: ContentEditorProps) => {
 	return (
 		<EditorContext.Provider value={{ editor }}>
 			<ButtonStateService.Provider editor={editor}>
-				<CommentEditorProvider editor={editor} onCommentSaved={onCommentSaved}>
+				<CommentEditorProvider
+					articlePropsRef={articlePropsRef}
+					editor={editor}
+					onCommentSaved={onCommentSaved}
+				>
 					<div>
 						<InlineLinkMenu editor={editor} />
 						<InlineToolbar editor={editor} shouldShow={shouldShow} />
-						<EditorContent
-							data-iseditable={true}
-							data-qa="article-editor"
-							data-testid="article-editor"
-							editor={editor}
-						/>
+						<EditorDestroyGuard editor={editor}>
+							<ProseMirrorMountGuard editor={editor}>
+								<EditorContent
+									data-iseditable={true}
+									data-qa="article-editor"
+									data-testid="article-editor"
+									editor={editor}
+								/>
+							</ProseMirrorMountGuard>
+						</EditorDestroyGuard>
 					</div>
 				</CommentEditorProvider>
 				<ArticleMat editor={editor} />

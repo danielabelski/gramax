@@ -1,5 +1,6 @@
 import { TooltipIconButton } from "@components/Atoms/TooltipIconButton";
-import styled from "@emotion/styled";
+import { cn } from "@core-ui/utils/cn";
+import { useCatalogViewSettingsContext } from "@ext/catalog/views/components/Context/CatalogViewSettingsContext";
 import { CatalogViewField } from "@ext/catalog/views/components/Helpers/CatalogViewField";
 import { CatalogViewFieldLabel } from "@ext/catalog/views/components/Helpers/CatalogViewFieldLabel";
 import { CatalogViewSection } from "@ext/catalog/views/components/Helpers/CatalogViewSection";
@@ -22,13 +23,9 @@ interface CatalogViewPropertyProps {
 	onChange: (properties: PropertyValue[]) => void;
 }
 
-const StyledScrollShadowContainer = styled(ScrollShadowContainer)`
-	max-height: min(35vh, 20rem);
-	overflow-x: hidden;
-`;
-
 export const CatalogViewProperty = ({ form, disabled, onChange }: CatalogViewPropertyProps) => {
 	const { properties: catalogProperties } = PropertyServiceProvider.value;
+	const { showFooter } = useCatalogViewSettingsContext();
 
 	const formProperties = form.watch("properties") as PropertyValue[];
 
@@ -69,13 +66,13 @@ export const CatalogViewProperty = ({ form, disabled, onChange }: CatalogViewPro
 
 	return (
 		<>
-			<CatalogViewSection>
+			<CatalogViewSection className={cn(!showFooter && "pb-3")}>
 				<CatalogViewSectionHeader>
 					<Label>{t("catalog.views.sections.properties")}</Label>
 					<AddProperty disabled={disabled} onChange={onAddProperty} properties={properties} />
 				</CatalogViewSectionHeader>
-				<StyledScrollShadowContainer className="space-y-5 lg:space-y-4">
-					<div style={{ paddingBottom: "0.25rem" }}>
+				<ScrollShadowContainer className="max-h-[min(35vh,20rem)] space-y-5 overflow-x-hidden lg:space-y-4">
+					<div className="pb-1">
 						{properties?.map((property) => {
 							const originalProperty = catalogProperties.get(property.id);
 							if (!originalProperty) return null;
@@ -113,7 +110,7 @@ export const CatalogViewProperty = ({ form, disabled, onChange }: CatalogViewPro
 						})}
 						{!properties?.length && <CatalogViewSectionEmpty />}
 					</div>
-				</StyledScrollShadowContainer>
+				</ScrollShadowContainer>
 			</CatalogViewSection>
 		</>
 	);

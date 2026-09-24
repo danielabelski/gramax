@@ -9,7 +9,6 @@ import { useApi } from "@core-ui/hooks/useApi";
 import { useDownloadAsZip } from "@core-ui/hooks/useDownloadAsZip";
 import { usePlatform } from "@core-ui/hooks/usePlatform";
 import { useCatalogPropsStore } from "@core-ui/stores/CatalogPropsStore/CatalogPropsStore.provider";
-import styled from "@emotion/styled";
 import DefaultErrorComponent from "@ext/errorHandlers/client/components/DefaultError";
 import type GetErrorComponent from "@ext/errorHandlers/logic/GetErrorComponent";
 import useRemoteProgress from "@ext/git/actions/Clone/logic/useRemoteProgress";
@@ -19,16 +18,6 @@ import { AlertConfirm } from "@ui-kit/AlertDialog";
 import { Button } from "@ui-kit/Button";
 import { Dialog, DialogBody, DialogContent, DialogTitle, DialogTrigger } from "@ui-kit/Dialog";
 import { type ComponentProps, useCallback, useState } from "react";
-
-const FooterWrapper = styled.div`
-	display: flex;
-	gap: 0.5rem;
-	padding: 0rem 1rem 1rem 3rem;
-`;
-
-const StyledCloneProgress = styled(CloneProgress)`
-	margin-top: 1rem;
-`;
 
 const DownloadZip = () => {
 	const { download, isDownloading } = useDownloadAsZip();
@@ -112,25 +101,29 @@ export const RepositoryHealthcheckFailed = ({ trigger, error }: RepositoryHealth
 		<Dialog modal onOpenChange={setOpen} open={open}>
 			<DialogTrigger asChild>{trigger}</DialogTrigger>
 			<DialogContent showCloseButton={!inProgress}>
-				<DialogBody className="flex flex-row items-start gap-4 lg:py-6">
-					<Icon className="text-status-warning" code="triangle-alert" size="24px" />
-					<div className="min-w-0 flex-1 space-y-2">
-						<DialogTitle className="text-lg">{t("git.error.broken.healthcheck.title")}</DialogTitle>
-						<div className="text-primary-fg">
-							{t("git.error.broken.healthcheck.body")},&nbsp;
-							<TechnicalDetails error={(error.cause as Error) || error}>
-								{t("git.error.broken.healthcheck.technical-details")}
-							</TechnicalDetails>
-							<br />
-							{t("git.error.broken.healthcheck.body2")}
-							<ErrorLine className="mt-2" error={recoverError || startRecoveringError} />
-							<div className="w-full flex justify-center">
-								{inProgress && <StyledCloneProgress name={catalogName} progress={progress} />}
+				<DialogBody className="lg:py-6">
+					<div className="flex flex-row items-start gap-4">
+						<Icon className="text-status-warning" code="triangle-alert" size="24px" />
+						<div className="min-w-0 flex-1 space-y-2">
+							<DialogTitle className="text-lg">{t("git.error.broken.healthcheck.title")}</DialogTitle>
+							<div className="text-primary-fg">
+								{t("git.error.broken.healthcheck.body")},&nbsp;
+								<TechnicalDetails error={(error.cause as Error) || error}>
+									{t("git.error.broken.healthcheck.technical-details")}
+								</TechnicalDetails>
+								<br />
+								{t("git.error.broken.healthcheck.body2")}
+								<ErrorLine className="mt-2" error={recoverError || startRecoveringError} />
+								<div className="w-full flex justify-center">
+									{inProgress && (
+										<CloneProgress className="mt-4" name={catalogName} progress={progress} />
+									)}
+								</div>
 							</div>
 						</div>
 					</div>
 				</DialogBody>
-				<FooterWrapper>
+				<div className="flex gap-2 pb-4 pl-14 pr-4 lg:pl-16">
 					<AlertConfirm
 						description={t("git.error.broken.healthcheck.ignore.confirm.description")}
 						onConfirm={resetLock}
@@ -142,7 +135,7 @@ export const RepositoryHealthcheckFailed = ({ trigger, error }: RepositoryHealth
 							disabled={inProgress}
 							size="lg"
 							status="warning"
-							style={{ padding: "0.5rem" }}
+							style={{ padding: "0.5rem 0.5rem 0.5rem 0" }}
 							variant="link"
 						>
 							{t("git.error.broken.healthcheck.ignore.button")}
@@ -160,7 +153,7 @@ export const RepositoryHealthcheckFailed = ({ trigger, error }: RepositoryHealth
 							</Button>
 						</AlertConfirm>
 					</div>
-				</FooterWrapper>
+				</div>
 			</DialogContent>
 		</Dialog>
 	);

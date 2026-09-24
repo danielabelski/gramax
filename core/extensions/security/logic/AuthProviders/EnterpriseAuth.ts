@@ -56,7 +56,13 @@ class EnterpriseAuth implements UserRepositoryProvider, AuthProvider {
 			res.redirect(from || baseFrom);
 			return;
 		}
-		const userData = await ei.getUser(token);
+		let userData: Awaited<ReturnType<EnterpriseApi["getUser"]>>;
+		try {
+			userData = await ei.getUser(token);
+		} catch {
+			res.redirect(from || baseFrom);
+			return;
+		}
 
 		if (!userData) {
 			res.redirect(from || baseFrom);
@@ -72,6 +78,7 @@ class EnterpriseAuth implements UserRepositoryProvider, AuthProvider {
 			new StrictPermissionMap({}),
 			this._em.getConfig(),
 			token,
+			userData.expiresAt,
 		);
 
 		await setUser(cookie, user);

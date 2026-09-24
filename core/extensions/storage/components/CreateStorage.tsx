@@ -38,7 +38,7 @@ interface CreateStorageContentProps {
 
 const CreateStorageContent = (props: CreateStorageContentProps) => {
 	const {
-		isOpen: propsIsOpen = true,
+		isOpen: propsIsOpen,
 		setIsOpen: propsSetIsOpen,
 		onSubmit,
 		onClose,
@@ -48,13 +48,15 @@ const CreateStorageContent = (props: CreateStorageContentProps) => {
 		title = t("forms.add-storage.name"),
 		trigger,
 	} = props;
-	const [isOpen, setIsOpen] = useState(propsIsOpen);
+	const hasTrigger = Boolean(trigger);
+	const initialIsOpen = propsIsOpen ?? !hasTrigger;
+	const [isOpen, setIsOpen] = useState(initialIsOpen);
 	const [selectedSourceType, setSelectedSourceType] = useState<string>(sourceType?.toString() || "");
 	const { primaryButton, secondaryButton } = useGetFooterButtons();
 
 	useWatch(() => {
-		setIsOpen(propsIsOpen);
-	}, [propsIsOpen]);
+		setIsOpen(propsIsOpen ?? !hasTrigger);
+	}, [propsIsOpen, hasTrigger]);
 
 	const updateIsOpen = useCallback(
 		(isOpen: boolean) => {
@@ -80,7 +82,7 @@ const CreateStorageContent = (props: CreateStorageContentProps) => {
 	const Form = selectedSourceType ? sourceComponents[selectedSourceType] : null;
 	return (
 		<Dialog onOpenChange={onOpenChange} open={isOpen}>
-			{trigger && <DialogTrigger>{trigger}</DialogTrigger>}
+			{trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
 			<DialogContent data-modal-root>
 				<FormHeader description={t("forms.add-storage.description")} icon="plug" title={title} />
 				<DialogBody>

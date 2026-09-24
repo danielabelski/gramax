@@ -1,7 +1,7 @@
 import type { AiServerConfig } from "@ext/ai/models/types";
 import type GitSourceData from "@ext/git/core/model/GitSourceData.schema";
 import type SourceType from "@ext/storage/logic/SourceDataProvider/model/SourceType";
-import type { WorkspaceConfig } from "@ext/workspace/WorkspaceConfig";
+import type { WorkspaceConfig, WorkspaceLfsConfig } from "@ext/workspace/WorkspaceConfig";
 import type { PluginConfig } from "@plugins/types";
 
 type SVG = string;
@@ -14,7 +14,7 @@ interface WorkspaceSource {
 
 interface WorkspaceGit {
 	source: WorkspaceSource;
-	lfs?: { patterns: string[] };
+	lfs?: WorkspaceLfsConfig;
 }
 
 interface WorkspaceStyle {
@@ -37,12 +37,12 @@ export interface EnterpriseWorkspaceConfig extends WorkspaceConfig {
 	wordTemplates?: ExportTemplate[];
 	pdfTemplates?: ExportTemplate[];
 	/* deprecated use git.lfs instead */
-	lfs?: { patterns: string[] };
+	lfs?: WorkspaceLfsConfig;
 }
 
 interface UserSettings {
 	source: GitSourceData;
-	ai: AiServerConfig;
+	ai?: AiServerConfig;
 	workspace: EnterpriseWorkspaceConfig;
 	from: string;
 }

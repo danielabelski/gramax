@@ -6,7 +6,7 @@ import SettingResetButton from "./SettingResetButton";
 
 type FormFieldProps = ComponentProps<typeof FormField>;
 
-interface SettingFieldProps extends Omit<FormFieldProps, "labelSuffix"> {
+interface SettingFieldProps extends Omit<FormFieldProps, "labelSuffix" | "controlSuffix"> {
 	/** settings schema key used for reset; defaults to `name` (true at the app level) */
 	settingKey?: string;
 	resetLevel?: Extract<LevelName, "app" | "workspace">;
@@ -20,14 +20,25 @@ interface SettingFieldProps extends Omit<FormFieldProps, "labelSuffix"> {
  * boilerplate: the `rotate-ccw` button appears automatically when the value differs
  * from the schema default (and is hidden when readonly or `withReset={false}`).
  */
-const SettingField = ({ settingKey, resetLevel = "app", withReset = true, name, ...rest }: SettingFieldProps) => {
+const SettingField = ({
+	settingKey,
+	resetLevel = "app",
+	withReset = true,
+	name,
+	layout = "horizontal",
+	labelClassName = "w-[30%] shrink-0",
+	...rest
+}: SettingFieldProps) => {
 	const key = settingKey ?? (name as string);
+
 	return (
 		<FormField
 			{...rest}
-			labelSuffix={
+			controlSuffix={
 				withReset ? <SettingResetButton level={resetLevel} name={name as string} settingKey={key} /> : undefined
 			}
+			labelClassName={labelClassName}
+			layout={layout}
 			name={name}
 		/>
 	);

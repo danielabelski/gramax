@@ -20,6 +20,8 @@ import { GesCloudManager } from "@ext/enterprise-cloud/GesCloudManager";
 import RepositoryProviderEventHandlers from "@ext/git/core/Repository/events/RepositoryProviderEventHandlers";
 import RepositoryProvider from "@ext/git/core/Repository/RepositoryProvider";
 import { HealthcheckRegistry } from "@ext/healthcheck/HealthCheckRegistry";
+import { ReadContentHealthchecker } from "@ext/healthcheck/ReadContentHealthchecker";
+import { ReadContentHealthState } from "@ext/healthcheck/ReadContentHealthState";
 import BugsnagLogger from "@ext/loggers/BugsnagLogger";
 import ConsoleLogger from "@ext/loggers/ConsoleLogger";
 import type Logger from "@ext/loggers/Logger";
@@ -30,6 +32,7 @@ import ParserEventHandlers from "@ext/markdown/core/Parser/events/ParserEventHan
 import MarkdownParser from "@ext/markdown/core/Parser/Parser";
 import ParserContextFactory from "@ext/markdown/core/Parser/ParserContext/ParserContextFactory";
 import type AuthManager from "@ext/security/logic/AuthManager";
+import type { AuthManagerProvider } from "@ext/security/logic/AuthManagerProvider";
 import EnterpriseAuth from "@ext/security/logic/AuthProviders/EnterpriseAuth";
 import ServerAuthManager from "@ext/security/logic/ServerAuthManager";
 import { TicketManager } from "@ext/security/logic/TicketManager/TicketManager";
@@ -59,7 +62,7 @@ const init = async (config: AppConfig): Promise<Application> => {
 
 	await XxHash.init();
 
-	const healthcheckRegistry = new HealthcheckRegistry();
+	const healthcheckRegistry = new HealthcheckRegistry(config.tokens.healthcheck);
 	const em = new EnterpriseManager(config.enterprise);
 
 	const rp = new RepositoryProvider(config);
@@ -115,7 +118,6 @@ const init = async (config: AppConfig): Promise<Application> => {
 		enterprise: enterpriseConfig.gesUrl ? { ...enterpriseConfig, lastUpdateDate: 0 } : {},
 	});
 	await wm.setWorkspace(workspace);
-
 	const ticketManager = new TicketManager(config.tokens.share);
 
 	const hashes = new HashItemProvider();
@@ -127,7 +129,8 @@ const init = async (config: AppConfig): Promise<Application> => {
 		? new EnterpriseAuth(config.paths.base, em, () => wm.current())
 		: new EnvAuth(config.paths.base, config.admin.login, config.admin.password);
 	const am: AuthManager = new ServerAuthManager(em, ap, ticketManager);
-	const contextFactory = new ContextFactory(config.tokens.cookie, am);
+	const amp: AuthManagerProvider = { current: () => am };
+	const contextFactory = new ContextFactory(config.tokens.cookie, amp);
 	const sitePresenterFactory = new SitePresenterFactory(
 		wm,
 		parser,
@@ -136,6 +139,8 @@ const init = async (config: AppConfig): Promise<Application> => {
 		customArticlePresenter,
 		config.isReadOnly,
 	);
+	const readContentHealthState = new ReadContentHealthState();
+	new ReadContentHealthchecker(wm, readContentHealthState, healthcheckRegistry);
 
 	const workspaceConfig = await wm.maybeCurrent()?.config();
 	const services = workspaceConfig?.services ?? config.services;
@@ -153,10 +158,10 @@ const init = async (config: AppConfig): Promise<Application> => {
 	const ptm = new PdfTemplateManager(wm);
 
 	const enterpriseCloudManager = new GesCloudManager(config.enterpriseCloud);
-	const agentManager = new AgentManager(config);
+	const agentManager = await AgentManager.create(config);
 
 	return {
-		am,
+		amp,
 		rp,
 		wm,
 		em,
@@ -179,6 +184,7 @@ const init = async (config: AppConfig): Promise<Application> => {
 		enterpriseCloudManager,
 		agentManager,
 		healthcheckRegistry,
+		readContentHealthState,
 		conf: {
 			search: config.search,
 			basePath: config.paths.base,
@@ -192,7 +198,6 @@ const init = async (config: AppConfig): Promise<Application> => {
 			isProduction: config.isProduction,
 
 			bugsnagApiKey: config.bugsnagApiKey,
-
 			services,
 
 			metrics: config.metrics,
@@ -212,8 +217,14 @@ const init = async (config: AppConfig): Promise<Application> => {
 
 const getApp = (): Promise<Application> => {
 	if (global.app) return global.app;
-	global.app = init(getConfig());
-	if (getExecutingEnvironment() !== "cli") void initAutoPull(global.app);
+	const app = init(getConfig());
+	global.app =
+		getExecutingEnvironment() === "cli"
+			? app
+			: app.then((application) => {
+					void initAutoPull(application);
+					return application;
+				});
 	return global.app;
 };
 

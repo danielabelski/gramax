@@ -15,6 +15,12 @@ describe("getResourceId", () => {
 		);
 	});
 
+	test("decodes nested groups from editor pathname", () => {
+		expect(getResourceId("gitlab.ics-it.ru/group%2Fsubgroup/docs/main/-", "gitlab.ics-it.ru", "docs")).toEqual(
+			"group/subgroup/docs",
+		);
+	});
+
 	test("uses path as is when it has no source prefix", () => {
 		expect(getResourceId("ics/docs", "gitlab.ics-it.ru", "docs")).toEqual("ics/docs");
 	});

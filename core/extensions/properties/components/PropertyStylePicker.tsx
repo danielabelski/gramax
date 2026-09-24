@@ -6,7 +6,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 
 interface PropertyStylePickerProps {
 	value?: Style;
-	onChange?: (style: Style) => void;
+	/** `null` means "no style": clicking the selected tile clears it (gh#912). */
+	onChange?: (style: Style | null) => void;
 }
 
 export const PropertyStylePicker = ({ value, onChange }: PropertyStylePickerProps) => {

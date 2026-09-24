@@ -3,12 +3,19 @@ import type Application from "@app/types/Application";
 import type DocportalApiRequest from "../logic/DocportalApiRequest";
 import type DocportalApiResponse from "../logic/DocportalApiResponse";
 
-interface ServerContext {
-	path: URL;
-	req: DocportalApiRequest;
-	res: DocportalApiResponse;
-	app: Application;
-	commands: CommandTree;
-}
+export default class ServerContext {
+	constructor(
+		readonly path: URL,
+		readonly req: DocportalApiRequest,
+		readonly res: DocportalApiResponse,
+		readonly app: Application,
+		readonly commands: CommandTree,
+	) {}
 
-export default ServerContext;
+	json(statusCode: number, body: Record<string, unknown>): Response {
+		this.res.statusCode = statusCode;
+		this.res.setHeader("Content-Type", "application/json");
+		this.res.send(JSON.stringify(body));
+		return this.res.getBunResponse();
+	}
+}

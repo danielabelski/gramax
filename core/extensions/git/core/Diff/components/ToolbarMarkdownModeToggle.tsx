@@ -3,7 +3,7 @@ import PageDataContext from "@core-ui/ContextServices/PageDataContext";
 import { useIsRevision } from "@ext/git/actions/Revisions/logic/hooks/useIsRevision";
 import { useIsDiffView } from "@ext/git/core/Diff/logic/hooks/useIsDiffView";
 import t from "@ext/localization/locale/translate";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 import { useCallback } from "react";
 
 export const ToolbarMarkdownModeToggle = () => {
@@ -18,13 +18,13 @@ export const ToolbarMarkdownModeToggle = () => {
 	}, [isMarkdown, router]);
 
 	return (
-		<ToolbarToggleButton
+		<GlassToolbarToggleButton
 			active={isMarkdown}
 			disabled={!isRevision && !isDiffView && isReadOnly}
 			onClick={toggleMarkdownMode}
 			tooltipText={t("editor.modes.source-text")}
 		>
-			<ToolbarIcon icon="markdown" />
-		</ToolbarToggleButton>
+			<GlassToolbarIcon icon="square-m" />
+		</GlassToolbarToggleButton>
 	);
 };

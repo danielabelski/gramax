@@ -1,8 +1,16 @@
+import { createEventEmitter, type Event } from "@core/Event/EventEmitter";
 import Path from "@core/FileProvider/Path/Path";
 import type PathnameData from "@core/RouterPath/model/PathnameData";
 import { ContentLanguage } from "@ext/localization/core/model/Language";
 
+// biome-ignore lint/complexity/noStaticOnlyClass: it's ok
 class RouterPathProvider {
+	static readonly events = createEventEmitter<
+		Event<"parse-path", { segments: string[]; mutable: { data?: PathnameData } }> &
+			Event<"is-editor-path", { segments: string[]; mutable: { value: boolean } }> &
+			Event<"generate-path", { data: PathnameData; mutable: { path: Path } }> &
+			Event<"unresolved-path", { path: string; mutable: { handled?: boolean } }>
+	>();
 	private static readonly _separator = "-";
 	private static readonly _readonlyPathPrefix = "/";
 
@@ -20,7 +28,16 @@ class RouterPathProvider {
 	}
 
 	static parsePath(path: string[] | string | Path): PathnameData {
-		const segments = RouterPathProvider._parseSegments(path);
+		const mutable: { data?: PathnameData } = {};
+		RouterPathProvider.events.emitSync("parse-path", {
+			segments: RouterPathProvider._getArrayOfStrings(path),
+			mutable,
+		});
+		return mutable.data ?? RouterPathProvider.parseEditorPath(RouterPathProvider._parseSegments(path));
+	}
+
+	static parseEditorPath(path: string[] | string | Path): PathnameData {
+		const segments = RouterPathProvider._getArrayOfStrings(path).map((p) => (p === "-" ? null : p));
 
 		let isPublic = false;
 		if (segments[0] === "public") {
@@ -65,14 +82,19 @@ class RouterPathProvider {
 				: null;
 		catalogName = catalogName === data.repo ? RouterPathProvider._separator : catalogName;
 
-		return new Path([
-			data.sourceName ? encodeURIComponent(data.sourceName) : RouterPathProvider._separator,
+		const source = data.sourceName ? encodeURIComponent(data.sourceName) : RouterPathProvider._separator;
+
+		const path = new Path([
+			source,
 			data.group ? encodeURIComponent(data.group) : RouterPathProvider._separator,
 			data.repo ?? RouterPathProvider._separator,
 			data.refname ? encodeURIComponent(data.refname) : RouterPathProvider._separator,
 			catalogName,
 			filePath,
 		]);
+		const mutable = { path };
+		RouterPathProvider.events.emitSync("generate-path", { data, mutable });
+		return mutable.path;
 	}
 
 	static parseItemLogicPath(itemLogicPath: string[] | Path): {
@@ -95,11 +117,17 @@ class RouterPathProvider {
 			.slice(1 + offset, 4 + offset)
 			.some((s) => s === RouterPathProvider._separator);
 
-		const isEditorPathname =
-			(maybeStorage?.includes(".") || maybeSeparator || maybeStorage.startsWith("localhost")) &&
-			(!maybeStorage?.includes(":") || /^.*:\d+$/.test(maybeStorage));
+		// `host:port` (e.g. an internal Gitea reached by a short DNS alias like `gitea-server:3000`)
+		// is a valid Git host even without a dot — recognize the general shape, not only `localhost`.
+		const hasPort = /^.*:\d+$/.test(maybeStorage);
 
-		return isEditorPathname;
+		const isEditorPathname =
+			(maybeStorage?.includes(".") || maybeSeparator || maybeStorage.startsWith("localhost") || hasPort) &&
+			(!maybeStorage?.includes(":") || hasPort);
+
+		const mutable = { value: isEditorPathname };
+		RouterPathProvider.events.emitSync("is-editor-path", { segments: currentPath, mutable });
+		return mutable.value;
 	}
 
 	static updatePathnameData(
@@ -150,7 +178,7 @@ class RouterPathProvider {
 			? rawSegments
 			: RouterPathProvider._getArrayOfStrings(RouterPathProvider.getPathname({ itemLogicPath: rawSegments }));
 
-		return segments.filter(Boolean).map((p) => (p === RouterPathProvider._separator ? null : p));
+		return segments;
 	}
 }
 

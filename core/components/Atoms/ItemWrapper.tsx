@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noRestrictedImports: will be removed in the future
 import styled from "@emotion/styled";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -32,7 +33,12 @@ export default styled(ItemWrapper)`
 		padding-left: 0;
 		width: 0;
 		opacity: 0;
-		transition: all 0.07s ease-in-out;
+		transition:
+			width 0.07s ease-in-out,
+			opacity 0.07s ease-in-out,
+			padding-left 0.07s ease-in-out,
+			gap 0.07s ease-in-out,
+			margin-right 0.07s ease-in-out;
 		color: var(--color-nav-item);
 	}
 

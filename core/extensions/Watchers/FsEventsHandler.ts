@@ -3,6 +3,7 @@ import Path from "@core/FileProvider/Path/Path";
 import type { Article } from "@core/FileStructue/Article/Article";
 import type { Catalog } from "@core/FileStructue/Catalog/Catalog";
 import type { Item } from "@core/FileStructue/Item/Item";
+import type { ClientItemRef } from "@core/SitePresenter/SitePresenter";
 import type SitePresenterFactory from "@core/SitePresenter/SitePresenterFactory";
 import type { ItemLink } from "@ext/navigation/NavigationLinks";
 import type { FsEventDto } from "@ext/Watchers/FsEvent";
@@ -16,7 +17,7 @@ export type FsHandleResult = {
 	navChanged: boolean;
 	itemLinks: ItemLink[] | null;
 	currentArticleRedirectTo: string | null;
-	modifiedArticleProps?: { path: string; props: Partial<ItemLink> }[];
+	modifiedArticleProps?: { ref: ClientItemRef; props: Partial<ItemLink> }[];
 };
 
 export const EMPTY_FS_HANDLE_RESULT: FsHandleResult = {
@@ -66,6 +67,14 @@ export const handleFsEvents = async (params: {
 	let renamedCurrentTo: string | null = null;
 
 	for (const event of dedupeEvents(events)) {
+		// The watcher lost events and cannot say which. Nothing about this one is path-scoped, so it
+		// skips classification entirely: reload the catalog and re-read the open article.
+		if (event.kind.type === "rescan") {
+			navChanged = true;
+			if (currentPath) changedArticles.add(currentPath);
+			continue;
+		}
+
 		const classified = await classifyFsEvent(event, {
 			catalog,
 			fp,
@@ -115,12 +124,16 @@ const dedupeEvents = (events: FsEventDto[]): FsEventDto[] => {
 const buildModifiedArticleProps = (
 	catalog: Catalog,
 	changedArticles: Set<string>,
-): { path: string; props: Partial<ItemLink> }[] | undefined => {
+): { ref: ClientItemRef; props: Partial<ItemLink> }[] | undefined => {
 	if (changedArticles.size === 0) return undefined;
-	const out: { path: string; props: Partial<ItemLink> }[] = [];
+	const out: { ref: ClientItemRef; props: Partial<ItemLink> }[] = [];
 	for (const articlePath of changedArticles) {
 		const item = catalog.findItemByItemPath(new Path(articlePath));
-		if (item) out.push({ path: item.ref.path.value, props: { title: item.props.title?.toString() || "" } });
+		if (item)
+			out.push({
+				ref: { path: item.ref.path.value, storageId: item.ref.storageId },
+				props: { title: item.props.title?.toString() || "" },
+			});
 	}
 	return out;
 };

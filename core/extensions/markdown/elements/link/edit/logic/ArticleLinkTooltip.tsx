@@ -82,6 +82,7 @@ export interface LinkTooltipProps extends Omit<TooltipProviderProps, "children" 
 	url?: Url;
 	environment: Environment;
 	basePath?: string;
+	container?: HTMLElement;
 }
 
 // For a top/bottom-placed popper "up/down" is popper's alt axis: altAxis keeps the preview from
@@ -140,6 +141,7 @@ const ArticleLinkTooltip = (props: LinkTooltipProps) => {
 		url,
 		resourceItemId,
 		resourceProviderType,
+		container,
 		...otherProps
 	} = props;
 	const [isVisible, setIsVisible] = useState(false);
@@ -263,6 +265,7 @@ const ArticleLinkTooltip = (props: LinkTooltipProps) => {
 
 	return (
 		<Tooltip
+			appendTo={() => container ?? document.body}
 			arrow={false}
 			content={
 				isVisible && (

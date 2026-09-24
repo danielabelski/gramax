@@ -108,8 +108,21 @@ const PropertyEditor = ({
 				docportalVisible: z.boolean().optional(),
 			})
 			.optional(),
-		style: z.enum(Object.values(Style) as [string, ...string[]]).optional(),
-		icon: z.string().optional(),
+		// gh#912. Clearing style/icon has to write `null`, not `undefined`:
+		// react-hook-form reads a controlled field via `get(values, name, defaultValue)`,
+		// so an `undefined` value silently falls back to the default and the field
+		// keeps showing the old value. `null` clears the UI but is rejected by
+		// `.optional()`, hence `.nullish()` + normalization back to "absent" on submit
+		// (`Property.style`/`icon` are not nullable, and `JSON.stringify` drops
+		// `undefined`, which is what actually erases the value in catalog props).
+		style: z
+			.enum(Object.values(Style) as [string, ...string[]])
+			.nullish()
+			.transform((val) => val ?? undefined),
+		icon: z
+			.string()
+			.nullish()
+			.transform((val) => val ?? undefined),
 		values: z.array(z.string()).optional(),
 	});
 
@@ -261,7 +274,7 @@ const PropertyEditor = ({
 												disable={["emoji", "file-input", "color"]}
 												label={field.value ? field.value : t("icon")}
 												onChange={(value) => "code" in value && field.onChange(value.code)}
-												onClear={() => field.onChange(undefined)}
+												onClear={() => field.onChange(null)}
 												value={field.value ? { code: field.value } : undefined}
 											/>
 										)}
@@ -291,6 +304,7 @@ const PropertyEditor = ({
 														{field.value && (
 															<InlineTriggerButton
 																className="shrink-0"
+																data-testid="style-clear"
 																onClick={() => field.onChange(null)}
 															/>
 														)}
@@ -351,8 +365,10 @@ const PropertyEditor = ({
 											onCheckedChange={toggleDocportalVisible}
 										/>
 										<Tooltip>
-											<TooltipTrigger>
-												<Icon className="text-primary-fg" icon="info" size="md" />
+											<TooltipTrigger asChild>
+												<span>
+													<Icon className="text-primary-fg" icon="info" size="md" />
+												</span>
 											</TooltipTrigger>
 											<TooltipContent>
 												{t("properties.options.docportalVisible.description")}

@@ -1,3 +1,8 @@
+/**
+ * biome-ignore-all lint/style/useNamingConvention: the protected surface of the print paginators predates
+ * the rule, and it is the base class every one of them extends — renaming it is a refactor of the whole
+ * subsystem, not part of a fix.
+ */
 import type { NodeDimensionsData } from "@ext/print/utils/pagination/NodeDimensions";
 import type { ControlInfo, PaginationInfo, PrintPageInfo } from "@ext/print/utils/pagination/types";
 import { throwIfAborted } from "./abort";
@@ -10,7 +15,13 @@ abstract class Paginator<Node extends HTMLElement = HTMLElement, CurrentContaine
 	public currentContainer: CurrentContainer;
 	public headingElements: HTMLHeadingElement[] = [];
 
-	private _marginBottom: number;
+	/**
+	 * Zero until something is actually measured. A paginator whose chrome adds no vertical space of its own
+	 * never records one, and `setMarginBottom` used to hand that `undefined` to the page's running total —
+	 * where `Math.max(undefined, …)` is NaN, every later `newHeight <= usable` is false, and the next element
+	 * opens a page with the one before it still nearly empty.
+	 */
+	private _marginBottom = 0;
 
 	constructor(protected node: Node) {}
 

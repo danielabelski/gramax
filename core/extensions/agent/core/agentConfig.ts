@@ -1,6 +1,8 @@
 class AgentConfig {
 	maxStoredSessions: number | null = null;
 	maxSteps: number | null = null;
+	compactionTriggerPercent = 90;
+	compactionTailUserCharsBudget = 20_000;
 	toolPreviewMaxChars = 8_000;
 	readMaxChars = 60_000;
 	searchHitsLimit = 15;
@@ -9,6 +11,36 @@ class AgentConfig {
 	searchTimeoutMs = 120_000;
 	searchIndexProgressWaitMs = 300_000;
 	repoExcludedPathPatterns = [/(^|\/)\.git(\/|$)/i];
+	systemPrefix = "@system";
+	skillPrefix = "@skills";
+	attachmentPrefix = "@attachments";
+	resourcePrefix = "@resources";
+	maxAttachmentMb = 50;
+	get maxAttachmentBytes() {
+		return this.maxAttachmentMb * 1024 * 1024;
+	}
+	httpRequestTimeoutMs = 120_000;
+	imageAttachmentExtensions = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
+	convertibleAttachmentExtensions = ["pdf", "docx", "xlsx"];
+	binaryAttachmentExtensions = [
+		"mp3",
+		"wav",
+		"m4a",
+		"flac",
+		"ogg",
+		"opus",
+		"mp4",
+		"mov",
+		"avi",
+		"mkv",
+		"pptx",
+		"ppt",
+		"doc",
+		"odt",
+		"ods",
+		"zip",
+		"bin",
+	];
 	allowedAttachmentExtensions = [
 		"txt",
 		"md",
@@ -29,11 +61,10 @@ class AgentConfig {
 		"sql",
 		"ini",
 		"toml",
-		"docx",
-		"xlsx",
-		"pdf",
+		...this.imageAttachmentExtensions,
+		...this.convertibleAttachmentExtensions,
+		...this.binaryAttachmentExtensions,
 	];
-	binaryAttachmentExtensions = ["docx", "xlsx", "pdf"];
 }
 
 export const agentConfig = new AgentConfig();

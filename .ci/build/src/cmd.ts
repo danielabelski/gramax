@@ -2,7 +2,7 @@ import assert from "assert";
 import { $ } from "bun";
 import fs from "fs/promises";
 
-import { join } from "path";
+import { isAbsolute, join } from "path";
 import { parseArgs } from "util";
 import * as b from "./builder";
 import {
@@ -129,24 +129,21 @@ export const build = async () => {
 export const signCiWindows = async () => {
 	if (!isCi) return;
 
-	const help = "usage: sign-ci-windows";
+	const help = "usage: sign-ci-windows <path>";
 
 	const args = parseArgs({
 		args: process.argv.slice(3),
-		options: {
-			profile: {
-				type: "string",
-			},
-			target: {
-				type: "string",
-			},
-		},
+		allowPositionals: true,
 	});
 
-	assert(args.values.target, `provide a target: ${help}`);
-	assert(args.values.profile, `provide a profile: ${help}`);
+	const target = args.positionals[0];
+	assert(target, `provide a path of artifact to sign: ${help}`);
+	// tauri and the NSIS `!uninstfinalize` hook both hand over an absolute path. a relative one could
+	// only come from makensis, whose cwd is the bundle dir rather than `project`, so refuse it
+	// instead of resolving it against the wrong base.
+	assert(isAbsolute(target), `path of artifact to sign must be absolute, got: ${target}`);
 
-	await s.win(join(project, "target", args.values.target, args.values.profile, "gramax.exe"));
+	await s.win(target);
 };
 
 export const sign = async () => {

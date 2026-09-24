@@ -63,7 +63,7 @@ export const meta = (id: string, extra: Record<string, unknown> = {}) =>
 
 /** Returns the file contents for a single plugin folder. */
 export const pluginDir = (id: string, js: string, metaExtra: Record<string, unknown> = {}): FileTree => ({
-	"_metadata.json": meta(id, metaExtra),
+	"manifest.json": meta(id, metaExtra),
 	[`${id}.js`]: js,
 });
 

@@ -1,4 +1,4 @@
-ARG CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX=docker.io
+ARG NEXUS_DOCKERHUB=docker.io
 ARG USE_IMAGE_TAG="latest-dev"
 
 FROM --platform=$BUILDPLATFORM gitlab.ics-it.ru:4567/ics/doc-reader/base-image:${USE_IMAGE_TAG:-latest-dev} AS deps
@@ -19,7 +19,7 @@ RUN ./install-deps.sh --ci --node && \
   git gc --aggressive && git prune && \
   rm -fr ./.npm ./target ./apps/next/.next/cache
 
-FROM --platform=$TARGETPLATFORM ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/node:21-bookworm-slim AS run
+FROM --platform=$TARGETPLATFORM ${NEXUS_DOCKERHUB}/node:21-bookworm-slim AS run
 
 ARG BRANCH \
   BUGSNAG_API_KEY \

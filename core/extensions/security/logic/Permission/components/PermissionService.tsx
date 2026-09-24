@@ -1,5 +1,6 @@
 import type { PageProps } from "@components/Pages/models/Pages";
 import type ContextService from "@core-ui/ContextServices/ContextService";
+import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
 import { usePlatform } from "@core-ui/hooks/usePlatform";
 import { useIsEnterprise } from "@ext/enterprise/utils/useIsEnterprise";
 import type IPermission from "@ext/security/logic/Permission/IPermission";
@@ -41,8 +42,10 @@ class PermissionService implements ContextService {
 		const { isTauri, isWeb } = usePlatform();
 		const isEnterprise = useIsEnterprise();
 		const { global, workspace, catalog } = useContext(UserPermissionsContext);
+		const { enabled, url: gesCloudUrl } = PageDataContextService.value.conf.enterpriseCloud;
+		const isGesCloud = enabled && gesCloudUrl;
 
-		if (!isEnterprise && (isTauri || isWeb)) return true;
+		if (!isGesCloud && !isEnterprise && (isTauri || isWeb)) return true;
 
 		if (workspacePath && catalogName) return catalog?.enough(catalogName, permission);
 		if (workspacePath) return workspace?.enough(workspacePath, permission);

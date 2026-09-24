@@ -8,10 +8,13 @@ interface FormFieldProps extends Omit<UiKitFormFieldProps, "description" | "titl
 	title: ReactNode | string;
 	description?: ReactNode | string;
 	labelSuffix?: ReactNode;
+	/** Rendered in the control row itself, right of the control, in a fixed-width slot. */
+	controlSuffix?: ReactNode;
 }
 
 interface ControlWrapperProps {
 	labelSuffix?: ReactNode;
+	controlSuffix?: ReactNode;
 	children?: ReactNode;
 }
 
@@ -23,11 +26,24 @@ interface ControlWrapperProps {
 // break that link (the div would get `id`/`aria-*` instead of the input), so
 // it re-forwards them via cloneElement onto the actual control.
 const ControlWrapper = React.forwardRef<HTMLElement, ControlWrapperProps>(
-	({ labelSuffix, children, ...props }, ref) => {
+	({ labelSuffix, controlSuffix, children, ...props }, ref) => {
 		const child = React.Children.only(children);
 		const clonedChild = React.isValidElement(child)
 			? React.cloneElement(child as React.ReactElement, { ...props, ref } as React.Attributes)
 			: child;
+
+		if (controlSuffix)
+			return (
+				<div className="relative flex w-full min-w-0 items-center">
+					{labelSuffix && (
+						<div className="absolute right-0 -top-[28px] z-10 pointer-events-auto flex items-center">
+							{labelSuffix}
+						</div>
+					)}
+					{clonedChild}
+					<div className="flex w-6 shrink-0 items-center justify-end">{controlSuffix}</div>
+				</div>
+			);
 
 		return (
 			<div className="relative w-full">
@@ -42,12 +58,14 @@ const ControlWrapper = React.forwardRef<HTMLElement, ControlWrapperProps>(
 ControlWrapper.displayName = "ControlWrapper";
 
 export const FormField: FC<FormFieldProps> = (props) => {
-	const { description, title, labelSuffix, control, ...rest } = props;
+	const { description, title, labelSuffix, controlSuffix, control, ...rest } = props;
 
 	let renderControl = control;
-	if (labelSuffix && control) {
+	if ((labelSuffix || controlSuffix) && control) {
 		renderControl = (fieldProps) => (
-			<ControlWrapper labelSuffix={labelSuffix}>{control(fieldProps)}</ControlWrapper>
+			<ControlWrapper controlSuffix={controlSuffix} labelSuffix={labelSuffix}>
+				{control(fieldProps)}
+			</ControlWrapper>
 		);
 	}
 

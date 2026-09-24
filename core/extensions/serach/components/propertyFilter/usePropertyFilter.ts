@@ -9,32 +9,30 @@ import {
 } from "@ext/serach/components/propertyFilter/propertyFilterModel";
 import { useCallback, useMemo, useState } from "react";
 
+export interface FilterablePropertyController {
+	item: FilterablePropertyItem;
+	valuesFilter: {
+		value: string;
+		set: (value: string) => void;
+	};
+	toggleValue: (value?: string) => void;
+	toggleEmpty: () => void;
+	toggleAll: () => void;
+	clear: () => void;
+}
+
 interface UsePropertyFilterArgs {
 	isReadOnlyPlatform: boolean;
 	properties: Map<string, Property>;
 }
 
-interface UsePropertyFilterResult {
-	filteredProperties: FilterablePropertyItem[];
-	filterableProperties: {
-		array: FilterablePropertyItem[];
-		map: Map<string, FilterablePropertyItem>;
-	};
-	shownFilterableProperties: {
-		array: FilterablePropertyItem[];
-		map: Map<string, FilterablePropertyItem>;
-	};
-	propertySearch: {
+export interface UsePropertyFilterResult {
+	controllers: FilterablePropertyController[];
+	selected: FilterablePropertyItem[];
+	filter: {
 		value: string;
 		set: (q: string) => void;
 	};
-	propertyValuesSearch: {
-		get: (name: string) => string;
-		set: (name: string, q: string) => void;
-	};
-	togglePropertyValue: (name: string, value?: string) => void;
-	selectAllPropertyValues: (name: string) => void;
-	selectEmptyPropertyValue: (name: string) => void;
 	clearFilteredProperties: () => void;
 }
 
@@ -50,48 +48,66 @@ export function usePropertyFilter({ properties, isReadOnlyPlatform }: UsePropert
 		return { availableProperties, availablePropertiesMap };
 	}, [properties, isReadOnlyPlatform]);
 
-	const { filterableProperties, shownFilterableProperties } = useMemo(
+	const { filterableProperties } = useMemo(
 		() => buildFilterableProperties(availableProperties, filteredProperties, propertyQuery, propertyValuesQueries),
 		[availableProperties, filteredProperties, propertyQuery, propertyValuesQueries],
 	);
 
-	return {
-		filteredProperties,
-		filterableProperties,
-		shownFilterableProperties,
-		propertySearch: {
-			value: propertyQuery,
-			set: useCallback((q) => setPropertyQuery(q.toLowerCase()), []),
+	const setPropertyValuesQuery = useCallback(
+		(name: string, q: string) => {
+			const newMap = new Map(propertyValuesQueries);
+			newMap.set(name, q.toLowerCase());
+			setPropertyValuesQueries(newMap);
 		},
-		propertyValuesSearch: {
-			get: useCallback((name) => propertyValuesQueries.get(name) ?? "", [propertyValuesQueries]),
-			set: useCallback(
-				(name, q) => {
-					const newMap = new Map(propertyValuesQueries);
-					newMap.set(name, q.toLowerCase());
-					setPropertyValuesQueries(newMap);
+		[propertyValuesQueries],
+	);
+
+	const clearPropertySelection = useCallback((name: string) => {
+		setFilteredProperties((prev) => prev.filter((item) => item.property.id !== name));
+	}, []);
+
+	const propertiesControllers = useMemo(
+		() =>
+			filterableProperties.array.map((item) => ({
+				item,
+				valuesFilter: {
+					value: propertyValuesQueries.get(item.property.id) ?? "",
+					set: (q: string) => setPropertyValuesQuery(item.property.id, q),
 				},
-				[propertyValuesQueries],
-			),
+				toggleValue: (value?: string) =>
+					setFilteredProperties((prev) =>
+						toggleFilterablePropertyValue(prev, availablePropertiesMap, item.property.id, value),
+					),
+				toggleEmpty: () =>
+					setFilteredProperties((prev) =>
+						selectEmptyFilterablePropertyValue(prev, availablePropertiesMap, item.property.id),
+					),
+				toggleAll: () =>
+					setFilteredProperties((prev) =>
+						selectAllFilterablePropertyValues(prev, availablePropertiesMap, item.property.id),
+					),
+				clear: () => clearPropertySelection(item.property.id),
+			})),
+		[
+			filterableProperties.array,
+			availablePropertiesMap,
+			propertyValuesQueries,
+			setPropertyValuesQuery,
+			clearPropertySelection,
+		],
+	);
+
+	const setPropertyFilter = useCallback((q: string) => setPropertyQuery(q.toLowerCase()), []);
+	const clearFilteredProperties = useCallback(() => setFilteredProperties([]), []);
+
+	return {
+		controllers: propertiesControllers,
+		selected: filteredProperties,
+		filter: {
+			value: propertyQuery,
+			set: setPropertyFilter,
 		},
-		togglePropertyValue: useCallback(
-			(name: string, value?: string) =>
-				setFilteredProperties((prev) =>
-					toggleFilterablePropertyValue(prev, availablePropertiesMap, name, value),
-				),
-			[availablePropertiesMap],
-		),
-		selectAllPropertyValues: useCallback(
-			(name: string) =>
-				setFilteredProperties((prev) => selectAllFilterablePropertyValues(prev, availablePropertiesMap, name)),
-			[availablePropertiesMap],
-		),
-		selectEmptyPropertyValue: useCallback(
-			(name: string) =>
-				setFilteredProperties((prev) => selectEmptyFilterablePropertyValue(prev, availablePropertiesMap, name)),
-			[availablePropertiesMap],
-		),
-		clearFilteredProperties: useCallback(() => setFilteredProperties([]), []),
+		clearFilteredProperties,
 	};
 }
 

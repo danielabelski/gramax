@@ -208,7 +208,15 @@
 	margin-top: 0.7em;
 }
 
+/* The resets below must reach the real first and last block of the body. In the editor
+   tiptap wraps the body in a node-view div, and every node view inside it in one more
+   pair (`.react-renderer > [data-node-view-wrapper]`), so a direct-child selector lands
+   on a wrapper and the block keeps its outer margin — the note then grows at that edge
+   by that margin. Each step is a child combinator on purpose: a descendant one would
+   also strip the margins of blocks in the middle of the note. */
 .admonition-content > *:last-child,
+.admonition-content > [data-node-view-content-react] > *:last-child,
+.admonition-content > [data-node-view-content-react] > *:last-child > [data-node-view-wrapper] > *:last-child,
 .admonition-content ul:last-child li:last-child:not(li:not(:last-child) *),
 .admonition-content ol:last-child li:last-child:not(li:not(:last-child) *),
 .admonition-content ul:last-child li:last-child:not(li:not(:last-child) *) > *:last-child,
@@ -216,7 +224,11 @@
 	margin-bottom: 0 !important;
 }
 
-.admonition-content > *:first-child {
+/* Same for the top edge. A node view renders its `.node-actions` overlay before the
+   block it wraps, so there the block is the second child, not the first. */
+.admonition-content > *:first-child,
+.admonition-content > [data-node-view-content-react] > *:first-child,
+.admonition-content > [data-node-view-content-react] > *:first-child > [data-node-view-wrapper] > .node-actions + * {
 	margin-top: 0 !important;
 }
 
@@ -231,6 +243,17 @@
 
 .admonition-collapsed .admonition-content .note-title ~ * {
 	display: none;
+}
+
+/* Collapsed: the title is the last visible element, but the hidden siblings keep
+   `.admonition-content > *:last-child` from matching it, so reset its margin here */
+.admonition-collapsed .admonition-content .note-title {
+	margin-bottom: 0;
+}
+
+/* Collapsed: the icon column would otherwise be taller than the single title line */
+.admonition-collapsed .admonition-icon i {
+	padding-bottom: 0;
 }
 
 .admonition-quote .note-title,

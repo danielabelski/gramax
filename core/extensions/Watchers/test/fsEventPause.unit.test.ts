@@ -13,24 +13,21 @@ describe("fsEventPause", () => {
 		expect(shouldPauseFsEventsForCommand(command)).toBe(true);
 	});
 
-	test.each([
-		"article/updateContent",
-		"storage/publish",
-		"fs/handleEvents",
-	])("does not pause watcher events for ordinary command %s", (command) => {
-		expect(shouldPauseFsEventsForCommand(command)).toBe(false);
-	});
+	test.each(["article/updateContent", "storage/publish", "fs/handleEvents"])(
+		"does not pause watcher events for ordinary command %s",
+		(command) => {
+			expect(shouldPauseFsEventsForCommand(command)).toBe(false);
+		},
+	);
 
 	test.each(["checkout", "syncing"])("skips backend watcher handling for transient state %s", (state) => {
 		expect(shouldSkipFsEventsForRepositoryState(state)).toBe(true);
 	});
 
-	test.each([
-		"default",
-		"mergeConflict",
-		"stashConflict",
-		undefined,
-	])("does not skip backend watcher handling for non-transient state %s", (state) => {
-		expect(shouldSkipFsEventsForRepositoryState(state)).toBe(false);
-	});
+	test.each(["default", "mergeConflict", "stashConflict", undefined])(
+		"does not skip backend watcher handling for non-transient state %s",
+		(state) => {
+			expect(shouldSkipFsEventsForRepositoryState(state)).toBe(false);
+		},
+	);
 });

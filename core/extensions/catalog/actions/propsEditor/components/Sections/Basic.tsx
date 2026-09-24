@@ -4,10 +4,11 @@ import { cn } from "@core-ui/utils/cn";
 import { CatalogCardPreview } from "@ext/catalog/actions/propsEditor/components/CatalogCardPreview";
 import UploadCatalogLogo from "@ext/catalog/actions/propsEditor/components/UploadCatalogLogo";
 import t from "@ext/localization/locale/translate";
+import SectionHeader from "@ext/settings/components/SectionHeader";
 import { InlineTriggerButton } from "@ui-kit/Button";
 import { usePreventAutoFocusToInput } from "@ui-kit/Dialog/utils";
 import { Divider } from "@ui-kit/Divider";
-import { FormBody, FormField, FormStack } from "@ui-kit/Form";
+import { FormField, FormStack } from "@ui-kit/Form";
 import { Icon } from "@ui-kit/Icon";
 import { Input } from "@ui-kit/Input";
 import { Popover, PopoverContent, PopoverTriggerButton } from "@ui-kit/Popover";
@@ -27,7 +28,8 @@ export const EditBasicProps = ({ formProps, form }: BasicProps) => {
 
 	return (
 		<>
-			<FormBody>
+			<div className="flex flex-1 min-h-0 flex-col gap-5 overflow-y-auto p-5">
+				<SectionHeader title={t("forms.catalog-edit-props.tabs.general")} />
 				<FormStack>
 					<FormField
 						control={({ field }) => (
@@ -119,9 +121,9 @@ export const EditBasicProps = ({ formProps, form }: BasicProps) => {
 
 					<UploadCatalogLogo form={form} formProps={formProps} />
 				</FormStack>
-			</FormBody>
+			</div>
 			<Divider />
-			<div className="px-4 py-5 lg:p-6">
+			<div className="px-5 py-5">
 				<FormStack>
 					<CatalogCardPreview form={form} />
 				</FormStack>

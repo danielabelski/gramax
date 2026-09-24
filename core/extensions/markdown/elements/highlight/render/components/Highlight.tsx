@@ -14,7 +14,6 @@ const Highlight = ({ color, children }: HighlightProps): ReactElement => {
 			style={{
 				backgroundColor: `color-mix(in srgb, var(--color-highlight-${newColor}) 50%, transparent)`,
 				borderRadius: "var(--radius-medium)",
-				color: "black",
 				padding: "2px 2px",
 			}}
 		>

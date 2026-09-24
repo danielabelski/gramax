@@ -143,36 +143,6 @@ export const features = {
 		targets: FeatureTarget.web | FeatureTarget.desktop,
 		default: false,
 	},
-	"native-fs": {
-		title: {
-			ru: "Rust-based File Structure",
-			en: "Rust-based File Structure",
-		},
-		desc: {
-			ru: "Более быстрая реализация чтения рабочего пространства и каталогов",
-			en: "Workspace & catalog read implementation with higher performance",
-		},
-		icon: "scan-text",
-		targets: FeatureTarget.all,
-		default: env("BRANCH") === "develop",
-	},
-	"agent-chat": {
-		title: {
-			ru: "Чат с агентом",
-			en: "Chat with agent",
-		},
-		desc: {
-			ru: "Добавляет панель чата с агентом для ответов на вопросы и помощи с редактированием документации",
-			en: "Adds a chat panel with an agent for answering questions and helping with documentation editing",
-		},
-		url: {
-			ru: null,
-			en: null,
-		},
-		icon: "chat",
-		targets: FeatureTarget.web | FeatureTarget.desktop,
-		default: false,
-	},
 	"ges-cloud": {
 		status: "in-dev",
 		title: {

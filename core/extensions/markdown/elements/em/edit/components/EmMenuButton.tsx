@@ -1,13 +1,13 @@
 import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/ButtonStateService";
 import t from "@ext/localization/locale/translate";
 import type { Editor } from "@tiptap/core";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 
 const EmMenuButton = ({ editor }: { editor: Editor }) => {
 	const { disabled, isActive } = ButtonStateService.useCurrentAction({ mark: "em" });
 
 	return (
-		<ToolbarToggleButton
+		<GlassToolbarToggleButton
 			active={isActive}
 			data-testid="tb-italic"
 			disabled={disabled}
@@ -15,8 +15,8 @@ const EmMenuButton = ({ editor }: { editor: Editor }) => {
 			onClick={() => editor.chain().focus().toggleItalic().run()}
 			tooltipText={t("editor.italic")}
 		>
-			<ToolbarIcon icon={"italic"} />
-		</ToolbarToggleButton>
+			<GlassToolbarIcon icon={"italic"} />
+		</GlassToolbarToggleButton>
 	);
 };
 

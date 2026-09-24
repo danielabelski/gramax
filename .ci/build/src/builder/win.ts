@@ -53,10 +53,11 @@ export class WindowsBuilder extends Builder {
 	}
 
 	override async _sign(): Promise<void> {
-		// gramax.windows-x86_64.exe & the app packaged in installer are already signed
+		// tauri already signed both the app binary and the installer through `bundle.windows.signCommand`
 	}
 
 	override async _verify(): Promise<void> {
 		await sign.win.verify(path.join(this.outdir, `gramax.${this.platform}.exe`));
+		await sign.win.verify(path.join(this.outdir, `gramax.${this.platform}.setup.exe`));
 	}
 }

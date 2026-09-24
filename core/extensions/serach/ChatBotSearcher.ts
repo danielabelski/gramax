@@ -23,6 +23,7 @@ export interface SearchStreamArgs extends SearchArgsBase {
 }
 
 export default interface ChatBotSearcher {
+	checkConnection(): Promise<boolean>;
 	search(args: SearchArgs): Promise<ChatBotSearchItem[]>;
 	search(args: SearchStreamArgs): Promise<ChatBotSearchStream>;
 	search(args: SearchArgs | SearchStreamArgs): Promise<ChatBotSearchItem[] | ChatBotSearchStream>;

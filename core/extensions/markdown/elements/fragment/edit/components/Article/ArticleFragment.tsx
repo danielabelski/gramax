@@ -1,31 +1,49 @@
+import { useRouter } from "@core/Api/useRouter";
 import ApiUrlCreator from "@core-ui/ContextServices/ApiUrlCreator";
 import ResourceService from "@core-ui/ContextServices/ResourceService/ResourceService";
 import BaseArticleView from "@ext/articleProvider/components/BaseArticleView";
 import type { ProviderItemProps } from "@ext/articleProvider/models/types";
 import t from "@ext/localization/locale/translate";
-import getArticleWithTitle from "@ext/markdown/elements/article/edit/logic/getArticleWithTitle";
 import FragmentUpdateService from "@ext/markdown/elements/fragment/edit/components/FragmentUpdateService";
 import FragmentService from "@ext/markdown/elements/fragment/edit/components/Tab/FragmentService";
+import { updateFragmentItem } from "@ext/markdown/elements/fragment/edit/logic/updateFragmentItem";
 import { Placeholder } from "@ext/markdown/elements/placeholder/placeholder";
+import NavigationEvents from "@ext/navigation/NavigationEvents";
 import type { JSONContent } from "@tiptap/core";
+import { useEffect } from "react";
 
 const ArticleFragment = ({ item }: { item: ProviderItemProps }) => {
 	const { fragments } = FragmentService.value;
 	const apiUrlCreator = ApiUrlCreator.value;
+	const router = useRouter();
+
+	useEffect(() => {
+		const listener = async ({ path, mutable }: { path: string; mutable: { preventGoto?: boolean } }) => {
+			mutable.preventGoto = true;
+			await FragmentUpdateService.updateContent(item.id, apiUrlCreator);
+			FragmentService.closeItem();
+			router.pushPath(path);
+		};
+
+		const clickToken = NavigationEvents.on("item-click", listener);
+		const createToken = NavigationEvents.on("item-create", listener);
+		const deleteToken = NavigationEvents.on("item-delete", listener);
+
+		return () => {
+			NavigationEvents.off(clickToken);
+			NavigationEvents.off(createToken);
+			NavigationEvents.off(deleteToken);
+		};
+	}, [item.id, router.pushPath]);
 
 	const updateContent = (id: string, content: JSONContent, title: string) => {
-		const newFragment = fragments.get(id);
-		if (!newFragment) return;
+		const fragment = fragments.get(id);
+		if (!fragment) return;
+		const updatedFragment = updateFragmentItem(fragment, content, title);
 
-		if (newFragment.title !== title) {
-			newFragment.title = title.trim();
-		}
-
-		let newContent = { ...content };
-		newContent.content.shift();
-		newContent = getArticleWithTitle(title, newContent);
-
-		FragmentService.setItems(Array.from(fragments.values()));
+		FragmentService.setItems(
+			Array.from(fragments.values()).map((item) => (item.id === updatedFragment.id ? updatedFragment : item)),
+		);
 	};
 
 	const onCloseClick = async () => {

@@ -1,3 +1,4 @@
+import { TextOverflowTooltip } from "@ui-kit/Tooltip";
 import { tv } from "tailwind-variants";
 
 export type TocLinkLevel = 0 | 1 | 2 | 3 | 4;
@@ -10,7 +11,7 @@ interface TocLinkProps {
 }
 
 const tocLinkStyles = tv({
-	base: "block no-underline text-xs w-full overflow-hidden whitespace-nowrap h-7 text-ellipsis text-[var(--color-primary-general)] hover:text-[var(--color-primary)]",
+	base: "flex h-7 w-full items-center whitespace-nowrap text-xs leading-7 no-underline transition-colors text-muted hover:text-primary-accent",
 	variants: {
 		level: {
 			0: "",
@@ -20,7 +21,7 @@ const tocLinkStyles = tv({
 			4: "pl-12",
 		},
 		active: {
-			true: "active text-[var(--color-primary)] font-normal",
+			true: "active text-primary-accent",
 			false: "",
 		},
 	},
@@ -29,6 +30,6 @@ const tocLinkStyles = tv({
 
 export const TocLink = ({ href, level, active = false, children }: TocLinkProps) => (
 	<a className={tocLinkStyles({ level, active })} data-qa={`article-navigation-link-level-${level}`} href={href}>
-		{children}
+		<TextOverflowTooltip>{children}</TextOverflowTooltip>
 	</a>
 );

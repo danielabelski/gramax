@@ -16,9 +16,6 @@ apps/tauri/src-tauri/icons
 
 apps/next/public
 
-# e2e
-/e2e/report
-
 # target -> next
 out/
 .next/

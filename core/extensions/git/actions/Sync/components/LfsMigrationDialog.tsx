@@ -11,17 +11,7 @@ import type MergeData from "@ext/git/actions/MergeConflictHandler/model/MergeDat
 import t from "@ext/localization/locale/translate";
 import type { DiffHunk } from "@ext/VersionControl/DiffHandler/model/DiffHunk";
 import { FileStatus } from "@ext/Watchers/model/FileStatus";
-import {
-	AlertDialog,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogIcon,
-	AlertDialogTitle,
-} from "@ui-kit/AlertDialog";
-import { Button, LoadingButtonTemplate } from "@ui-kit/Button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@ui-kit/Collapsible";
+import { AlertProgressConfirm } from "@ui-kit/AlertDialog";
 import { Skeleton } from "@ui-kit/Skeleton";
 import { diffLines } from "diff";
 import { type ReactNode, useEffect, useState } from "react";
@@ -87,7 +77,7 @@ const DetailsAttributes = ({ added, removed }: { added: string[]; removed: strin
 	const [lead, tail] = t("git.lfs-migration.alert.details-lead").split("{file}");
 
 	return (
-		<p className="text-muted text-sm">
+		<p className="break-words">
 			{lead}
 			<code data-component="code">.gitattributes</code>
 			{tail}
@@ -117,7 +107,6 @@ export interface LfsMigrationDialogProps {
 const LfsMigrationDialog = ({ apiUrlCreator, fileDiff, added, removed, onSettled }: LfsMigrationDialogProps) => {
 	const [open, setOpen] = useState(true);
 	const [migrating, setMigrating] = useState(false);
-	const [detailsOpen, setDetailsOpen] = useState(false);
 	// Walking the HEAD tree can take a while on a large catalog, so the dialog opens right away and
 	// fills the numbers in when they arrive. `undefined` is still loading, `null` is a failed request
 	// — both handled by `AffectedSummary`. The fetch keeps `notifyError` off (a stats failure must not
@@ -161,88 +150,36 @@ const LfsMigrationDialog = ({ apiUrlCreator, fileDiff, added, removed, onSettled
 		onSettled(true, res.ok ? (await res.json()).mergeData : undefined);
 	};
 
-	const onOpenChange = (nextOpen: boolean) => {
-		if (!nextOpen) {
-			handleDismiss();
-			return;
-		}
-		setOpen(nextOpen);
-	};
-
-	const onEscapeKeyDown = (event: Event) => {
-		if (migrating) event.preventDefault();
-	};
-
 	return (
-		<AlertDialog onOpenChange={onOpenChange} open={open}>
-			<AlertDialogContent onEscapeKeyDown={onEscapeKeyDown}>
-				<AlertDialogHeader className="grid grid-cols-[0_1fr] items-start gap-y-4 has-[>svg]:grid-cols-[1.5rem_1fr] has-[>svg]:gap-x-4">
-					<AlertDialogIcon icon="cloud-upload" />
-					<AlertDialogTitle className="col-start-2 mb-0 text-left">
-						{t(`git.lfs-migration.alert.${migrating ? "migrating" : "title"}`)}
-					</AlertDialogTitle>
-					<AlertDialogDescription asChild className="col-start-2 text-left">
-						<div className="flex flex-col gap-3">
-							<p>{t("git.lfs-migration.alert.body")}</p>
-
-							<AffectedSummary stats={affected} />
-
-							{fileDiff && (
-								<Collapsible onOpenChange={setDetailsOpen} open={detailsOpen}>
-									<CollapsibleTrigger asChild>
-										<Button
-											className="text-muted-foreground h-auto p-0 text-sm font-normal"
-											endIcon={detailsOpen ? "chevron-up" : "chevron-down"}
-											size="sm"
-											variant="link"
-										>
-											{t("git.lfs-migration.alert.details-trigger")}
-										</Button>
-									</CollapsibleTrigger>
-									<CollapsibleContent className="flex flex-col gap-2">
-										<DetailsAttributes added={added} removed={removed} />
-										<p className="text-muted text-sm">
-											{t("git.lfs-migration.alert.details-directions")}
-										</p>
-										<div className="max-h-64 overflow-auto rounded-md border p-2 text-sm">
-											<DiffContent changes={toLineHunks(fileDiff)} isCode showDiff />
-										</div>
-									</CollapsibleContent>
-								</Collapsible>
-							)}
-
-							{!migrating && (
-								<p className="text-muted-foreground text-sm">{t("git.lfs-migration.alert.footnote")}</p>
-							)}
+		<AlertProgressConfirm
+			cancelText={t("git.lfs-migration.alert.later")}
+			confirmText={t("git.lfs-migration.alert.migrate")}
+			description={
+				<>
+					<p>{t("git.lfs-migration.alert.body")}</p>
+					<AffectedSummary stats={affected} />
+				</>
+			}
+			details={
+				fileDiff && (
+					<>
+						<DetailsAttributes added={added} removed={removed} />
+						<p>{t("git.lfs-migration.alert.details-directions")}</p>
+						<div className="max-h-64 overflow-auto rounded-md border p-2">
+							<DiffContent changes={toLineHunks(fileDiff)} isCode showDiff />
 						</div>
-					</AlertDialogDescription>
-				</AlertDialogHeader>
-				{/* The ui-kit footer only stacks below the `sm` viewport breakpoint, but the dialog can be
-				    narrow while the window is wide. Labels never break mid-word: the buttons keep their
-				    text on one line and wrap onto separate rows instead. */}
-				<AlertDialogFooter className="flex-wrap gap-2 sm:justify-end sm:space-x-0">
-					<Button
-						className="whitespace-nowrap"
-						disabled={migrating}
-						onClick={handleDismiss}
-						variant="outline"
-					>
-						{t("git.lfs-migration.alert.later")}
-					</Button>
-					{migrating ? (
-						<LoadingButtonTemplate
-							className="whitespace-nowrap"
-							text={t("git.lfs-migration.alert.migrate")}
-							variant="primary"
-						/>
-					) : (
-						<Button className="whitespace-nowrap" onClick={handleMigrate} variant="primary">
-							{t("git.lfs-migration.alert.migrate")}
-						</Button>
-					)}
-				</AlertDialogFooter>
-			</AlertDialogContent>
-		</AlertDialog>
+					</>
+				)
+			}
+			detailsText={t("git.lfs-migration.alert.details-trigger")}
+			icon="cloud-upload"
+			note={!migrating && <p>{t("git.lfs-migration.alert.footnote")}</p>}
+			onCancel={handleDismiss}
+			onConfirm={handleMigrate}
+			open={open}
+			running={migrating}
+			title={t(`git.lfs-migration.alert.${migrating ? "migrating" : "title"}`)}
+		/>
 	);
 };
 

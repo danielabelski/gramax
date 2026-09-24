@@ -194,6 +194,76 @@ fn fetch(_sandbox: TempDir, #[with(&_sandbox)] repos: Repos) -> Result {
 	Ok(())
 }
 
+fn set_upstream(repos: &Repos, branch: &str, upstream: Option<&str>) -> Result {
+	repos.local.repo().find_branch(branch, BranchType::Local)?.set_upstream(upstream)?;
+	Ok(())
+}
+
+fn commit_on_remote(repos: &Repos, branch: &str) -> Result {
+	repos.remote.checkout(branch, false)?;
+	fs::write(repos.remote_path.join("file"), format!("committed on {branch}"))?;
+	repos.remote.add_all()?;
+	repos.remote.commit_debug()?;
+	Ok(())
+}
+
+#[rstest]
+fn fetch_stops_tracking_another_branch(_sandbox: TempDir, #[with(&_sandbox)] repos: Repos) -> Result {
+	repos.local.new_branch("feature")?;
+	repos.local.debug_push()?;
+	// what `git checkout -b feature origin/master` leaves behind
+	set_upstream(&repos, "feature", Some("origin/master"))?;
+	commit_on_remote(&repos, "master")?;
+
+	repos.local.fetch(RemoteOptions::default(), Rc::new(|_| {}))?;
+
+	let feature = repos.local.branch_by_head()?.short_info()?;
+	assert_eq!(feature.remote_name, Some("feature".into()));
+	assert_eq!(repos.local.count_changed_files("file")?.pull, 0);
+	Ok(())
+}
+
+#[rstest]
+fn fetch_tracks_branch_of_same_name_when_upstream_is_missing(_sandbox: TempDir, #[with(&_sandbox)] repos: Repos) -> Result {
+	repos.local.new_branch("feature")?;
+	repos.local.debug_push()?;
+	set_upstream(&repos, "feature", None)?;
+	commit_on_remote(&repos, "feature")?;
+
+	repos.local.fetch(RemoteOptions::default(), Rc::new(|_| {}))?;
+
+	let feature = repos.local.branch_by_head()?.short_info()?;
+	assert_eq!(feature.remote_name, Some("feature".into()));
+	assert_eq!(repos.local.count_changed_files("file")?.pull, 1);
+	Ok(())
+}
+
+#[rstest]
+fn fetch_drops_upstream_to_another_branch_when_own_is_not_on_remote(_sandbox: TempDir, #[with(&_sandbox)] repos: Repos) -> Result {
+	repos.local.new_branch("feature")?;
+	set_upstream(&repos, "feature", Some("origin/master"))?;
+	commit_on_remote(&repos, "master")?;
+
+	repos.local.fetch(RemoteOptions::default(), Rc::new(|_| {}))?;
+
+	let feature = repos.local.branch_by_head()?.short_info()?;
+	assert_eq!(feature.remote_name, None);
+	assert_eq!(repos.local.count_changed_files("file")?.pull, 0);
+	Ok(())
+}
+
+#[rstest]
+fn push_tracks_created_branch_even_if_upstream_was_another(_sandbox: TempDir, #[with(&_sandbox)] repos: Repos) -> Result {
+	repos.local.new_branch("feature")?;
+	set_upstream(&repos, "feature", Some("origin/master"))?;
+
+	repos.local.debug_push()?;
+
+	let feature = repos.local.branch_by_head()?.short_info()?;
+	assert_eq!(feature.remote_name, Some("feature".into()));
+	Ok(())
+}
+
 #[rstest]
 #[case("https://github.com/pashokitsme/android-intent")]
 fn auto_add_remote_postfix(_sandbox: TempDir, #[case] url: &str, #[with(&_sandbox)] repo: Repo<TestCreds>) -> Result {

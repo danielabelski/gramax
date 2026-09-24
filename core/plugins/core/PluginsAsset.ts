@@ -25,8 +25,15 @@ export interface PluginsListResult {
 }
 
 export class PluginsAsset extends Asset {
-	listIds(): Promise<string[]> {
-		return this._listDir(PLUGINS_PATH);
+	async listIds(): Promise<string[]> {
+		const names = await this._listDir(PLUGINS_PATH);
+		const entries = await Promise.all(
+			names.map(async (name) => ({
+				name,
+				isFolder: await this._fp.isFolder(PLUGINS_PATH.join(new Path(name))).catch(() => false),
+			})),
+		);
+		return entries.filter((entry) => entry.isFolder).map((entry) => entry.name);
 	}
 
 	async getAll(): Promise<PluginsListResult> {
@@ -51,13 +58,14 @@ export class PluginsAsset extends Asset {
 
 		const files = await this._readFolder(folder);
 		const paths = PluginFileParser.getPluginFilePaths(pluginId);
+		const metadataFileName = PluginFileParser.getMetadataFileName(files.map((file) => file.path));
 
 		let metadata: string | null = null;
 		let script: string | null = null;
 		let locale: string | null = null;
 
 		for (const f of files) {
-			if (f.path === paths.metadata) metadata = f.content;
+			if (f.path === metadataFileName) metadata = f.content;
 			else if (f.path === paths.script) script = f.content;
 			else if (f.path === paths.locale) locale = f.content;
 		}

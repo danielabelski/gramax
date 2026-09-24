@@ -2,7 +2,7 @@ import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/Butt
 import t from "@ext/localization/locale/translate";
 import getSelectedText from "@ext/markdown/elementsUtils/getSelectedText";
 import type { Editor } from "@tiptap/core";
-import { ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 
 const LinkMenuButton = ({ editor, onClick }: { editor: Editor; onClick: () => void }) => {
 	const { disabled, isActive } = ButtonStateService.useCurrentAction({ mark: "link" });
@@ -12,7 +12,7 @@ const LinkMenuButton = ({ editor, onClick }: { editor: Editor; onClick: () => vo
 	};
 
 	return (
-		<ToolbarToggleButton
+		<GlassToolbarToggleButton
 			active={isActive}
 			data-qa="link-button"
 			disabled={disabled}
@@ -20,8 +20,8 @@ const LinkMenuButton = ({ editor, onClick }: { editor: Editor; onClick: () => vo
 			onClick={() => onClickHandler()}
 			tooltipText={t("link")}
 		>
-			<ToolbarIcon icon={"link"} />
-		</ToolbarToggleButton>
+			<GlassToolbarIcon icon={"link"} />
+		</GlassToolbarToggleButton>
 	);
 };
 

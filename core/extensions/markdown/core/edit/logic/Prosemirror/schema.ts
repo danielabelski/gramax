@@ -44,6 +44,7 @@ import noteTitle from "@ext/markdown/elements/note/edit/model/noteTitleSchema";
 import openApiSchema from "@ext/markdown/elements/openApi/edit/models/openApiSchema";
 import paragraphSchema from "@ext/markdown/elements/paragraph/editor/model/paragraphSchema";
 import questionSchema from "@ext/markdown/elements/question/edit/models/questionSchema";
+import secretSchema from "@ext/markdown/elements/secret/edit/model/secretSchema";
 import * as table_simple from "@ext/markdown/elements/table/edit/model/simpleTableSchema";
 import * as table from "@ext/markdown/elements/table/edit/model/tableSchema";
 import tabSchema from "@ext/markdown/elements/tabs/edit/model/tab/tabSchema";
@@ -82,6 +83,9 @@ export const getSchema = (additionalSchema?: Record<string, any>, modifiers?: Sc
 			br,
 			horizontal_rule,
 			hard_break: { inline: true, group: "inline", selectable: false },
+			// leafText keeps textContent identical to the old "softbreak -> space" parsing:
+			// the diff engine, search and exports read it (one char per one leaf position).
+			soft_break: { inline: true, group: "inline", atom: true, selectable: false, leafText: () => " " },
 
 			...table,
 			...table_simple,
@@ -98,6 +102,7 @@ export const getSchema = (additionalSchema?: Record<string, any>, modifiers?: Sc
 
 			"inline-property": inlinePropertySchema,
 			"block-property": blockPropertySchema,
+			secret: secretSchema,
 
 			// "db-diagram": blockMd("db-diagram"),
 			// "db-table": blockMd("db-table"),

@@ -23,7 +23,7 @@ interface HeaderProps {
 
 const TooltipElement = ({ content, children }: { content: ReactElement; children: ReactElement }) => {
 	return (
-		<Tooltip delayDuration={500}>
+		<Tooltip>
 			<TooltipTrigger asChild>{children}</TooltipTrigger>
 			<TooltipContent>{content}</TooltipContent>
 		</Tooltip>

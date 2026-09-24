@@ -8,6 +8,7 @@ import { compressOptionsFor, optimalCompressRules } from "@core/FileProvider/mod
 import Path from "@core/FileProvider/Path/Path";
 import type { Article } from "@core/FileStructue/Article/Article";
 import parseContent from "@core/FileStructue/Article/parseContent";
+import { ensureLfsPatternForResource } from "@core/GitLfs/logic/ensureLfsPatternForResource";
 import HashResourceManager from "@core/Hash/HashItems/HashResourceManager";
 import { uniqueName } from "@core/utils/uniqueName";
 import ArticleProvider, { type ArticleProviderType } from "@ext/articleProvider/logic/ArticleProvider";
@@ -19,7 +20,7 @@ import { Command } from "../../../types/Command";
 
 /**
  * `compress-images.enabled` is the single user-facing switch: on, every image
- * goes through the optimal preset (JPEG); off, the file is stored as-is.
+ * goes through the optimal preset (WebP); off, the file is stored as-is.
  */
 const getCompressOptions = (
 	settings: SettingsResolver,
@@ -106,8 +107,11 @@ const set: Command<
 
 		await article.parsedContent.write(async (p) => {
 			if (!p || !data) return;
-			const hashItem = new HashResourceManager(outputPath, p.parsedContext.getResourceManager(), ctx);
-			await p.parsedContext.getResourceManager().setContent(outputPath, data, settings);
+			const resourceManager = p.parsedContext.getResourceManager();
+			// Before the write: the mask must reach the index ahead of the file it covers.
+			await ensureLfsPatternForResource(workspace, catalog, resourceManager.getAbsolutePath(outputPath));
+			const hashItem = new HashResourceManager(outputPath, resourceManager, ctx);
+			await resourceManager.setContent(outputPath, data, settings);
 			hashes.deleteHash(hashItem);
 			return p;
 		});

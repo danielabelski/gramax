@@ -1,17 +1,21 @@
+import FetchService from "@core-ui/ApiServices/FetchService";
 import Method from "@core-ui/ApiServices/Types/Method";
 import MimeTypes from "@core-ui/ApiServices/Types/MimeTypes";
+import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
+import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
+import SourceDataService from "@core-ui/ContextServices/SourceDataService";
 import WorkspaceService from "@core-ui/ContextServices/Workspace";
 import { useApi, useDeferApi } from "@core-ui/hooks/useApi";
-import { refreshPage } from "@core-ui/utils/initGlobalFuncs";
 import type { AgentEvent } from "@ext/agent/core/events";
-import { agentLlmConfig } from "@ext/agent/llm/agentLlmConfig";
+import type { AgentLlmEndpoint } from "@ext/agent/llm";
+import { getEnterpriseSourceData } from "@ext/enterprise/utils/getEnterpriseSourceData";
 import t from "@ext/localization/locale/translate";
 import { useWorkspaceAi } from "@ext/workspace/components/useWorkspaceAi";
-import { useCallback, useRef, useState } from "react";
-import { getApiKey } from "../store/AgentStore";
+import { useCallback, useState } from "react";
+import { setQuote, useChatQuote } from "../store/ChatStore";
 import type { SessionStatePayload } from "../types/chat";
+import { snapshotAgentSession } from "../utils/agentSessionActivity";
 import { useAgentAttachments } from "./useAgentAttachments";
-import { getAgentEnabledSnapshot } from "./useAgentChatVisibility";
 import { useAgentPollTick } from "./useAgentPollTick";
 import { useDraftPersistence } from "./useDraftPersistence";
 
@@ -20,12 +24,6 @@ type MessageSendPayload = {
 	error?: string;
 	message?: string;
 };
-
-const SEND_OPTS = {
-	method: Method.POST,
-	mime: MimeTypes.json,
-	consumeError: true,
-} as const;
 
 const CANCEL_OPTS = {
 	method: Method.POST,
@@ -48,7 +46,7 @@ const errorText = (data: MessageSendPayload | null, fallback: string): string =>
 	}
 };
 
-const getWorkspaceAiDirectUrl = (baseUrl: string | undefined) => {
+const getChatCompletionsUrl = (baseUrl: string | undefined) => {
 	if (!baseUrl) return undefined;
 	const trimmed = baseUrl.replace(/\/+$/, "");
 	return `${trimmed}/openaiapi/chat/completions`;
@@ -60,7 +58,7 @@ type Args = {
 	openCatalogName: string | null;
 	openItemPath: string | null;
 	fetchSessionState: () => Promise<SessionStatePayload | null>;
-	flushSessionEvents: (data: SessionStatePayload | null) => AgentEvent[];
+	applySessionState: (data: SessionStatePayload | null) => AgentEvent[];
 	startPolling: (tick: () => Promise<void> | void) => void;
 	stopPolling: () => void;
 	appendError: (message: string) => void;
@@ -72,17 +70,17 @@ export const useAgentSender = ({
 	openCatalogName,
 	openItemPath,
 	fetchSessionState,
-	flushSessionEvents,
+	applySessionState,
 	startPolling,
 	stopPolling,
 	appendError,
 }: Args) => {
-	const [browserAllowed, setBrowserAllowedState] = useState(false);
-	const browserAllowedRef = useRef(browserAllowed);
-	browserAllowedRef.current = browserAllowed;
 	const workspacePath = WorkspaceService.current()?.path ?? "";
+	const sourceDatas = SourceDataService.value;
 	const { getData: getWorkspaceAiData } = useWorkspaceAi(workspacePath);
+	const apiUrlCreator = ApiUrlCreatorService.value;
 
+	const [browserAllowed, setBrowserAllowedState] = useState(false);
 	const { call: callSetBrowserAllowed } = useDeferApi<unknown>({
 		url: (api) => api.getAgentBrowserSetAllowedUrl(),
 		opts: { method: Method.POST, mime: MimeTypes.json, consumeError: true },
@@ -94,15 +92,6 @@ export const useAgentSender = ({
 			void callSetBrowserAllowed({ opts: { body: JSON.stringify({ allowed }) } });
 		},
 		[callSetBrowserAllowed],
-	);
-
-	const flushAndRefresh = useCallback(
-		(state: SessionStatePayload | null) => {
-			for (const event of flushSessionEvents(state)) {
-				if ("refreshPage" in event && event.refreshPage) void refreshPage();
-			}
-		},
-		[flushSessionEvents],
 	);
 
 	const {
@@ -119,7 +108,7 @@ export const useAgentSender = ({
 		openCatalogName,
 		openItemPath,
 		fetchSessionState,
-		flushAndRefresh,
+		flushAndRefresh: applySessionState,
 		startPolling,
 		stopPolling,
 	});
@@ -145,14 +134,15 @@ export const useAgentSender = ({
 		hydrating,
 	});
 
-	const { call: callSend } = useDeferApi<MessageSendPayload>({
-		url: (api) => api.getAgentMessageSendUrl(),
-		opts: SEND_OPTS,
-	});
+	const quote = useChatQuote();
+
 	const { call: callCancel } = useApi<void>({
 		url: (api) => api.getAgentSessionCancelUrl(sessionId ?? ""),
 		opts: CANCEL_OPTS,
 	});
+
+	const { gesUrl } = PageDataContextService.value.conf.enterprise;
+	const { url: gesCloudUrl, enabled: gesCloudEnabled } = PageDataContextService.value.conf.enterpriseCloud;
 
 	const send = useCallback(async () => {
 		const text = draft.trim();
@@ -161,23 +151,26 @@ export const useAgentSender = ({
 		const pickedAttachments = attachments;
 		const pickedSkill = selectedSkillName;
 		const pickedDraftAttachments = draftAttachments;
+		const pickedQuote = quote;
 		const restoreDraft = () => {
 			setDraft(text);
 			setAttachments(pickedAttachments);
 			setDraftAttachments(pickedDraftAttachments);
+			setQuote(pickedQuote);
 			if (sessionId) {
-				persistDraft(sessionId, text, pickedSkill, pickedDraftAttachments);
-				restoreBaseline(text, pickedSkill, pickedDraftAttachments);
+				persistDraft(sessionId, text, pickedSkill, pickedDraftAttachments, pickedQuote);
+				restoreBaseline(text, pickedSkill, pickedDraftAttachments, pickedQuote);
 			}
 		};
 		setSending(true);
 		sendingRef.current = true;
-		sessionSnapshotRef.current = null;
+		sessionSnapshotRef.current = snapshotAgentSession(null);
 		setShowAgentThinkingIfChanged(true);
 		flushDraft();
 		setDraft("");
 		setAttachments([]);
 		setDraftAttachments([]);
+		setQuote(null);
 
 		try {
 			const activeId = sessionId;
@@ -189,43 +182,58 @@ export const useAgentSender = ({
 
 			clearOnSend(activeId, pickedSkill);
 
-			startPolling(() => void pollTickRef.current());
-			const workspaceAiData = await getWorkspaceAiData().catch(() => undefined);
-			const agentEnabled = getAgentEnabledSnapshot();
-			const apiUrl = agentEnabled
-				? agentLlmConfig.directUrl
-				: (getWorkspaceAiDirectUrl(workspaceAiData?.aiApiUrl) ?? "");
-			const apiToken = agentEnabled ? (getApiKey() ?? "") : (workspaceAiData?.aiToken ?? "");
+			startPolling(() => pollTickRef.current().then(() => undefined));
 
-			let httpErrorBody: MessageSendPayload | null = null;
-			let networkErrored = false;
-			const data = await callSend({
-				opts: {
-					body: JSON.stringify({
-						sessionId: activeId,
-						text,
-						apiUrl,
-						apiToken,
-						attachments: pickedAttachments,
-						openCatalogName,
-						openItemPath,
-						useSkill: pickedSkill,
-					}),
-				},
-				onError: (err) => {
-					if (err instanceof Error) networkErrored = true;
-					else httpErrorBody = (err as MessageSendPayload | null) ?? null;
-				},
-			});
-			if (networkErrored) {
+			let endpoint: AgentLlmEndpoint;
+			if (gesUrl) {
+				endpoint = {
+					kind: "enterprise",
+					url: getChatCompletionsUrl(gesUrl) ?? "",
+					token: getEnterpriseSourceData(sourceDatas ?? [], gesUrl)?.token ?? "",
+				};
+			} else if (gesCloudUrl && gesCloudEnabled) {
+				endpoint = { kind: "enterpriseCloud", url: getChatCompletionsUrl(gesCloudUrl) ?? "" };
+			} else {
+				const workspaceAiData = await getWorkspaceAiData().catch(() => undefined);
+				const workspaceUrl = getChatCompletionsUrl(workspaceAiData?.aiApiUrl);
+				if (!workspaceUrl) {
+					restoreDraft();
+					appendError(t("agent.error-type.unauthorized"));
+					return;
+				}
+
+				endpoint = { kind: "direct", url: workspaceUrl, apiKey: workspaceAiData?.aiToken ?? "" };
+			}
+
+			// DeferApi does not support parallel requests
+			const res = await FetchService.fetch<MessageSendPayload>(
+				apiUrlCreator.getAgentMessageSendUrl(),
+				JSON.stringify({
+					sessionId: activeId,
+					text,
+					endpoint,
+					attachments: pickedAttachments,
+					quote: pickedQuote ?? undefined,
+					openCatalogName,
+					openItemPath,
+					useSkill: pickedSkill,
+				}),
+				MimeTypes.json,
+				Method.POST,
+				false,
+			);
+
+			if (!res.ok) {
+				const httpErrorBody = (await res.json().catch(() => null)) as MessageSendPayload | null;
 				restoreDraft();
-				appendError(t("agent.chat-error.agent-failed"));
+				appendError(errorText(httpErrorBody, t("agent.chat-error.send-message-error")));
 				return;
 			}
 
+			const data = (await res.json()) as MessageSendPayload | null;
 			if (!data) {
 				restoreDraft();
-				appendError(errorText(httpErrorBody, t("agent.chat-error.send-message-error")));
+				appendError(t("agent.chat-error.send-message-error"));
 				return;
 			}
 
@@ -244,15 +252,18 @@ export const useAgentSender = ({
 	}, [
 		appendError,
 		attachments,
-		callSend,
 		clearOnSend,
 		draft,
 		draftAttachments,
+		gesCloudUrl,
+		gesCloudEnabled,
 		flushDraft,
+		gesUrl,
 		openCatalogName,
 		openItemPath,
 		persistDraft,
 		pollTickRef,
+		quote,
 		restoreBaseline,
 		selectedSkillName,
 		sending,
@@ -272,7 +283,7 @@ export const useAgentSender = ({
 		if (!sessionId) return;
 		sendingRef.current = false;
 		setShowAgentThinkingIfChanged(false);
-		sessionSnapshotRef.current = null;
+		sessionSnapshotRef.current = snapshotAgentSession(null);
 		stopPolling();
 		await callCancel();
 		await pollTickRef.current();

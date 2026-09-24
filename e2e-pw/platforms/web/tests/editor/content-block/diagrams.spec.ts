@@ -5,7 +5,7 @@ import { editorTest } from "@web/fixtures/editor.fixture";
 editorTest.describe("Diagrams", () => {
 	editorTest("mermaid", async ({ editor, basePage, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "Mermaid" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "Mermaid" }).click();
 
 		const diagram = sharedPage.locator('[data-qa="qa-diagram-data"]');
 
@@ -24,7 +24,7 @@ editorTest.describe("Diagrams", () => {
 
 	editorTest("clear mermaid content doesn't throw error", async ({ editor, basePage, sharedPage }) => {
 		await editor.clickToolbar("semiBlocks");
-		await sharedPage.getByRole("menuitem", { name: "PlantUML" }).click();
+		await sharedPage.getByRole("menuitemradio", { name: "PlantUML" }).click();
 
 		const diagram = sharedPage.locator('[data-qa="qa-diagram-data"]');
 

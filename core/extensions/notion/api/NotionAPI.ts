@@ -117,25 +117,31 @@ export default class NotionAPI implements SourceAPI {
 		requestBody?,
 	): Promise<{ status: number; body?: any; contentType?: string }> {
 		const isNotionApi = !url.startsWith("http");
-		const fetchOptions = {
-			url: isNotionApi ? `https://api.notion.com/v1/${url}` : url,
+		const requestUrl = isNotionApi ? `https://api.notion.com/v1/${url}` : url;
+		const fetchOptions: RequestInit = {
 			method,
 			...(isNotionApi && {
-				headers: { "Notion-Version": "2022-06-28" },
-				auth: { token: this._data.token },
+				headers: {
+					Authorization: `Bearer ${this._data.token}`,
+					"Content-Type": "application/json",
+					"Notion-Version": "2022-06-28",
+				},
 				...(requestBody && { body: requestBody }),
 			}),
 		};
 
 		for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
 			try {
-				const { status, body, contentType } = await resolveModule("httpFetch")(fetchOptions);
+				const res = await resolveModule("httpFetch")(requestUrl, fetchOptions);
+				const status = res.status;
+				const contentType = res.headers.get("content-type") ?? undefined;
+				const body = contentType?.includes("application/json")
+					? await res.json()
+					: new Uint8Array(await res.arrayBuffer());
 				if (status !== null && status !== 429) {
 					return {
 						status,
-						body: contentType.includes("application/json")
-							? JSON.parse(body.data as string)
-							: new Uint8Array(body.data as number[]),
+						body,
 						contentType,
 					};
 				}

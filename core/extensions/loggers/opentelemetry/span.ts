@@ -1,9 +1,14 @@
+import { isSecretKey, REDACTED } from "@ext/loggers/redactSecrets";
 import type * as api from "@opentelemetry/api";
 import type * as sdk from "@opentelemetry/sdk-trace-base";
 
 export interface ToSpan {
 	toSpan(): unknown;
 }
+
+/** Approximate budget, in serialized characters, a single span attribute may spend. */
+const SERIALIZE_LIMIT = 2600;
+const TRUNCATED = "<truncated>";
 
 export enum SpanAttribute {
 	Args = "args",
@@ -93,35 +98,59 @@ export class OtelSpanEncoder {
 	}
 
 	serialize(value: unknown): api.AttributeValue {
-		const limit = 2600;
 		try {
 			if (typeof value === "number" || typeof value === "string" || typeof value === "boolean") return value;
 			if (typeof value === "function") return "function";
 
-			const resolved = this._resolveDeep(value);
-			const json = JSON.stringify(resolved);
-			return json?.length > limit ? `<${json.length - limit} more> ${json.slice(0, limit)} ..` : json;
+			return JSON.stringify(this._resolveDeep(value));
 		} catch (e) {
-			console.error("failed to serialize span", e, value);
-			return `${value}`;
+			// never echo `value` — the object that failed to serialize may be the one carrying credentials
+			console.error("failed to serialize span", e);
+			return "<unserializable>";
 		}
 	}
 
-	private _resolveDeep(value: unknown, depth = 0, limit = 12, seen: WeakSet<object> = new WeakSet()): unknown {
+	/**
+	 * @param redacted the value sits under a credential-bearing key — every primitive below it is masked.
+	 */
+	private _resolveDeep(
+		value: unknown,
+		depth = 0,
+		limit = 12,
+		seen: WeakSet<object> = new WeakSet(),
+		budget: { left: number } = { left: SERIALIZE_LIMIT },
+		redacted = false,
+	): unknown {
 		if (value === null || value === undefined) return value;
-		if (typeof value !== "object") return value;
+		if (typeof value === "string") {
+			if (redacted) {
+				budget.left -= REDACTED.length + 2;
+				return REDACTED;
+			}
+			const room = Math.max(0, budget.left);
+			budget.left -= value.length + 2;
+			return value.length > room ? `${value.slice(0, room)}${TRUNCATED}` : value;
+		}
+		if (typeof value !== "object") {
+			budget.left -= redacted ? REDACTED.length + 2 : 8;
+			return redacted ? REDACTED : value;
+		}
+
+		// binary payloads (image paste, resource content) expand byte-per-key into millions of properties — stub them
+		if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return `<binary ${value.byteLength} bytes>`;
 
 		if (seen.has(value)) return "<circular>";
-		seen.add(value);
 
 		if ("then" in value && typeof value.then === "function") return "<promise>";
 		if ("toSpan" in value && typeof value.toSpan === "function") {
 			const span = value.toSpan();
 			if (typeof span === "object" && span !== null) {
 				if (!Array.isArray(span) && value.constructor) span.constructor = value.constructor.name;
-				return this._resolveDeep(span, depth + 1, limit, seen);
+				return this._withPath(seen, value, () =>
+					this._resolveDeep(span, depth + 1, limit, seen, budget, redacted),
+				);
 			}
-			return span;
+			return redacted ? REDACTED : span;
 		}
 
 		if (depth >= limit) {
@@ -129,13 +158,48 @@ export class OtelSpanEncoder {
 			return name && name !== "Object" && name !== "Array" ? `<object ${name}>` : "[...]";
 		}
 
-		if (Array.isArray(value)) return value.map((v) => this._resolveDeep(v, depth + 1, limit, seen));
-
-		const out: Record<string, unknown> = {};
-		for (const [k, v] of Object.entries(value)) {
-			out[k] = this._resolveDeep(v, depth + 1, limit, seen);
+		if (Array.isArray(value)) {
+			return this._withPath(seen, value, () => {
+				const out: unknown[] = [];
+				for (const v of value) {
+					if (budget.left <= 0) {
+						out.push(TRUNCATED);
+						break;
+					}
+					budget.left -= 1;
+					out.push(this._resolveDeep(v, depth + 1, limit, seen, budget, redacted));
+				}
+				return out;
+			});
 		}
-		return out;
+
+		return this._withPath(seen, value, () => {
+			const out: Record<string, unknown> = {};
+			for (const [k, v] of Object.entries(value)) {
+				if (budget.left <= 0) {
+					out[TRUNCATED] = TRUNCATED;
+					break;
+				}
+				budget.left -= k.length + 4;
+				out[k] = this._resolveDeep(v, depth + 1, limit, seen, budget, redacted || isSecretKey(k));
+			}
+			return out;
+		});
+	}
+
+	/**
+	 * Marks `value` as being on the current path while its children are walked, then unmarks it.
+	 * Only ancestors count as circular — a node reached twice through different branches is walked
+	 * twice, so a shared object under a secret key is masked there even if it is also reachable
+	 * from a plain key.
+	 */
+	private _withPath<T>(seen: WeakSet<object>, value: object, walk: () => T): T {
+		seen.add(value);
+		try {
+			return walk();
+		} finally {
+			seen.delete(value);
+		}
 	}
 }
 

@@ -7,6 +7,7 @@ const sessionRestore: Command<{ activeSessionId?: string | null }, { restored: n
 	kind: ResponseKind.json,
 
 	async do({ activeSessionId }) {
+		await this._app.agentManager.secrets.load();
 		await this._app.agentManager.sessions.load(activeSessionId);
 		return { restored: (await this._app.agentManager.sessions.list()).length };
 	},

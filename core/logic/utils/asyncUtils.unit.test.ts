@@ -177,19 +177,14 @@ describe("asyncUtils", () => {
 
 		describe("waitRace", () => {
 			it("returns first completed promise", async () => {
-				const promises = [
-					new Promise((resolve) => setTimeout(() => resolve(1), 100)),
-					new Promise((resolve) => setTimeout(() => resolve(2), 50)),
-				];
+				const pending = new Promise(() => {});
+				const promises = [pending, Promise.resolve(2)];
 				const result = await promises.waitRace();
 				expect(result).toBe(2);
 			});
 
 			it("rejects if first promise is rejected", async () => {
-				const promises = [
-					new Promise((resolve, reject) => setTimeout(() => reject(new Error("first error")), 50)),
-					new Promise((resolve) => setTimeout(() => resolve(2), 100)),
-				];
+				const promises = [Promise.reject(new Error("first error")), Promise.resolve(2)];
 				await expect(promises.waitRace()).rejects.toThrow("first error");
 			});
 		});

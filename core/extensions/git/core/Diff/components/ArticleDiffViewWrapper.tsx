@@ -23,7 +23,7 @@ import useFetchDiffData from "@ext/git/core/Diff/logic/hooks/useFetchDiffData";
 import { useResetArticleView } from "@ext/git/core/Diff/logic/hooks/useResetArticleView";
 import { FileStatus } from "@ext/Watchers/model/FileStatus";
 import type { JSONContent } from "@tiptap/core";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 const DEBOUNCE_TIME = 200;
 const DEBOUNCE_SYMBOL = Symbol();
@@ -42,14 +42,18 @@ const ArticleDiffViewWrapper = ({ data, isReadOnly: propsIsReadOnly }: ArticleDi
 	const apiUrlCreator = ApiUrlCreatorService.value;
 	const sideBarDataRef = useRef(sideBarData);
 
-	const isAdded = sideBarDataRef.current.data.status === FileStatus.new;
-	const isDeleted = sideBarDataRef.current.data.status === FileStatus.delete;
+	const isAdded = sideBarData.data.status === FileStatus.new;
+	const isDeleted = sideBarData.data.status === FileStatus.delete;
 	const isAddedOrDeleted = isAdded || isDeleted;
 	const isReadOnly = propsIsReadOnly || isDeleted || isRevision;
 
-	const newPath = sideBarDataRef.current.data.filePath.path;
-	const oldPath = sideBarDataRef.current.data.filePath.oldPath;
+	const newPath = sideBarData.data.filePath.path;
+	const oldPath = sideBarData.data.filePath.oldPath;
 	const fullArticlePath = Path.join(catalogName, newPath);
+	const diffKey = useMemo(
+		() => JSON.stringify([newPath, oldPath ?? null, sideBarData.data.status, scope ?? null, oldScope ?? null]),
+		[newPath, oldPath, sideBarData.data.status, scope, oldScope],
+	);
 
 	const content = useRef<string>(null);
 	const editTree = useRef<JSONContent>(null);
@@ -57,7 +61,14 @@ const ArticleDiffViewWrapper = ({ data, isReadOnly: propsIsReadOnly }: ArticleDi
 	const oldContent = useRef<string>(null);
 	const oldEditTree = useRef<JSONContent>(null);
 
-	const [isLoading, setIsLoading] = useState(true);
+	const activeDiffKeyRef = useRef(diffKey);
+	activeDiffKeyRef.current = diffKey;
+	const requestIdRef = useRef(0);
+	const [loadState, setLoadState] = useState<{ diffKey: string | null; isLoading: boolean }>({
+		diffKey: null,
+		isLoading: true,
+	});
+	const isLoading = loadState.diffKey !== diffKey || loadState.isLoading;
 
 	const fetchDiffData = useFetchDiffData({ isAdded, isDeleted, scope, oldScope, newPath, oldPath });
 
@@ -70,67 +81,57 @@ const ArticleDiffViewWrapper = ({ data, isReadOnly: propsIsReadOnly }: ArticleDi
 			const haveNewDataAlready = isAdded || (editTree.current && typeof content.current === "string");
 			const haveOldDataAlreadyOrNotNeeded = isDeleted || haveOldDataAlready;
 			if (haveNewDataAlready && haveOldDataAlreadyOrNotNeeded) return;
-			setIsLoading(true);
-
-			try {
-				const { newData, oldData } = await fetchDiffData(null);
-				oldContent.current = oldData?.content;
-				oldEditTree.current = oldData?.editTree;
-				content.current = newData?.content;
-				editTree.current = newData?.editTree;
-			} catch (error) {
-				console.error(error);
-			} finally {
-				setIsLoading(false);
-			}
-
-			return;
-		}
-
-		if (isAddedOrDeleted) {
-			setIsLoading(true);
-			const { newData, oldData } = await fetchDiffData(null);
-			if (isAdded) {
-				content.current = newData?.content;
-				editTree.current = newData?.editTree;
-			} else {
-				oldContent.current = oldData?.content;
-				oldEditTree.current = oldData?.editTree;
-			}
-			setIsLoading(false);
-			return;
 		}
 
 		const haveOldDataAlready = oldEditTree.current && typeof oldContent.current === "string";
-		const onlyNew = !!haveOldDataAlready;
+		const onlyNew = !isRevision && !isAddedOrDeleted && !!haveOldDataAlready;
+		const requestId = ++requestIdRef.current;
+		const isCurrentRequest = () => requestId === requestIdRef.current && activeDiffKeyRef.current === diffKey;
 
-		setIsLoading(true);
-		const { newData, oldData } = await fetchDiffData(onlyNew);
+		setLoadState({ diffKey, isLoading: true });
+		try {
+			const { newData, oldData } = await fetchDiffData(onlyNew);
+			if (!isCurrentRequest()) return;
 
-		content.current = newData?.content;
-		editTree.current = newData?.editTree;
-		if (!onlyNew) {
-			oldContent.current = oldData?.content;
-			oldEditTree.current = oldData?.editTree;
+			if (!isDeleted) {
+				content.current = newData?.content;
+				editTree.current = newData?.editTree;
+			}
+			if (!isAdded && !onlyNew) {
+				oldContent.current = oldData?.content;
+				oldEditTree.current = oldData?.editTree;
+			}
+		} catch (error) {
+			if (isRevision) console.error(error);
+			else throw error;
+		} finally {
+			if (isCurrentRequest()) setLoadState({ diffKey, isLoading: false });
 		}
-		setIsLoading(false);
 	};
 
 	useResetArticleView();
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
+	// biome-ignore lint/correctness/useExhaustiveDependencies: diffKey represents all inputs used to load the diff
 	useLayoutEffect(() => {
+		requestIdRef.current += 1;
+		sideBarDataRef.current = sideBarData;
+		content.current = null;
+		editTree.current = null;
+		oldContent.current = null;
+		oldEditTree.current = null;
+
 		setDiffEnabled(true);
 		setDoublePanelLocked(isDeleted);
 		setSideBarData(sideBarData);
 		void tryGetNewData();
 
 		return () => {
+			requestIdRef.current += 1;
 			setDiffEnabled(false);
 			setDoublePanelLocked(false);
 			setSideBarData(null);
 		};
-	}, []);
+	}, [diffKey]);
 
 	useEffect(() => {
 		const onPublishFinish = async () => {

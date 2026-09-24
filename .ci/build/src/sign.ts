@@ -40,7 +40,7 @@ export const win = async (exe: PathLike) => {
 	const kmsAwsSecretAccessKey = env("KMS_AWS_SECRET_ACCESS_KEY", "required for win signing");
 	const codingSigningCert = env("CODE_SIGNING_CERT", "required for win signing");
 
-	await $`jsign --alias "${kmsAwsKeyId}" --storepass "${kmsAwsAccessKeyId}|${kmsAwsSecretAccessKey}" --keystore eu-north-1 --storetype AWS --certfile "${codingSigningCert}" --tsaurl http://timestamp.digicert.com "${exe}"`;
+	await $`jsign --alias "${kmsAwsKeyId}" --storepass "${kmsAwsAccessKeyId}|${kmsAwsSecretAccessKey}" --keystore eu-north-1 --storetype AWS --certfile "${codingSigningCert}" --alg SHA-256 --tsaurl http://timestamp.digicert.com "${exe}"`;
 };
 
 win.verify = async (exe: PathLike) => {

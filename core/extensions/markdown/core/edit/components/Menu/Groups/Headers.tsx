@@ -9,12 +9,13 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@ui-kit/Dropdown";
+import { GlassToolbarGroup, GlassToolbarToggleGroup, GlassToolbarTriggerChevron } from "@ui-kit/GlassToolbar";
 import { Icon } from "@ui-kit/Icon";
-import { ComponentVariantProvider } from "@ui-kit/Providers";
-import { ToolbarDropdownMenuItem, ToolbarToggleGroup, ToolbarTriggerChevron } from "@ui-kit/Toolbar";
 import { useCallback } from "react";
 
 const HeadersMenuGroup = ({ editor }: { editor?: Editor }) => {
@@ -23,8 +24,9 @@ const HeadersMenuGroup = ({ editor }: { editor?: Editor }) => {
 	});
 
 	const onSelectHeading = useCallback(
-		(level: Level) => {
+		(value: string) => {
 			if (!editor) return;
+			const level = Number(value) as Level;
 			editor.chain().focus().toggleHeading({ level }).run();
 			setEditorStore({ lastUsedHeadingLevel: level });
 		},
@@ -43,43 +45,36 @@ const HeadersMenuGroup = ({ editor }: { editor?: Editor }) => {
 	const lastUsedHeadingLevelString = lastUsedHeadingLevel?.toString();
 
 	return (
-		<>
-			<ToolbarToggleGroup
+		<GlassToolbarGroup>
+			<GlassToolbarToggleGroup
 				defaultValue={lastUsedHeadingLevelString}
 				disabled={disabled}
 				type="single"
 				value={lastUsedHeadingLevelString}
 			>
 				<HeadingMenuButton editor={editor} level={lastUsedHeadingLevel} />
-			</ToolbarToggleGroup>
-			<ComponentVariantProvider variant="inverse">
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<ToolbarTriggerChevron data-testid="tb-headers" disabled={disabled} sub />
-					</DropdownMenuTrigger>
-					<DropdownMenuContent
-						className="lg:shadow-hard-base"
-						onCloseAutoFocus={onCloseAutoFocus}
-						side="top"
-						sideOffset={8}
+			</GlassToolbarToggleGroup>
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<GlassToolbarTriggerChevron data-testid="tb-headers" disabled={disabled} sub />
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" onCloseAutoFocus={onCloseAutoFocus} side="top" sideOffset={8}>
+					<DropdownMenuLabel>{t("editor.heading")}</DropdownMenuLabel>
+					<DropdownMenuRadioGroup
+						indicatorIconPosition="start"
+						onValueChange={onSelectHeading}
+						value={lastUsedHeadingLevelString}
 					>
-						<DropdownMenuLabel className="font-normal text-inverse-muted">
-							{t("editor.heading")}
-						</DropdownMenuLabel>
 						{[2, 3, 4].map((level) => (
-							<ToolbarDropdownMenuItem
-								active={lastUsedHeadingLevelString === level.toString()}
-								key={level}
-								onSelect={() => onSelectHeading(level as Level)}
-							>
+							<DropdownMenuRadioItem data-heading-level={level} key={level} value={level.toString()}>
 								<Icon icon={`heading-${level}-custom` as IconCode} />
 								{t("editor.heading")} {level} <DropdownMenuShortcut value={`Mod-Alt-${level}`} />
-							</ToolbarDropdownMenuItem>
+							</DropdownMenuRadioItem>
 						))}
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</ComponentVariantProvider>
-		</>
+					</DropdownMenuRadioGroup>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</GlassToolbarGroup>
 	);
 };
 

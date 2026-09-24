@@ -8,8 +8,8 @@ import { useReviewNotificationsStore } from "@ext/review/logic/store/ReviewNotif
 import type { ReviewListItem as ReviewListItemModel } from "@ext/review/models/ReviewList";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { EmptyState } from "@ui-kit/EmptyState";
+import { PanelLoader } from "@ui-kit/FloatingPanel";
 import { Icon } from "@ui-kit/Icon";
-import { Loader } from "@ui-kit/Loader";
 import { ScrollShadowContainer } from "@ui-kit/ScrollShadowContainer";
 import { TextOverflowTooltip } from "@ui-kit/Tooltip";
 import { forwardRef, type HTMLAttributes, useCallback, useMemo, useRef, useState } from "react";
@@ -38,7 +38,7 @@ const getItemId = (item: ReviewListItemModel) => `${item.pathname}-${item.id}`;
 const GroupHeader = forwardRef<HTMLButtonElement, GroupHeaderProps>(
 	({ index, label, items, unreadCount, open, onToggle, ...props }, ref) => (
 		<button
-			className="flex items-center gap-1.5 w-full px-3 pt-3 pb-1 hover:bg-transparent uppercase cursor-pointer bg-transparent border-0"
+			className="flex w-full cursor-pointer items-center gap-1.5 rounded-lg border-0 bg-transparent px-2 py-2 uppercase hover:bg-secondary-border"
 			data-index={index}
 			onClick={onToggle}
 			ref={ref}
@@ -133,19 +133,14 @@ export const ReviewItemsList = ({ data, isLoading }: { data: ScopedItemList; isL
 		},
 	});
 
-	if (isLoading)
-		return (
-			<Loader className="py-6" size="md">
-				{t("loading")}
-			</Loader>
-		);
+	if (isLoading) return <PanelLoader size="md">{t("loading")}</PanelLoader>;
 
-	if (!data || !data?.count) return <EmptyState>{t("list.no-results-found")}</EmptyState>;
+	if (!data?.count) return <EmptyState>{t("list.no-results-found")}</EmptyState>;
 
 	const virtualItems = virtualizer.getVirtualItems();
 
 	return (
-		<ScrollShadowContainer className="flex-1 min-h-0 overflow-x-hidden" ref={scrollRef}>
+		<ScrollShadowContainer className="min-h-0 flex-1 overflow-x-hidden px-2 pb-2" ref={scrollRef}>
 			<div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
 				{virtualItems.map((virtualItem) => {
 					const row = flatRows[virtualItem.index];

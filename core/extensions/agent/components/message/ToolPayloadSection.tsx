@@ -1,5 +1,6 @@
 import { tryCopyToClipboard } from "@core-ui/utils/clipboard";
 import { cn } from "@core-ui/utils/cn";
+import { isTouchClick, keepTooltipOpen } from "@core-ui/utils/copyTooltip";
 import t from "@ext/localization/locale/translate";
 import { Divider } from "@ui-kit/Divider";
 import { Icon } from "@ui-kit/Icon";
@@ -109,20 +110,22 @@ const CopyableValue = ({ value }: { value: unknown }) => {
 	const onClickHandler = (event: MouseEvent<HTMLSpanElement>) => {
 		event.preventDefault();
 		event.stopPropagation();
-		void tryCopyToClipboard(toCopyText(value), { showPopover: false }).then((ok) => setCopied(ok));
+		// On touch there is no tooltip to switch to "copied", so confirm with a popover.
+		void tryCopyToClipboard(toCopyText(value), { showPopover: isTouchClick(event) }).then((ok) => setCopied(ok));
 	};
 
-	const onOpenChange = (open: boolean) => {
-		if (open) setCopied(false);
-	};
+	// The tooltip opens after a hover delay, so a quick click lands before it is shown.
+	// Resetting on the way in instead of on open keeps that click's "copied" visible.
+	const resetCopied = () => setCopied(false);
 
 	return (
-		<Tooltip delayDuration={0} onOpenChange={onOpenChange}>
+		<Tooltip>
 			<TooltipTrigger asChild>
 				<span
 					className="-mx-1 min-w-0 cursor-pointer rounded px-1 transition-colors hover:bg-secondary-bg-hover"
 					onClick={onClickHandler}
-					onPointerDown={(event) => event.preventDefault()}
+					onPointerDown={keepTooltipOpen}
+					onPointerEnter={resetCopied}
 				>
 					<PrimitiveValue value={value} />
 				</span>

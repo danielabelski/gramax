@@ -5,8 +5,9 @@ import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/Butt
 import ResourceService, { type ResourceServiceType } from "@core-ui/ContextServices/ResourceService/ResourceService";
 import t from "@ext/localization/locale/translate";
 import type { Editor } from "@tiptap/core";
+import { DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@ui-kit/Dropdown";
+import { GlassToolbarIcon, GlassToolbarToggleButton } from "@ui-kit/GlassToolbar";
 import { Icon } from "@ui-kit/Icon";
-import { ToolbarDropdownMenuItem, ToolbarIcon, ToolbarToggleButton } from "@ui-kit/Toolbar";
 import { type ChangeEvent, useCallback } from "react";
 import createFile from "../logic/createFile";
 
@@ -50,7 +51,7 @@ export const FileMenuButton = ({ editor, onStart, onSave }: FileMenuButtonProps)
 
 	const { disabled, isActive } = ButtonStateService.useCurrentAction({ mark: "file" });
 	return (
-		<ToolbarToggleButton
+		<GlassToolbarToggleButton
 			active={isActive}
 			data-qa={`qa-edit-menu-file`}
 			disabled={disabled}
@@ -62,9 +63,9 @@ export const FileMenuButton = ({ editor, onStart, onSave }: FileMenuButtonProps)
 			tooltipText={t("file")}
 		>
 			<FileInput apiUrlCreator={apiUrlCreator} editor={editor} onSave={onSave} resourceService={rs}>
-				<ToolbarIcon icon="file" />
+				<GlassToolbarIcon icon="file" />
 			</FileInput>
-		</ToolbarToggleButton>
+		</GlassToolbarToggleButton>
 	);
 };
 
@@ -76,31 +77,34 @@ export const FileMenuButtonDropdown = ({ editor, onStart, onSave }: FileMenuButt
 
 	if (disabled) {
 		return (
-			<ToolbarDropdownMenuItem active={isActive} dataQa={`qa-edit-menu-file`} disabled={disabled}>
-				<div className="flex flex-row items-center gap-2 w-full">
-					<Icon icon="file" />
-					{t("file")}
-				</div>
-			</ToolbarDropdownMenuItem>
+			<DropdownMenuRadioGroup value={isActive ? "file" : undefined}>
+				<DropdownMenuRadioItem disabled={disabled} value="file">
+					<div className="flex flex-row items-center gap-2 w-full" data-qa="qa-edit-menu-file">
+						<Icon icon="file" />
+						{t("file")}
+					</div>
+				</DropdownMenuRadioItem>
+			</DropdownMenuRadioGroup>
 		);
 	}
 
 	return (
-		<ToolbarDropdownMenuItem
-			active={isActive}
-			dataQa={`qa-edit-menu-file`}
-			disabled={disabled}
-			onSelect={(e) => {
-				e.preventDefault();
-				onStart?.();
-			}}
-		>
-			<FileInput apiUrlCreator={apiUrlCreator} editor={editor} onSave={onSave} resourceService={rs}>
-				<div className="flex flex-row items-center gap-2 w-full">
-					<Icon icon="file" />
-					{t("file")}
-				</div>
-			</FileInput>
-		</ToolbarDropdownMenuItem>
+		<DropdownMenuRadioGroup value={isActive ? "file" : undefined}>
+			<DropdownMenuRadioItem
+				disabled={disabled}
+				onSelect={(e) => {
+					e.preventDefault();
+					onStart?.();
+				}}
+				value="file"
+			>
+				<FileInput apiUrlCreator={apiUrlCreator} editor={editor} onSave={onSave} resourceService={rs}>
+					<div className="flex flex-row items-center gap-2 w-full" data-qa="qa-edit-menu-file">
+						<Icon icon="file" />
+						{t("file")}
+					</div>
+				</FileInput>
+			</DropdownMenuRadioItem>
+		</DropdownMenuRadioGroup>
 	);
 };

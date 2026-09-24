@@ -7,4 +7,6 @@ export type {
 	ChatCompletionUsage,
 	ChatIterationResult,
 } from "./agentLlmContracts";
+export type { AgentLlmEndpoint } from "./agentLlmEndpoint";
+export { parseAgentLlmEndpoint } from "./agentLlmEndpoint";
 export { AgentLlmEventMapper } from "./agentLlmEventMapper";

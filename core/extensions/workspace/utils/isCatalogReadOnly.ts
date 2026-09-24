@@ -4,6 +4,7 @@ import type { ReadonlyCatalog } from "@core/FileStructue/Catalog/ReadonlyCatalog
 import { getWorkspaceGesUrl } from "@ext/enterprise/utils/getWorkspaceEnterpriseConfig";
 import isReadOnlyEnterprise from "@ext/enterprise/utils/isReadOnlyEnterprise";
 import type { Workspace } from "@ext/workspace/Workspace";
+import { isReadOnlyGesCloud } from "../../enterprise-cloud/logic/Catalog/IsGesCloudCatalogReadonly";
 
 const isCatalogReadOnly = async (
 	app: Application,
@@ -18,7 +19,8 @@ const isCatalogReadOnly = async (
 		app.conf.isReadOnly ||
 			!!catalog?.props?.resolvedView ||
 			(catalog?.basePath && workspace.getFileProvider().at(catalog.basePath).isReadOnly) ||
-			(workspaceGesUrl && (await isReadOnlyEnterprise(ctx.user, catalog))),
+			(workspaceGesUrl && (await isReadOnlyEnterprise(ctx.user, catalog))) ||
+			(workspaceConfig.enterpriseCloud?.url && (await isReadOnlyGesCloud(ctx.user, catalog))),
 	);
 };
 

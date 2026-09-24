@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: out of scope */
+/** biome-ignore-all lint/style/useNamingConvention: out of scope */
 import type ApiRequest from "@core/Api/ApiRequest";
 import type ApiResponse from "@core/Api/ApiResponse";
 import Cookie from "@ext/cookie/Cookie";

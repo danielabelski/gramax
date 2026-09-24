@@ -74,6 +74,7 @@ export type EnvironmentVariable = {
 	RESOURCE_SEARCH_ENABLED: Bool;
 	ALLOWED_GRAMAX_URLS: string;
 	GES_REFRESH_INTERVAL: string;
+	HEALTHCHECK_TOKEN: string;
 	HIDE_ERROR_CAUSE: Bool;
 
 	// Enterprise Cloud

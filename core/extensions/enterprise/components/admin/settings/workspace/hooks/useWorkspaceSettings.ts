@@ -16,7 +16,6 @@ const defaultSettings: WorkspaceSettings = {
 		},
 		lfs: { patterns: [] },
 	},
-	sections: {},
 	wordTemplates: [],
 	pdfTemplates: [],
 };

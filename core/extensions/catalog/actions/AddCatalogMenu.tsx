@@ -1,3 +1,4 @@
+import { leaveEditModeGuard } from "@components/HomePage/leaveEditModeGuard";
 import { topMenuItemClassName } from "@components/HomePage/TopMenu/const";
 import { classNames } from "@components/libs/classNames";
 import isMobileService from "@core-ui/ContextServices/isMobileService";
@@ -11,6 +12,7 @@ import {
 } from "@ui-kit/Dropdown";
 import { Icon } from "@ui-kit/Icon";
 import { MenuItemRichTemplate } from "@ui-kit/MenuItem";
+import { useState } from "react";
 import IsReadOnlyHOC from "../../../ui-logic/HigherOrderComponent/IsReadOnlyHOC";
 import CreateCatalog from "./CreateCatalog";
 import { useButtonsHandlers } from "./logic/useButtonsHandlers";
@@ -30,11 +32,17 @@ const AddCatalogMenu = ({
 }: AddCatalogMenuProps) => {
 	const { onCloneClick, onImportClick } = useButtonsHandlers();
 	const isMobile = isMobileService.value;
+	const [dropdownOpen, setDropdownOpen] = useState(false);
+
+	const onOpenChange = async (open: boolean) => {
+		if (open && !(await leaveEditModeGuard())) return;
+		setDropdownOpen(open);
+	};
 
 	if (!canCreateCatalog && !canCloneCatalog && !canImportCatalog) return null;
 
 	return (
-		<DropdownMenu>
+		<DropdownMenu onOpenChange={onOpenChange} open={dropdownOpen}>
 			{isMobile ? (
 				<DropdownMenuTriggerButton
 					className={classNames("aspect-square p-2", {}, [topMenuItemClassName])}

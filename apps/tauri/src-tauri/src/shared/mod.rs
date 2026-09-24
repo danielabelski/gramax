@@ -1,7 +1,6 @@
 use tauri::*;
 
 pub mod commands;
-pub mod http_req;
 pub mod http_server;
 pub mod session_data;
 pub mod window;

@@ -2,9 +2,8 @@ import type { CommandTree } from "@app/commands";
 import { getExecutingEnvironment } from "@app/resolveModule/env";
 import type { PageProps } from "@components/Pages/models/Pages";
 import Path from "@core/FileProvider/Path/Path";
-import getPageDataByPathname, { PageDataType } from "@core/RouterPath/logic/getPageDataByPathname";
+import { PageDataType } from "@core/RouterPath/logic/getPageDataByPathname";
 import getShareDataFromRouterPath from "@core/RouterPath/logic/getShareDataFromRouterPath";
-import RouterPathProvider from "@core/RouterPath/RouterPathProvider";
 import type {
 	ArticlePageDataParams,
 	HomePageDataParams,
@@ -12,6 +11,7 @@ import type {
 	PageDataParams,
 } from "@core/SitePresenter/types/PageDataParams";
 import homeSections from "@core/utils/homeSections";
+import { resolvePageDataByPathname } from "@ext/enterprise/pathname/resolvePageDataByPathname";
 import getPartGitSourceDataByStorageName from "@ext/storage/logic/utils/getPartSourceDataByStorageName";
 import type WorkspaceManager from "@ext/workspace/WorkspaceManager";
 
@@ -54,9 +54,8 @@ const resolvePageData = async (
 		return { page: "article" as const, data, context };
 	}
 
-	const pathnameData = RouterPathProvider.parsePath(splittedPath);
-
-	const { type: pageDataType, itemLogicPath } = await getPageDataByPathname(pathnameData, wm);
+	const { pageData, pathnameData } = await resolvePageDataByPathname(splittedPath, wm);
+	const { type: pageDataType, itemLogicPath } = pageData;
 
 	// https://support.ics-it.ru/issue/GXS-1938
 	const data =

@@ -3,10 +3,18 @@ import { AuthorizeMiddleware } from "@core/Api/middleware/AuthorizeMiddleware";
 import { DesktopModeMiddleware } from "@core/Api/middleware/DesktopModeMiddleware";
 import ReloadConfirmMiddleware from "@core/Api/middleware/ReloadConfirmMiddleware";
 import type Context from "@core/Context/Context";
-import type { ClientArticleProps } from "@core/SitePresenter/SitePresenter";
+import Path from "@core/FileProvider/Path/Path";
+import type { ClientArticleProps, ClientItemRef } from "@core/SitePresenter/SitePresenter";
 import { Command } from "../../types/Command";
 
-const updateProps: Command<{ ctx: Context; catalogName: string; props: ClientArticleProps }, { pathname: string }> =
+export type UpdateItemPropsResult = {
+	pathname: string;
+	ref: ClientItemRef;
+	fileName: string;
+	logicPath: string;
+};
+
+const updateProps: Command<{ ctx: Context; catalogName: string; props: ClientArticleProps }, UpdateItemPropsResult> =
 	Command.create({
 		path: "item/updateProps",
 
@@ -20,11 +28,27 @@ const updateProps: Command<{ ctx: Context; catalogName: string; props: ClientArt
 
 			const catalog = await workspace.getCatalog(catalogName, ctx);
 			if (!catalog) return;
-			const updatedItem = await catalog.updateItemProps(props, resourceUpdaterFactory);
+
+			// Resolved by file path: the only identifier the client gets back from this very response
+			// and keeps current. The `logicPath` it sends is one step behind after a rename, and
+			// looking up by it silently found nothing — the edit was lost. What goes on is the item
+			// itself: the catalog has no business finding it a second time, by another field.
+			const item = catalog.findItemByItemPath(new Path(props.ref.path));
+			if (!item) return;
+
+			const updatedItem = await catalog.updateItemProps(item, props, resourceUpdaterFactory);
 			if (!updatedItem) return;
 
 			const ref = { path: updatedItem.ref.path.value, storageId: updatedItem.ref.storageId };
-			return { pathname: await catalog.getPathname(updatedItem), ref };
+			// The file name was a guess: the server takes another one when that is occupied. Returning
+			// the actual one — with the rest of the address — is the only way the client learns it: the
+			// page is not re-read after a rename, so anything left from the old path would stay forever.
+			return {
+				pathname: await catalog.getPathname(updatedItem),
+				ref,
+				fileName: updatedItem.getFileName(),
+				logicPath: updatedItem.logicPath,
+			};
 		},
 
 		params(ctx, q, body) {

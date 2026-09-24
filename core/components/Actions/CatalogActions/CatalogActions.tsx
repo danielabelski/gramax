@@ -1,22 +1,21 @@
 import useShouldRenderDeleteCatalog from "@components/Actions/useShouldRenderDeleteCatalog";
-import Icon from "@components/Atoms/Icon";
+import type { LeftNavigationTab } from "@components/Layouts/LeftNavigationTabs/LeftNavigationTab";
 import NavigationTabsService from "@components/Layouts/LeftNavigationTabs/NavigationTabsService";
-import type { LeftNavigationTab } from "@components/Layouts/StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
 import { usePlatform } from "@core-ui/hooks/usePlatform";
 import useWatch from "@core-ui/hooks/useWatch";
+import { useItemLinks } from "@core-ui/stores/ItemLinksStore/ItemLinksStore.provider";
 import t from "@ext/localization/locale/translate";
-import NavigationDropdown from "@ext/navigation/components/NavigationDropdown";
-import type { ItemLink } from "@ext/navigation/NavigationLinks";
 import useValidateDeleteCatalogInStatic from "@ext/static/logic/useValidateDeleteCatalogInStatic";
 import { applyMenuModifiers } from "@plugins/store";
-import { Button } from "@ui-kit/Button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTriggerButton } from "@ui-kit/Dropdown";
+import { Icon } from "@ui-kit/Icon";
+import { ComponentVariantProvider } from "@ui-kit/Providers";
 import { type FC, Fragment, type ReactNode, useEffect, useState } from "react";
 import { buildCatalogMenu, type MenuItemDescriptorApp } from "./buildCatalogMenu";
 import { CatalogActionsProvider, useCatalogActionsContext } from "./CatalogActionsContext";
 
 interface CatalogActionsProps {
 	isCatalogExist: boolean;
-	itemLinks: ItemLink[];
 	currentTab: LeftNavigationTab;
 }
 
@@ -57,26 +56,27 @@ const CatalogActionsMenu: FC = () => {
 			const modifiedItems = await applyMenuModifiers(baseItems, ctx.pluginContext);
 			setMenuItems(modifiedItems);
 		};
-		applyModifiers();
-	}, [ctx.pluginContext]);
+		void applyModifiers();
+	}, [ctx.pluginContext, ctx.isAgentAvailable, ctx.renderDeleteCatalog]);
 
 	return renderMenuItems(menuItems);
 };
 
-const CatalogActions: FC<CatalogActionsProps> = ({ isCatalogExist, itemLinks, currentTab }) => {
+const CatalogActions: FC<CatalogActionsProps> = ({ isCatalogExist, currentTab }) => {
 	const shouldRenderDeleteCatalog = useShouldRenderDeleteCatalog();
 	const [renderDeleteCatalog, setRenderDeleteCatalog] = useState(false);
 	const validateDeleteCatalogInStatic = useValidateDeleteCatalogInStatic();
 	const { isStatic } = usePlatform();
+	const itemLinks = useItemLinks();
 
 	useEffect(() => {
-		setRenderDeleteCatalog(shouldRenderDeleteCatalog);
-	}, [shouldRenderDeleteCatalog]);
+		setRenderDeleteCatalog(isStatic ? false : shouldRenderDeleteCatalog);
+	}, [isStatic, shouldRenderDeleteCatalog]);
 
 	if (!isCatalogExist) return null;
 
-	const onOpen = async () => {
-		if (!shouldRenderDeleteCatalog || !isStatic) return;
+	const handleOpenChange = async (open: boolean) => {
+		if (!open || !shouldRenderDeleteCatalog || !isStatic) return;
 		setRenderDeleteCatalog(await validateDeleteCatalogInStatic());
 	};
 
@@ -91,20 +91,23 @@ const CatalogActions: FC<CatalogActionsProps> = ({ isCatalogExist, itemLinks, cu
 			renderDeleteCatalog={renderDeleteCatalog}
 			setCurrentTab={setCurrentTab}
 		>
-			<NavigationDropdown
-				dataQa="qa-catalog-actions"
-				dataTestId="catalog-actions"
-				onOpen={onOpen}
-				style={{ marginRight: "-4px" }}
-				tooltipText={t("catalog.actions.title")}
-				trigger={
-					<Button className="p-0 h-full" size="xs" variant="text">
-						<Icon code="ellipsis-vertical" style={{ fontSize: "1.7em" }} />
-					</Button>
-				}
-			>
-				<CatalogActionsMenu />
-			</NavigationDropdown>
+			<ComponentVariantProvider variant="glass">
+				<DropdownMenu modal={false} onOpenChange={handleOpenChange}>
+					<DropdownMenuTriggerButton
+						className="aspect-square shrink-0 p-0"
+						data-qa="qa-catalog-actions"
+						data-testid="catalog-actions"
+						size="sm"
+						tooltip={t("catalog.actions.title")}
+						variant="ghost"
+					>
+						<Icon className="size-4" icon="ellipsis" />
+					</DropdownMenuTriggerButton>
+					<DropdownMenuContent align="start" side="right">
+						<CatalogActionsMenu />
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</ComponentVariantProvider>
 		</CatalogActionsProvider>
 	);
 };

@@ -39,7 +39,10 @@ export const IconPickerList = ({ color, virtualizer, rows, onChange, ...props }:
 									<IconPickerItem
 										code={entry.code}
 										color={color}
-										key={`${item.index}-${i}`}
+										key={`${item.index}-${
+											// biome-ignore lint/suspicious/noArrayIndexKey: expected
+											i
+										}`}
 										onClick={onChange}
 										svg={entry.svg}
 									/>

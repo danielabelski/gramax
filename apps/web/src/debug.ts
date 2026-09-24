@@ -4,12 +4,20 @@ import getCommands from "@app/web/commands";
 import Path from "@core/FileProvider/Path/Path";
 import { downloadZipArchive } from "@core/FileProvider/utils/createZipArchive";
 import RouterPathProvider from "@core/RouterPath/RouterPathProvider";
+import { setAgentChatIsOpen } from "@ext/agent/components/store/AgentChatIsOpenStore";
+import { AGENT_SKILLS_PANEL_ID } from "@ext/agent/components/types/constants";
 import * as git from "@ext/git/core/GitCommands/LibGit2IntermediateCommands";
 import GitStash from "@ext/git/core/model/GitStash";
 import WebStashCache from "@ext/git/core/WebStashCache/WebStashCache";
 import ConsoleLogger from "@ext/loggers/ConsoleLogger";
 import { LogLevel } from "@ext/loggers/Logger";
 import type SourceData from "@ext/storage/logic/SourceDataProvider/model/SourceData";
+import type { Editor } from "@tiptap/core";
+import { useFloatingPanelStore } from "@ui-kit/FloatingPanel";
+
+export const agentChat = (isOpen = true) => setAgentChatIsOpen(isOpen);
+
+export const agentSkills = (isOpen = true) => useFloatingPanelStore.getState().setIsOpen(AGENT_SKILLS_PANEL_ID, isOpen);
 
 export const clear = async () => {
 	console.log("Delete all");
@@ -137,6 +145,23 @@ export const gitApplyStash = async (catalogName: string, stashOid: string) => {
 	await gvc?.applyStash(new GitStash(stashOid));
 };
 
+/**
+ * The stashes the repository actually holds, newest first — `git stash list`.
+ *
+ * Not the same question as `gitStashes`, which reads `WebStashCache`: that is a log of stashes ever
+ * created and keeps naming ones that were dropped long ago.
+ */
+export const gitStashList = async (catalogName: string) => {
+	const app = await getApp();
+	const { gvc } = (await app.wm.current().getContextlessCatalog(catalogName)).repo;
+	return (await gvc?.listStashes()) ?? [];
+};
+
+/** Whether the repository still holds this stash. */
+export const gitStashExists = async (catalogName: string, stashOid: string) => {
+	return (await gitStashList(catalogName)).some((stash) => stash.oid === stashOid);
+};
+
 export const initZip = async () => {
 	const JSZip = await import("jszip");
 	return new JSZip.default();
@@ -145,6 +170,12 @@ export const zip = async (catalog: string) => {
 	const app = await getApp();
 	const fp = app.wm.current().getFileProvider();
 	await downloadZipArchive(fp, new Path(catalog), catalog);
+};
+
+export const setWorkspaceAi = async (apiUrl: string, token: string) => {
+	const application = await getApp();
+	const ctx = await application.contextFactory.fromWeb({ language: "ru" });
+	application.adp.setEditorAiData(ctx, application.wm.current().path(), { apiUrl, token });
 };
 
 export const setSourceData = async (data: SourceData) => {
@@ -156,4 +187,4 @@ export const setSourceData = async (data: SourceData) => {
 // biome-ignore lint/style/useConst: reassinged from ArticleEditRenderer
 export let forceSave: () => void = null;
 // biome-ignore lint/style/useConst: reassinged from ArticleEditRenderer
-export let editor = null;
+export let editor: Editor | null = null;

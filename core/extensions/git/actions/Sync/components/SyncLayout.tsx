@@ -1,8 +1,7 @@
-import StatusBarElement from "@components/Layouts/StatusBar/StatusBarElement";
-// biome-ignore lint/style/noRestrictedImports: will be fixed in future
-import styled from "@emotion/styled";
 import PullPushCounter from "@ext/git/actions/Sync/components/PullPushCounter";
-import t from "@ext/localization/locale/translate";
+import t, { pluralize } from "@ext/localization/locale/translate";
+import { GlassToolbarButton, GlassToolbarText } from "@ui-kit/GlassToolbar";
+import { Icon } from "@ui-kit/Icon";
 import type { CSSProperties } from "react";
 
 interface SyncLayoutProps {
@@ -16,49 +15,43 @@ interface SyncLayoutProps {
 	onClick?: () => void;
 }
 
-const Wrapper = styled.span`
-	display: flex;
-	align-items: center;
-	gap: 4px;
-`;
-
-const Warning = styled.span`
-	margin-left: 2px;
-`;
-
 const SyncLayout = (props: SyncLayoutProps) => {
 	const { pullCounter, pushCounter, sourceInvalid, syncProccess, onClick, style, className, disabled } = props;
 
-	const ok = syncProccess ? t("synchronization") : `${t("sync")} ${t("catalog.name")}`;
+	const changesTooltip = [
+		pullCounter > 0 &&
+			pluralize(pullCounter, {
+				one: t("sync-catalog-changed1"),
+				few: t("sync-catalog-changed2"),
+				many: t("sync-catalog-changed3"),
+			}),
+		pushCounter > 0 &&
+			pluralize(pushCounter, {
+				one: t("sync-catalog-push1"),
+				few: t("sync-catalog-push2"),
+				many: t("sync-catalog-push3"),
+			}),
+	]
+		.filter(Boolean)
+		.join("; ");
+	const ok = syncProccess ? t("synchronization") : changesTooltip || `${t("sync")} ${t("catalog.name")}`;
 	const err = t("storage-not-connected");
 
 	return (
 		<span className={className} style={style}>
-			<StatusBarElement
+			<GlassToolbarButton
+				aria-label={t("sync")}
 				className="sync-icons"
-				disable={disabled}
-				iconClassName={syncProccess ? "animate-spin" : ""}
-				iconCode="refresh-cw"
-				iconStrokeWidth="1.6"
+				data-testid="sync-trigger"
+				disabled={disabled}
 				onClick={onClick}
 				tooltipText={sourceInvalid ? err : ok}
 			>
-				<Wrapper>
-					{sourceInvalid && <Warning>!</Warning>}
-					<PullPushCounter pullCounter={pullCounter} pushCounter={pushCounter} />
-				</Wrapper>
-			</StatusBarElement>
+				<Icon icon={syncProccess ? "refresh-cw-animated" : "refresh-cw"} />
+				{sourceInvalid && <GlassToolbarText className="text-xs font-medium">!</GlassToolbarText>}
+				<PullPushCounter pullCounter={pullCounter} pushCounter={pushCounter} />
+			</GlassToolbarButton>
 		</span>
 	);
 };
-export default styled(SyncLayout)`
-	@keyframes spinner {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	.sync-icons {
-		height: 100%;
-	}
-`;
+export default SyncLayout;

@@ -17,7 +17,7 @@ editorTest.describe("Bullet List", () => {
 
 	editorTest("create via toolbar", async ({ editor, sharedPage }) => {
 		await editor.clickToolbar("lists");
-		await sharedPage.getByRole("menuitem", { name: "Bullet" }).click();
+		await sharedPage.locator('[data-list-type="bullet"]').click();
 		await editor.type("text");
 		await editor.assertMarkdown("-  text");
 	});
@@ -83,7 +83,7 @@ editorTest.describe("Bullet List", () => {
 			   -  text
 		`);
 		await editor.clickToolbar("lists");
-		await sharedPage.getByRole("menuitem", { name: "Bullet" }).click();
+		await sharedPage.locator('[data-list-type="bullet"]').click();
 		await editor.assertMarkdown(md`
 			-  text
 

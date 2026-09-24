@@ -1,6 +1,7 @@
 import { getExecutingEnvironment } from "@app/resolveModule/env";
 import type Context from "@core/Context/Context";
 import type PageDataContext from "@core/Context/PageDataContext";
+import EnterpriseUser from "@ext/enterprise/EnterpriseUser";
 import getClientPermissions from "@ext/enterprise/utils/getClientPermissions";
 import { getWorkspaceEnterpriseConfig } from "@ext/enterprise/utils/getWorkspaceEnterpriseConfig";
 import UiLanguage from "@ext/localization/core/model/Language";
@@ -47,7 +48,10 @@ const getPageDataContext: GetPageDataContext = async ({ ctx, app, isArticle, use
 		domain: ctx.domain,
 		isArticle,
 		isLogged: ctx.user.isLogged,
-		userInfo: userInfo || ctx.user.info || null,
+		user: {
+			info: userInfo || ctx.user.info || null,
+			sessionExpired: ctx.user instanceof EnterpriseUser ? ctx.user.sessionExpired : undefined,
+		},
 		language: {
 			content: ctx.contentLanguage || null,
 		},
@@ -76,7 +80,7 @@ const getPageDataContext: GetPageDataContext = async ({ ctx, app, isArticle, use
 			ai: {
 				enabled: Boolean(conf.portalAi.enabled || app.adp.getEditorAiData(ctx, workspace?.path() ?? "").apiUrl),
 			},
-			enterpriseCloud: app.enterpriseCloudManager.getConfig(),
+			enterpriseCloud: await app.enterpriseCloudManager.getConfig(),
 		},
 		permissions: getClientPermissions(ctx.user),
 		features: getExecutingEnvironment() === "next" ? getEnabledFeatures().map((f) => f.name) : null,

@@ -11,11 +11,12 @@ import type EnterpriseManager from "@ext/enterprise/EnterpriseManager";
 import type { GesCloudManager } from "@ext/enterprise-cloud/GesCloudManager";
 import type GitRepositoryProvider from "@ext/git/core/Repository/RepositoryProvider";
 import type { HealthcheckRegistry } from "@ext/healthcheck/HealthCheckRegistry";
+import type { ReadContentHealthState } from "@ext/healthcheck/ReadContentHealthState";
 import type Logger from "@ext/loggers/Logger";
 import type MarkdownFormatter from "@ext/markdown/core/edit/logic/Formatter/Formatter";
 import type MarkdownParser from "@ext/markdown/core/Parser/Parser";
 import type ParserContextFactory from "@ext/markdown/core/Parser/ParserContext/ParserContextFactory";
-import type AuthManager from "@ext/security/logic/AuthManager";
+import type { AuthManagerProvider } from "@ext/security/logic/AuthManagerProvider";
 import type { TicketManager } from "@ext/security/logic/TicketManager/TicketManager";
 import type SearcherManager from "@ext/serach/SearcherManager";
 import type SettingsResolver from "@ext/settings/logic/SettingsResolver";
@@ -29,7 +30,7 @@ interface Application {
 	em: EnterpriseManager;
 	hashes: Hash;
 	logger: Logger;
-	am: AuthManager;
+	amp: AuthManagerProvider;
 	parser: MarkdownParser;
 	tablesManager: TableDB;
 	rp: GitRepositoryProvider;
@@ -48,6 +49,7 @@ interface Application {
 	enterpriseCloudManager: GesCloudManager;
 	agentManager: AgentManager;
 	healthcheckRegistry?: HealthcheckRegistry;
+	readContentHealthState?: Pick<ReadContentHealthState, "observe" | "recordFailure">;
 	conf: {
 		basePath: Path;
 		version: string;
@@ -60,7 +62,6 @@ interface Application {
 		hideErrorCause: boolean;
 
 		bugsnagApiKey: string;
-
 		services: ServicesConfig;
 
 		metrics: MetricsConfig;

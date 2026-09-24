@@ -10,14 +10,14 @@ import SignInEnterpriseForm from "@ext/enterprise/components/SingInOut/SignInEnt
 import { getGesSignInUrl } from "@ext/enterprise/components/SingInOut/utils/getGesSignInUrl";
 
 const GesEditorHomePage = ({ data }: { data: HomePageData }) => {
-	const gesUrl = PageDataContextService.value.conf.activeGesUrl;
-	const isLogged = PageDataContextService.value.isLogged;
+	const { conf, isLogged } = PageDataContextService.value;
+	const gesUrl = conf.activeGesUrl;
 	const authUrl = getGesSignInUrl(gesUrl, true);
 	const signInEnterpriseProps = useSignIn({ authUrl });
 
 	return (
 		<HomePageWrapper>
-			<GesWebTopMenu section={data.section} />
+			<GesWebTopMenu section={data.views.global.section} />
 			{!isLogged ? (
 				<div className="flex justify-center items-center h-screen">
 					<SignInEnterpriseForm authUrl={authUrl} {...signInEnterpriseProps} onlySSO />

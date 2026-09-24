@@ -16,13 +16,14 @@ const ArticlePage = ({ data }: { data: ArticlePageData }) => {
 	const isShowMainLangContentPreview = useShowMainLangContentPreview();
 	const itemLinks = useItemLinks();
 
+	// Mounting is the article change: the view is keyed by the article, and a rename keeps both.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: expected
-	useEffect(() => clear(), [data.articleProps.logicPath]);
+	useEffect(() => clear(), []);
 
 	if (data.articleProps.welcome) return <Welcome data={data} />;
 	return (
 		<div className="flex flex-col h-fit min-h-dvh sm:h-full sm:min-h-0">
-			<ArticleErrorHandler key={data.articleProps.logicPath}>
+			<ArticleErrorHandler resetKey={data.articleProps.logicPath}>
 				<ArticleBreadcrumb
 					hasPreview={isShowMainLangContentPreview}
 					itemLinks={itemLinks}

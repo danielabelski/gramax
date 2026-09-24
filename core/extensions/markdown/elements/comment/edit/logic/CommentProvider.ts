@@ -43,14 +43,8 @@ class CommentProvider {
 		this._commentCountCache = this._useCache ? new CommentsCountCache(_fp, fs, _catalog, this) : null;
 		this._commentSearchCache = this._useCache ? new CommentsSearchCache(_fp, fs, _catalog, this) : null;
 
-		let checkoutToken = null;
-		let syncToken = null;
-		_catalog.events.on("repository-set", ({ catalog }) => {
-			if (checkoutToken) catalog.repo.events.off(checkoutToken);
-			if (syncToken) catalog.repo.events.off(syncToken);
-			checkoutToken = catalog.repo.events.on("checkout", () => this._onCheckout());
-			syncToken = catalog.repo.events.on("sync", () => this._onCheckout());
-		});
+		_catalog.events.on("checkout", () => this._onCheckout());
+		_catalog.events.on("sync", () => this._onCheckout());
 
 		_catalog.events.on("item-moved", ({ from, to }) => this._onItemMoved(from.path, to.path));
 		_catalog.events.on("item-props-updated", ({ ref, item }) => this._onItemMoved(ref.path, item.ref.path));

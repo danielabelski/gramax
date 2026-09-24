@@ -8,4 +8,10 @@ describe("extractCatalogName", () => {
 
 		expect(extractCatalogName("my-catalog~commit-abc123def456")).toBe("my-catalog");
 	});
+
+	it("returns nothing when there is no catalog", () => {
+		expect(extractCatalogName(null)).toBeUndefined();
+
+		expect(extractCatalogName(undefined)).toBeUndefined();
+	});
 });

@@ -15,6 +15,7 @@ import { type MouseEvent, type ReactNode, useCallback, useMemo } from "react";
 
 interface ItemProps {
 	name: string;
+	id?: string;
 	trigger: ReactNode;
 	selected?: boolean;
 	value?: string[];
@@ -34,7 +35,19 @@ const getCheckedState = (values: string[], selected: string[]) => {
 	return true;
 };
 
-const Item = ({ values, onClick, renderer, trigger, selected, value, name, mode, ignoreEmpty, buttons }: ItemProps) => {
+const Item = ({
+	values,
+	onClick,
+	renderer,
+	trigger,
+	selected,
+	value,
+	name,
+	id,
+	mode,
+	ignoreEmpty,
+	buttons,
+}: ItemProps) => {
 	const rendererChildren = useMemo(() => renderer?.(), [renderer]);
 	const isSelected = useMemo(() => {
 		if (!selected && !value) return false;
@@ -58,7 +71,7 @@ const Item = ({ values, onClick, renderer, trigger, selected, value, name, mode,
 			);
 		}
 
-		return <DropdownMenuRadioItem value={name}>{trigger}</DropdownMenuRadioItem>;
+		return <DropdownMenuRadioItem value={id ?? name}>{trigger}</DropdownMenuRadioItem>;
 	}
 
 	const onCheckAll = useCallback(

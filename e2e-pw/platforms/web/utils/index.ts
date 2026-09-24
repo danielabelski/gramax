@@ -1,20 +1,9 @@
-import type Application from "@gramax/app/types/Application";
 import type { Page as PlaywrightPage } from "@playwright/test";
+import { evaluateOnApp } from "@utils/app";
 import fs from "fs/promises";
 import type JsZip from "jszip";
 import { resolve } from "path";
 import { fileURLToPath } from "url";
-
-declare global {
-	interface Window {
-		app?: Promise<Application>;
-		debug: typeof import("@gramax/apps/web/src/debug") & {
-			forceSave?: (() => Promise<void>) | null;
-			editor?: import("@tiptap/core").Editor | null;
-		};
-		refreshPage: () => Promise<void>;
-	}
-}
 
 export type FileTree = {
 	[key: string]: FileTree | string | number[];
@@ -25,26 +14,30 @@ export const uploadAndExtractZip = async (page: PlaywrightPage, zip: string): Pr
 	const zipBuffer = await fs.readFile(absoluteZipPath);
 	const zipData = new Uint8Array(zipBuffer);
 
-	await page.evaluate(async (zipData: Uint8Array) => {
-		const intoPath = window.debug.intoPath;
+	await evaluateOnApp(
+		page,
+		async (zipData: Uint8Array) => {
+			const intoPath = window.debug.intoPath;
 
-		const { wm } = await window.app!;
-		const fp = wm.current().getFileProvider();
+			const { wm } = await window.app!;
+			const fp = wm.current().getFileProvider();
 
-		const zip = await window.debug.initZip();
-		await zip.loadAsync(zipData);
+			const zip = await window.debug.initZip();
+			await zip.loadAsync(zipData);
 
-		for (const [relativePath, entry] of Object.entries(zip.files as Record<string, JsZip.JSZipObject>)) {
-			if (entry.dir || relativePath.endsWith("/")) {
-				const path = intoPath(relativePath.replace(/\/$/, ""));
-				await fp.mkdir(path).catch(() => {});
-			} else {
-				const content = await entry.async("uint8array");
-				const path = intoPath(relativePath);
-				await fp.write(path, new Uint8Array(content) as unknown as Buffer);
+			for (const [relativePath, entry] of Object.entries(zip.files as Record<string, JsZip.JSZipObject>)) {
+				if (entry.dir || relativePath.endsWith("/")) {
+					const path = intoPath(relativePath.replace(/\/$/, ""));
+					await fp.mkdir(path).catch(() => {});
+				} else {
+					const content = await entry.async("uint8array");
+					const path = intoPath(relativePath);
+					await fp.write(path, new Uint8Array(content) as unknown as Buffer);
+				}
 			}
-		}
-	}, zipData);
+		},
+		zipData,
+	);
 };
 
 export type SourceData = Parameters<typeof import("@gramax/apps/web/src/debug").setSourceData>[0];

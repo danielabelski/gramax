@@ -188,3 +188,43 @@ fn diff_tree2workdir(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) 
 
 	Ok(())
 }
+
+#[rstest]
+fn diff_root_commit_against_empty_tree(sandbox: TempDir) -> Result {
+	// `Repo::init` commits whatever is already on disk, so this repository's only commit is a root
+	// commit carrying both files — the shape `versionControl/statuses` has to cope with.
+	let path = sandbox.path().join("root-repo");
+	fs::create_dir(&path)?;
+	fs::write(path.join("file"), "content")?;
+	fs::write(path.join("file2"), "content2")?;
+
+	let repo = Repo::init(&path, TestCreds)?;
+
+	let root_commit = repo.repo().head()?.peel_to_commit()?;
+	assert_eq!(root_commit.parent_count(), 0);
+
+	// A root commit has no parent to diff against, and the callers still need to know what it
+	// introduced. Git's well-known empty tree is that missing parent: everything reads as added.
+	let opts = DiffConfig {
+		compare: DiffCompareOptions::Tree2Tree {
+			new: OidInfo::from(&root_commit.id()),
+			old: OidInfo("4b825dc642cb6eb9a060e54bf8d69288fbee4904".to_owned()),
+		},
+		renames: true,
+		use_merge_base: false,
+		pathspecs: None,
+	};
+
+	let diff = repo.diff(opts)?;
+
+	assert!(diff.has_changes);
+	assert_eq!(diff.added, 2);
+	assert_eq!(diff.deleted, 0);
+	assert_eq!(diff.files.len(), 2);
+	assert_eq!(diff.files[0].path, PathBuf::from("file"));
+	assert_eq!(diff.files[0].status, StatusEntry::New);
+	assert_eq!(diff.files[1].path, PathBuf::from("file2"));
+	assert_eq!(diff.files[1].status, StatusEntry::New);
+
+	Ok(())
+}

@@ -14,6 +14,14 @@ type BuildConfig = Omit<AppBuildConfig, "metrics"> & {
 		};
 	};
 	features?: string | string[];
+	ai?: AiBuildConfig;
+};
+
+export type AiBuildConfig = {
+	url?: string;
+	instance?: string;
+	token?: string;
+	publicToken?: string;
 };
 
 export type CliConfig = {

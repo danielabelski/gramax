@@ -11,8 +11,8 @@ export const tabs: Schema = {
 	type: SchemaType.block,
 	transform: async (node, config) => {
 		const children = (await node.transformChildren(config)).filter((c) => c);
-		if (!children || children.length == 0) return null;
-		if (children.length == 1) return children;
+		if (!children || children.length === 0) return null;
+		if (children.length === 1) return children;
 		return new Tag(
 			"tabs",
 			{
@@ -32,6 +32,7 @@ export const tab: Schema = {
 		name: { type: String },
 		icon: { type: String },
 		tag: { type: String },
+		property: { type: {} as CustomAttributeType },
 	},
 	selfClosing: false,
 	type: SchemaType.block,

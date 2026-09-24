@@ -1,5 +1,5 @@
 import type ActionConfirm from "@components/Atoms/ActionConfirm";
-import ButtonLink from "@components/Molecules/ButtonLink";
+import { RightNavigationButton } from "@components/Layouts/CatalogLayout/RightNavigation/RightNavigationButton";
 import MimeTypes from "@core-ui/ApiServices/Types/MimeTypes";
 import ModalToOpenService from "@core-ui/ContextServices/ModalToOpenService/ModalToOpenService";
 import ModalToOpen from "@core-ui/ContextServices/ModalToOpenService/model/ModalsToOpen";
@@ -12,13 +12,18 @@ import type { CatalogView as CatalogViewType } from "@ext/catalog/views/models/C
 import t from "@ext/localization/locale/translate";
 import PermissionService from "@ext/security/logic/Permission/components/PermissionService";
 import { editCatalogPermission } from "@ext/security/logic/Permission/Permissions";
-import { Icon } from "@ui-kit/Icon";
 import { Popover, PopoverTrigger } from "@ui-kit/Popover";
-import { type ComponentProps, memo, useCallback, useRef, useState } from "react";
+import { ComponentVariantProvider } from "@ui-kit/Providers";
+import { TextOverflowTooltip } from "@ui-kit/Tooltip";
+import { type ComponentProps, memo, type ReactElement, useCallback, useRef, useState } from "react";
 
 type CatalogViewsResponse = { views: CatalogViewType[]; hasMore: boolean };
 
-export const CatalogView = memo(() => {
+interface CatalogViewProps {
+	trigger?: ReactElement;
+}
+
+export const CatalogView = memo(({ trigger }: CatalogViewProps) => {
 	const [items, setItems] = useState<CatalogViewType[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 
@@ -128,7 +133,7 @@ export const CatalogView = memo(() => {
 	);
 
 	const onLoadMore = useCallback(() => {
-		getViews({ offset: offsetRef.current, limit: 10 });
+		void getViews({ offset: offsetRef.current, limit: 10 });
 	}, [getViews]);
 
 	const onDeleteClick = useCallback(
@@ -150,27 +155,33 @@ export const CatalogView = memo(() => {
 	if (!isCatalogExist || (!isEditInstant && !hasViews)) return;
 
 	return (
-		<Popover onOpenChange={handleOpenChange}>
-			<PopoverTrigger asChild>
-				<ButtonLink
-					disabled={!isEditInstant && !hasViews}
-					iconCode="layers"
-					rightActions={[<Icon icon="chevron-down" key="chevron-down" />]}
-					text={catalogView?.name || t("catalog.views.trigger")}
+		<ComponentVariantProvider variant="glass">
+			<Popover onOpenChange={handleOpenChange}>
+				<PopoverTrigger asChild data-testid="catalog-view-trigger">
+					{trigger ?? (
+						<RightNavigationButton
+							asTrigger
+							disabled={!isEditInstant && !hasViews}
+							startIcon="eye"
+							trailingIcon="chevron-down"
+						>
+							<TextOverflowTooltip>{catalogView?.name || t("catalog.views.trigger")}</TextOverflowTooltip>
+						</RightNavigationButton>
+					)}
+				</PopoverTrigger>
+				<CatalogViewSettingsContent
+					editable={canEditCatalogViews}
+					hasMoreRef={hasMoreRef}
+					hasViews={hasViews}
+					isLoading={isLoading}
+					items={items}
+					onDeleteClick={onDeleteClick}
+					onLoadMore={onLoadMore}
+					onSaveClick={canEditCatalogViews ? createView : undefined}
+					onUpdateClick={canEditCatalogViews ? updateView : undefined}
+					onUpdateDocportalVisible={canEditCatalogViews ? onUpdateDocportalVisible : undefined}
 				/>
-			</PopoverTrigger>
-			<CatalogViewSettingsContent
-				editable={canEditCatalogViews}
-				hasMoreRef={hasMoreRef}
-				hasViews={hasViews}
-				isLoading={isLoading}
-				items={items}
-				onDeleteClick={onDeleteClick}
-				onLoadMore={onLoadMore}
-				onSaveClick={canEditCatalogViews ? createView : undefined}
-				onUpdateClick={canEditCatalogViews ? updateView : undefined}
-				onUpdateDocportalVisible={canEditCatalogViews ? onUpdateDocportalVisible : undefined}
-			/>
-		</Popover>
+			</Popover>
+		</ComponentVariantProvider>
 	);
 });

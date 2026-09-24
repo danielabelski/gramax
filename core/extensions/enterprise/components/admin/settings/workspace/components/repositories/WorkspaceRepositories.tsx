@@ -1,4 +1,3 @@
-import LfsPatternsEditor from "@core/GitLfs/components/LfsPatternsEditor";
 import { repoColumn, repoColumnId } from "@ext/enterprise/components/admin/settings/resources/model/repoColumn";
 import { DeleteSelectedButton } from "@ext/enterprise/components/admin/ui-kit/DeleteSelectedButton";
 import { SettingsSection } from "@ext/enterprise/components/admin/ui-kit/SettingsSection";
@@ -74,15 +73,6 @@ export function WorkspaceRepositories({
 		[setLocalSettings],
 	);
 
-	const patterns = localSettings.git?.lfs?.patterns ?? [];
-
-	const handleChange = (values: string[]) => {
-		setLocalSettings((prev) => ({
-			...prev,
-			git: { ...prev.git, lfs: { patterns: values } },
-		}));
-	};
-
 	return (
 		<SettingsSection
 			count={
@@ -116,14 +106,6 @@ export function WorkspaceRepositories({
 					</>
 				}
 			/>
-
-			<div className="mt-4">
-				<LfsPatternsEditor
-					description={t("workspace.lfs-section-description")}
-					onChange={handleChange}
-					value={patterns}
-				/>
-			</div>
 		</SettingsSection>
 	);
 }

@@ -12,37 +12,49 @@ const getAttrs = (token) => {
 	return token.attrs || {};
 };
 
-const findQuestion = (tokens: Token[], id: number) => {
-	for (let i = id; i >= 0; i--) {
-		const token = tokens[i];
+interface QuizTokenIndex {
+	answerIndexesByQuestion: Map<number, number[]>;
+	questionIndexByAnswer: Map<number, number>;
+}
 
-		if (token.type === "question_open") return { token, index: i };
-	}
-};
+const quizTokenIndexes = new WeakMap<Token[], QuizTokenIndex>();
 
-const findQuestionAnswers = (tokens: Token[], questionStartIndex: number) => {
-	const answers: { token: Token; index: number }[] = [];
+const getQuizTokenIndex = (tokens: Token[]): QuizTokenIndex => {
+	const cached = quizTokenIndexes.get(tokens);
+	if (cached) return cached;
 
-	for (let i = questionStartIndex + 1; i < tokens.length; i++) {
-		const token = tokens[i];
+	const answerIndexesByQuestion = new Map<number, number[]>();
+	const questionIndexByAnswer = new Map<number, number>();
+	const questionStack: number[] = [];
 
-		if (token.type === "question_close") break;
-
-		if (token.type === "questionAnswer_open") {
-			answers.push({ token, index: i });
+	for (let index = 0; index < tokens.length; index++) {
+		const token = tokens[index];
+		if (token.type === "question_open") {
+			questionStack.push(index);
+			answerIndexesByQuestion.set(index, []);
+		} else if (token.type === "question_close") {
+			questionStack.pop();
+		} else if (token.type === "questionAnswer_open") {
+			const questionIndex = questionStack.at(-1);
+			if (questionIndex !== undefined) {
+				questionIndexByAnswer.set(index, questionIndex);
+				answerIndexesByQuestion.get(questionIndex)?.push(index);
+			}
 		}
 	}
 
-	return answers;
+	const index = { answerIndexesByQuestion, questionIndexByAnswer };
+	quizTokenIndexes.set(tokens, index);
+	return index;
 };
 
 const quizTokensTransformer: TokenTransformerFunc = ({ token, tokens, id }) => {
 	if (token.type === "questionAnswer_open") {
 		const attrs = getAttrs(token);
-		const data = findQuestion(tokens, id);
+		const questionIndex = getQuizTokenIndex(tokens).questionIndexByAnswer.get(id);
 
-		if (!data?.token) return;
-		const { token: parent } = data;
+		if (questionIndex === undefined) return;
+		const parent = tokens[questionIndex];
 		const parentAttrs = getAttrs(parent);
 		const textToken = tokens[id + 2];
 		const type = answerTypeByQuestionType[parentAttrs.type as QuestionType];
@@ -66,10 +78,11 @@ const quizTokensTransformer: TokenTransformerFunc = ({ token, tokens, id }) => {
 		const attrs = getAttrs(token);
 		const textToken = tokens[id + 2];
 
-		const answers = findQuestionAnswers(tokens, id);
+		const answerIndexes = getQuizTokenIndex(tokens).answerIndexesByQuestion.get(id) ?? [];
 		let hasCorrectAnswers = false;
 
-		for (const { token: answerToken } of answers) {
+		for (const answerIndex of answerIndexes) {
+			const answerToken = tokens[answerIndex];
 			const attrs = getAttrs(answerToken);
 			if (attrs.correct === "true" || attrs.correct === true) {
 				hasCorrectAnswers = true;

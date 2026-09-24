@@ -68,7 +68,7 @@ const IconMenuButton = ({ editor }: IconMenuButtonProps) => {
 					{t("icon")}
 				</div>
 			</DropdownMenuSubTrigger>
-			<DropdownMenuSubContent className="shadow-hard-base p-0 min-w-32" sideOffset={8}>
+			<DropdownMenuSubContent className="p-0 min-w-32" sideOffset={8}>
 				<IconPicker className="max-h-96" disable={["file-input"]} onChange={handleChange} size="sm" />
 			</DropdownMenuSubContent>
 		</DropdownMenuSub>

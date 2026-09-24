@@ -1,14 +1,29 @@
+import ArticleLoadingView from "@core-ui/ContextServices/views/articleView/ArticleLoadingView";
 import AgentSkillService from "@ext/agent/components/skills/AgentSkillService";
+import { useAgentSecretNames } from "@ext/agent/components/utils/secret/useAgentSecretNames";
 import BaseArticleView from "@ext/articleProvider/components/BaseArticleView";
 import type { ProviderItemProps } from "@ext/articleProvider/models/types";
+import t from "@ext/localization/locale/translate";
+import { Placeholder } from "@ext/markdown/elements/placeholder/placeholder";
+import SecretNode from "@ext/markdown/elements/secret/edit/model/secretNode";
 import type { JSONContent } from "@tiptap/core";
+
+const AgentSkillPlaceholder = Placeholder.configure({
+	placeholder: ({ editor, node }) => {
+		const { doc } = editor.state;
+		if (doc.firstChild === node) return t("agent.skills.title-placeholder");
+		if (doc.childCount === 2 && doc.content.child(1) === node) return t("agent.skills.content-placeholder");
+	},
+});
 
 interface ArticleAgentSkillProps {
 	item: ProviderItemProps;
 }
 
 const ArticleAgentSkill = ({ item }: ArticleAgentSkillProps) => {
-	const { skills } = AgentSkillService.value;
+	const { skills, remoteVersion } = AgentSkillService.value;
+	const liveItem = skills.get(item.id) ?? item;
+	const knownSecretNames = useAgentSecretNames();
 
 	const updateContent = (id: string, _content: JSONContent, title: string) => {
 		const skill = skills.get(id);
@@ -21,9 +36,13 @@ const ArticleAgentSkill = ({ item }: ArticleAgentSkillProps) => {
 		AgentSkillService.setItems(Array.from(skills.values()));
 	};
 
+	if (!knownSecretNames) return <ArticleLoadingView />;
+
 	return (
 		<BaseArticleView
-			item={item}
+			extensions={[AgentSkillPlaceholder, SecretNode.configure({ knownNames: knownSecretNames })]}
+			item={liveItem}
+			key={`${liveItem.id}:${remoteVersion}`}
 			onCloseClick={() => AgentSkillService.closeItem()}
 			onUpdate={updateContent}
 			providerType="agentSkill"

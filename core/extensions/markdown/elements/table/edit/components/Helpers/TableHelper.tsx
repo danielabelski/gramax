@@ -1,5 +1,6 @@
 import Tooltip from "@components/Atoms/Tooltip";
 import HoverableActions from "@components/controls/HoverController/HoverableActions";
+import StickyTableWrapper from "@components/StickyWrapper/StickyTableWrapper";
 import t from "@ext/localization/locale/translate";
 import { HELPERS_LEFT, HELPERS_TOP } from "@ext/markdown/elements/table/edit/components/Helpers/consts";
 import TablePlusActions from "@ext/markdown/elements/table/edit/components/Helpers/TablePlusActions";
@@ -26,7 +27,7 @@ interface TableHelperProps {
 	node: Node;
 	pos: number;
 	editor: Editor;
-	StickyTableWrapperComponent?: ({ children }: { children: JSX.Element }) => JSX.Element;
+	disableWrapper?: boolean;
 	sorted: boolean;
 	tableSheet?: TableNodeSheet;
 }
@@ -56,8 +57,7 @@ const getVisibleControls = (container: HTMLElement, cellIndex: number, rowIndex:
 };
 
 const TableHelper = (props: TableHelperProps) => {
-	const { tableRef, hoverElementRef, children, node, pos, editor, sorted, StickyTableWrapperComponent, tableSheet } =
-		props;
+	const { tableRef, hoverElementRef, children, node, pos, editor, sorted, disableWrapper, tableSheet } = props;
 
 	const [isHovered, setIsHovered] = useState(false);
 
@@ -91,6 +91,15 @@ const TableHelper = (props: TableHelperProps) => {
 		setHoveredData(-1, -1);
 	}, [setHoveredData]);
 	const { tableSizes } = useTableSizes(tableRef, hideControls);
+
+	useEffect(() => {
+		if (!isHovered || !tableSizes || !lastEvent.current) return;
+		const { clientX, clientY } = lastEvent.current;
+		const target = document.elementFromPoint(clientX, clientY);
+		if (!target || !hoverControlsRef.current?.contains(target)) return;
+		const { cellIndex, rowIndex } = getHoveredData({ target, clientX, clientY }, tableRef.current);
+		setHoveredData(cellIndex, rowIndex);
+	}, [tableSizes, isHovered, tableRef, setHoveredData]);
 
 	const onMouseMove = useCallback(
 		(event: ReactMouseEvent) => {
@@ -138,7 +147,7 @@ const TableHelper = (props: TableHelperProps) => {
 					data-table-select-all-container
 					style={selectAllStyle}
 				>
-					<Tooltip content={t("select-table")} delay={[1000, 0]}>
+					<Tooltip content={t("select-table")} delay="long">
 						<div
 							className="relative z-[var(--z-index-base)] cursor-pointer border-b-4 border-l-4 border-r-4 border-t-4 border-b-[var(--color-line)] border-l-transparent border-r-[var(--color-line)] border-t-transparent pointer-events-auto after:absolute after:right-0 after:top-0 after:h-0 after:w-0 after:border-l-4 after:border-l-transparent after:content-[''] hover:border-b-[var(--color-article-text)] hover:border-r-[var(--color-article-text)]"
 							contentEditable={false}
@@ -174,7 +183,9 @@ const TableHelper = (props: TableHelperProps) => {
 			setIsHovered={setIsHovered}
 		>
 			<div onMouseMove={onMouseMove} ref={hoverControlsRef}>
-				<StickyTableWrapperComponent>{WrapperChildren}</StickyTableWrapperComponent>
+				<StickyTableWrapper disableWrapper={disableWrapper} tableRef={tableRef}>
+					{WrapperChildren}
+				</StickyTableWrapper>
 			</div>
 		</HoverableActions>
 	);

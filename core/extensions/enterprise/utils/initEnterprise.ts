@@ -19,7 +19,7 @@ const initEnterprise = async (router: Router, addWorkspaceUrl: Url, cloneCatalog
 	SourceDataService.value = [userSettings.source];
 	await FetchService.fetch(cloneCatalogsUrl, JSON.stringify(userSettings));
 	ModalToOpenService.removeModal(id);
-	await refreshPage();
+	refreshPage();
 };
 
 export default initEnterprise;

@@ -1,9 +1,9 @@
 import type { ClientArticleProps } from "@core/SitePresenter/SitePresenter";
 import type { ResourceServiceType } from "@core-ui/ContextServices/ResourceService/ResourceService";
-import { getEditorStore } from "@core-ui/stores/EditorStore";
 import { resolveFileKind } from "@core-ui/utils/resolveFileKind";
 import {
 	type ClipboardComments,
+	type CommentBodies,
 	collectClipboardComments,
 } from "@ext/markdown/elements/comment/edit/logic/clipboardComments";
 import createPlainText from "@ext/markdown/elements/copyArticles/createPlainText";
@@ -27,6 +27,7 @@ export interface GramaxClipboardData {
 
 export interface CopyOptions {
 	cut?: boolean;
+	comments?: CommentBodies;
 }
 
 const IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"];
@@ -120,15 +121,15 @@ const createGramaxClipboardData = (
 	fragment: Fragment,
 	articleProps: ClientArticleProps,
 	resourceService: ResourceServiceType,
+	comments?: CommentBodies,
 ): GramaxClipboardData => {
 	const { $from, $to } = view.state.selection;
-	const storage = getEditorStore().editor?.storage?.comment;
 
 	return {
 		copyPath: articleProps?.logicPath || "",
 		range: { from: $from.pos, to: $to.pos },
 		data: createNodesJSON(view, fragment, resourceService.getBuffer),
-		comments: collectClipboardComments(fragment, storage?.comments),
+		comments: collectClipboardComments(fragment, comments),
 	};
 };
 
@@ -234,6 +235,7 @@ const getNodesData = (
 	view: EditorView,
 	articleProps: ClientArticleProps,
 	resourceService: ResourceServiceType,
+	comments?: CommentBodies,
 ): { copyTypes: Record<string, string>; deleteRange: { from: number; to: number } } => {
 	const { fragment, plainText, deleteRange } = createFragment(view);
 	const imageData = getImageFromFragment(fragment, resourceService);
@@ -241,7 +243,9 @@ const getNodesData = (
 
 	return {
 		copyTypes: {
-			"text/gramax": JSON.stringify(createGramaxClipboardData(view, fragment, articleProps, resourceService)),
+			"text/gramax": JSON.stringify(
+				createGramaxClipboardData(view, fragment, articleProps, resourceService, comments),
+			),
 			"text/plain": plainText,
 			"text/html": getSerializedHTML(view, fragment),
 		},
@@ -260,7 +264,7 @@ export const copy = (
 	const { tr } = view.state;
 	if (from === to) return;
 
-	const data = getNodesData(view, articleProps, resourceService);
+	const data = getNodesData(view, articleProps, resourceService, options?.comments);
 	if (data) Object.entries(data.copyTypes).forEach(([type, data]) => event.clipboardData.setData(type, data));
 
 	if (options?.cut) {

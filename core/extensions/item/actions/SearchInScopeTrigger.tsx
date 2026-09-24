@@ -1,9 +1,9 @@
 import Icon from "@components/Atoms/Icon";
 import { useRouter } from "@core/Api/useRouter";
 import Url from "@core-ui/ApiServices/Types/Url";
-import SearchQueryService from "@core-ui/ContextServices/SearchQuery";
 import t from "@ext/localization/locale/translate";
 import type { ItemLink } from "@ext/navigation/NavigationLinks";
+import SearchQueryService from "@ext/serach/components/SearchQueryContext";
 import { DropdownMenuItem } from "@ui-kit/Dropdown";
 
 export const SearchInScopeTrigger = ({ itemLink, isCategory }: { itemLink: ItemLink; isCategory: boolean }) => {

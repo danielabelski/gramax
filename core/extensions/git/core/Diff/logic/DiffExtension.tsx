@@ -4,7 +4,6 @@ import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import ArticleRefService from "@core-ui/ContextServices/ArticleRef";
 import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
-import type { SidebarsIsPinValue } from "@core-ui/ContextServices/Sidebars/SidebarsIsPin";
 import debounceFunction from "@core-ui/debounceFunction";
 import { CatalogStoreProvider } from "@core-ui/stores/CatalogPropsStore/CatalogPropsStore.provider";
 import ProseMirrorDiffLineComponent from "@ext/git/core/Diff/components/ProseMirrorDiffLine";
@@ -29,7 +28,7 @@ export interface DiffExtensionProps {
 	articleRef: MutableRefObject<HTMLDivElement>;
 	apiUrlCreator: ApiUrlCreator;
 	articlePath: string;
-	isPin: SidebarsIsPinValue;
+	isLeftPinned: boolean;
 	oldScope: TreeReadScope;
 	newScope: TreeReadScope;
 	isDoublePanel: boolean;
@@ -40,7 +39,7 @@ export interface DiffExtensionProps {
 export interface DiffExtensionStore {
 	diffLines: ProseMirrorDiffLine[];
 	isOldEditor: boolean;
-	isPin: SidebarsIsPinValue;
+	isLeftPinned: boolean;
 	oldScope: TreeReadScope;
 	newScope: TreeReadScope;
 	isDoublePanel: boolean;
@@ -55,7 +54,7 @@ declare module "@tiptap/core" {
 		diffLines: {
 			updateDiffLinesModel: (diffLines: ProseMirrorDiffLine[]) => ReturnType;
 			updateIsDoublePanel: (isDoublePanel: boolean, triggerUpdate?: boolean) => ReturnType;
-			updateIsPin: (isPin: SidebarsIsPinValue, triggerUpdate?: boolean) => ReturnType;
+			updateIsLeftPinned: (isLeftPinned: boolean, triggerUpdate?: boolean) => ReturnType;
 		};
 	}
 }
@@ -171,9 +170,8 @@ class DiffLines implements PluginView {
 
 	private _getLeft(diffLine: ProseMirrorDiffLine) {
 		const isComment = diffLine.type === "comment";
-		const isPin = this._extensionStore?.isPin;
 		const leftOffest = isComment ? "7px" : "2px";
-		return isPin.left ? leftOffest : `calc(30px + ${leftOffest})`;
+		return this._extensionStore.isLeftPinned ? leftOffest : `calc(30px + ${leftOffest})`;
 	}
 
 	private _addNewRenderData(count: number) {
@@ -222,7 +220,7 @@ const DiffExtension = Extension.create<DiffExtensionProps, DiffExtensionStore>({
 		return {
 			isOldEditor: false,
 			articleRef: null,
-			isPin: { left: true, right: true },
+			isLeftPinned: true,
 			articlePath: null,
 			apiUrlCreator: null,
 			pageDataContext: null,
@@ -236,7 +234,7 @@ const DiffExtension = Extension.create<DiffExtensionProps, DiffExtensionStore>({
 	addStorage() {
 		return {
 			isOldEditor: this.options.isOldEditor,
-			isPin: this.options.isPin,
+			isLeftPinned: this.options.isLeftPinned,
 			diffLines: [],
 			oldScope: this.options.oldScope,
 			newScope: this.options.newScope,
@@ -259,10 +257,10 @@ const DiffExtension = Extension.create<DiffExtensionProps, DiffExtensionStore>({
 					if (triggerUpdate) editor.commands.focus(undefined, { scrollIntoView: false });
 					return true;
 				},
-			updateIsPin:
-				(isPin, triggerUpdate = true) =>
+			updateIsLeftPinned:
+				(isLeftPinned, triggerUpdate = true) =>
 				({ editor }) => {
-					editor.storage.diffLines.isPin = isPin;
+					editor.storage.diffLines.isLeftPinned = isLeftPinned;
 					if (triggerUpdate) editor.commands.focus(undefined, { scrollIntoView: false });
 					return true;
 				},

@@ -6,8 +6,8 @@ type Author = {
 	email: string;
 };
 
-export const useReviewAuthors = (): Author[] => {
-	const { authors: gitCommitAuthors } = useGitCommitAuthors(true);
+export const useReviewAuthors = (): { authors: Author[]; isLoading: boolean } => {
+	const { authors: gitCommitAuthors, isLoading } = useGitCommitAuthors(true);
 
 	const commentFilter = useCallback(
 		(mail: string) => {
@@ -16,5 +16,8 @@ export const useReviewAuthors = (): Author[] => {
 		[gitCommitAuthors],
 	);
 
-	return gitCommitAuthors.filter((author) => commentFilter(author.email));
+	return {
+		authors: gitCommitAuthors.filter((author) => commentFilter(author.email)),
+		isLoading,
+	};
 };

@@ -64,6 +64,11 @@ export class GitAutoMerger {
 	}
 
 	private async _onAutoMergeSuccess(processedFiles: Map<string, string>): Promise<void> {
+		// Most merges auto-merge nothing, and an empty list is not "no paths" by the time it reaches
+		// git: `LibGit2Commands.add` turns it into `["."]`, which stages the whole working copy —
+		// measured at 1135-1473 ms per merge on a catalog of 3448 files.
+		if (!processedFiles.size) return;
+
 		const paths: Path[] = [];
 		for (const [file, content] of processedFiles) {
 			await this._fp.write(new Path(file), content);

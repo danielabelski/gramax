@@ -166,14 +166,14 @@ describe("syncOverrides", () => {
 		});
 	});
 
-	test("persists server-expanded non-root categories so they stay open after the current article changes", () => {
+	test("does not persist categories expanded to reveal the current article", () => {
 		const deep = makeCategory("root/child/deep/_index.md", [], false);
 		const child = makeCategory("root/child/_index.md", [deep], true);
 		const root = makeCategory("root/_index.md", [child], true);
 
 		syncOverrides("cat", [root]);
 
-		expect(getCatalogOverrides("cat")).toEqual({ "root/child/_index.md": true });
+		expect(getCatalogOverrides("cat")).toEqual({});
 	});
 
 	test("does not overwrite an explicit user choice with a server expansion", () => {

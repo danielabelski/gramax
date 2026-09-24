@@ -2,6 +2,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: 123 */
 
 import resolveModule from "@app/resolveModule/frontend";
+import { CLIENT_CLOSED_STATUS_CODE } from "@core/Api/consts";
 import type { Event } from "@core/Event/EventEmitter";
 import trimRoutePrefix from "@core-ui/ApiServices/trimRoutePrefix";
 import { events } from "@core-ui/hooks/useApi";
@@ -57,6 +58,7 @@ export default class FetchService {
 		})();
 
 		if (res.ok) return res;
+		if (res.status === CLIENT_CLOSED_STATUS_CODE) return res;
 
 		let error: any;
 		if (res.status === 404) {

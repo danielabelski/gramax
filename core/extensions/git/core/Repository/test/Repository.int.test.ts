@@ -85,11 +85,40 @@ describe("Repository", () => {
 					expect(await dfp.read(repPath(".git/gramax/state.json"))).toBe(JSON.stringify(state));
 					expect((await rep.getState()).inner).toEqual(state);
 					break;
-				} catch (err) {
+				} catch {
 					attempts--;
 				}
 			}
 		});
+
+		// A checkout stashes the working copy, and a stash that cannot be replayed on the branch just
+		// checked out becomes a conflict. Aborting it resets the branch the repository stands on, so the
+		// head it resets to has to be read together with the branch it belongs to.
+		test("stash conflict on checkout, and aborting it leaves the checked-out branch where it was", async () => {
+			await rep.gvc.createNewBranch("B");
+			await dfp.write(repPath("1.txt"), "111\nBBB\n333");
+			await rep.publish({ commitMessage: "test", data: mockUserData, filesToPublish: [path("1.txt")] });
+			const headOfB = (await rep.gvc.getCommitHash("B")).toString();
+
+			await rep.checkout({ data: mockUserData, branch: "master" });
+			const headOfMaster = (await rep.gvc.getCommitHash("master")).toString();
+
+			await dfp.write(repPath("1.txt"), "111\nunpublished\n333");
+			await rep.checkout({ data: mockUserData, branch: "B" });
+
+			expect((await rep.getState()).inner).toMatchObject({
+				data: { branchNameBefore: "master", commitHeadBefore: headOfMaster },
+				value: "stashConflict",
+			});
+
+			await (await rep.getState()).abortMerge(mockUserData);
+
+			expect((await rep.gvc.getCommitHash("B")).toString()).toBe(headOfB);
+			expect((await rep.gvc.getCommitHash("master")).toString()).toBe(headOfMaster);
+			expect(await rep.gvc.getCurrentBranchName(false)).toBe("master");
+			expect(await dfp.read(repPath("1.txt"))).toBe("111\nunpublished\n333");
+		});
+
 		describe("default", () => {
 			test("when aborting merge", async () => {
 				const state = { value: "default" };
@@ -121,7 +150,7 @@ describe("Repository", () => {
 			fr = new FileRepository(__dirname);
 			({ firstInstance: rep, secondInstance: remoteRep } = fr.create());
 
-			fs.writeFileSync(fr.secondPath + "/remote_change", "remote change");
+			fs.writeFileSync(`${fr.secondPath}/remote_change`, "remote change");
 			await remoteRep.publish({
 				commitMessage: "test",
 				data: mockUserData,
@@ -151,7 +180,7 @@ describe("Repository", () => {
 			const commitHashBefore = await rep.gvc.getHeadCommit();
 
 			await rep.gvc.createNewBranch("local");
-			fs.writeFileSync(fr.firstPath + "/change", "change");
+			fs.writeFileSync(`${fr.firstPath}/change`, "change");
 
 			const statusBefore = await rep.gvc.getChanges();
 			expect(statusBefore.length).toBe(1);
@@ -163,7 +192,7 @@ describe("Repository", () => {
 
 			expect(commitHashAfter.toString()).toBe(commitHashBefore.toString());
 			expect(statusAfter.length).toBe(1);
-			expect(fs.readFileSync(fr.firstPath + "/change", "utf-8")).toBe("change");
+			expect(fs.readFileSync(`${fr.firstPath}/change`, "utf-8")).toBe("change");
 		});
 	});
 });

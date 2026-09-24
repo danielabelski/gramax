@@ -1,7 +1,9 @@
 import { type AnimationEvent, useCallback, useState } from "react";
+import { useNavigationTreeStore } from "../store/navigationTreeStore";
 
 export const useCollapsibleAnimation = (onOpenChange: (open: boolean) => void) => {
 	const [animating, setAnimating] = useState(false);
+	const notifyLayoutSettled = useNavigationTreeStore((s) => s.notifyLayoutSettled);
 
 	const handleOpenChange = useCallback(
 		(open: boolean) => {
@@ -13,10 +15,14 @@ export const useCollapsibleAnimation = (onOpenChange: (open: boolean) => void) =
 		[onOpenChange],
 	);
 
-	const handleAnimationEnd = useCallback((event: AnimationEvent<HTMLElement>) => {
-		if (event.target !== event.currentTarget) return;
-		setAnimating(false);
-	}, []);
+	const handleAnimationEnd = useCallback(
+		(event: AnimationEvent<HTMLElement>) => {
+			if (event.target !== event.currentTarget) return;
+			setAnimating(false);
+			notifyLayoutSettled();
+		},
+		[notifyLayoutSettled],
+	);
 
 	return { animating, handleOpenChange, handleAnimationEnd };
 };

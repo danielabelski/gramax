@@ -1,4 +1,5 @@
 use std::io::BufWriter;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
@@ -14,6 +15,11 @@ use tauri::*;
 const MAX_FILE_COUNT: usize = 10;
 
 static FILTER_RELOAD_HANDLE: OnceLock<reload::Handle<EnvFilter, Registry>> = OnceLock::new();
+static CURRENT_LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
+
+pub fn current_log_file() -> Option<&'static Path> {
+	CURRENT_LOG_FILE.get().map(PathBuf::as_path)
+}
 
 /// Live-reload the min tracing level without restart (backs the runtime otel level switch from JS).
 /// Crate-scoped `RUST_LOG` directives (`crate=level`) are preserved; only the global level is replaced.
@@ -90,6 +96,7 @@ fn create_log_file(dir: &PathBuf) -> std::io::Result<BufWriter<std::fs::File>> {
 
 	let file = std::fs::File::options().append(true).create(true).open(&log_path)?;
 
+	let _ = CURRENT_LOG_FILE.set(log_path.clone());
 	let _ = std::fs::hard_link(&log_path, &latest_path);
 
 	Ok(BufWriter::new(file))

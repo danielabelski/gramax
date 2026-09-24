@@ -8,7 +8,7 @@ import UiLanguage, {
 	overriddenLanguage,
 	resolveLanguage,
 } from "../../extensions/localization/core/model/Language";
-import type AuthManager from "../../extensions/security/logic/AuthManager";
+import type { AuthManagerProvider } from "../../extensions/security/logic/AuthManagerProvider";
 import type User from "../../extensions/security/logic/User/User";
 import type Theme from "../../extensions/Theme/Theme";
 import { validateTheme } from "../../extensions/Theme/utils";
@@ -33,7 +33,7 @@ export interface FromWebArgs {
 export class ContextFactory {
 	constructor(
 		private _cookieSecret: string,
-		private _am: AuthManager,
+		private readonly _amp: AuthManagerProvider,
 	) {}
 
 	async fromNode({ req, res, query }: FromArgs): Promise<Context> {
@@ -50,7 +50,7 @@ export class ContextFactory {
 			UiLanguage[req.headers["accept-language"]?.split(",")?.[0]];
 		if (!query.l) query.l = ContentLanguage[req.headers["x-gramax-language"]];
 
-		const user = await this._am.getUser(cookie, query, req.headers);
+		const user = await this._amp.current().getUser(cookie, query, req.headers);
 
 		return this._getContext({
 			cookie,
@@ -69,7 +69,7 @@ export class ContextFactory {
 		query.l = language;
 		query.ui = getCachedSetting("general.language");
 
-		const user = await this._am.getUser(cookie, query);
+		const user = await this._amp.current().getUser(cookie, query);
 		return this._getContext({ cookie, user, query, domain: getClientDomain(), viewId: cookie.get("viewIds") });
 	}
 

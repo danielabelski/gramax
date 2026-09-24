@@ -79,6 +79,7 @@ const Header = (props: HeaderProps) => {
 							<NavigationDropdown
 								trigger={
 									<IconButton
+										aria-label={t("actions")}
 										className="shrink-0"
 										icon="ellipsis-vertical"
 										iconClassName="h-5 w-5"

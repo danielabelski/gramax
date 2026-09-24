@@ -71,10 +71,13 @@ const fsPluginInvoke = async <O>(cmd: string, args: FsArgs): Promise<O> => {
 	try {
 		return await invoke(`plugin:plugin-gramax-core|${cmd}`, args);
 	} catch (err: any) {
+		// fs commands serialize as `{name, message}`, core commands (scan_workspace, scan_catalog)
+		// as `{kind, message}`. Read both, or a refusal from a scan loses its discriminant.
+		const code = err?.name ?? err?.kind;
 		throw new IoError({
 			name: `IO (${cmd})`,
-			code: err?.name,
-			message: `${err?.name}: ${err?.message};\nargs: ${JSON.stringify(args, null, 4)}`,
+			code,
+			message: `${code}: ${err?.message};\nargs: ${JSON.stringify(args, null, 4)}`,
 		});
 	}
 };

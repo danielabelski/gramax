@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { shallow } from "zustand/shallow";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 
-export type ReviewSortingOrder = "none" | "newest" | "oldest";
+export type ReviewSortingOrder = "newest" | "oldest";
 
 export type ReviewGrouping = "none" | "article" | "date";
 
@@ -54,7 +54,7 @@ const store = create<ReviewStore>()(
 			articleItems: null,
 			currentItem: null,
 			currentScope: "article",
-			sorting: "none",
+			sorting: "newest",
 			grouping: "none",
 			pendingItem: null,
 			filters: {},

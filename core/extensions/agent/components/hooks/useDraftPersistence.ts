@@ -1,8 +1,10 @@
 import Method from "@core-ui/ApiServices/Types/Method";
 import MimeTypes from "@core-ui/ApiServices/Types/MimeTypes";
 import { useApi, useDeferApi } from "@core-ui/hooks/useApi";
+import type { AgentQuote } from "@ext/agent/core/events";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AgentDraftAttachment, AgentDraftSnapshot } from "../types/chat";
+import { setQuote, useChatQuote } from "../store/ChatStore";
+import type { AgentDraftAttachment, AgentDraftSnapshot, AgentDraftType } from "../types/chat";
 
 const LOAD_DRAFT_OPTS = { method: Method.GET, mime: MimeTypes.json, consumeError: true } as const;
 const SAVE_DRAFT_OPTS = { method: Method.POST, mime: MimeTypes.json, consumeError: true } as const;
@@ -25,6 +27,7 @@ export const useDraftPersistence = (sessionId: string | null, sendingRef: { curr
 	const [selectedSkillName, setSelectedSkillName] = useState<string | null>(null);
 	const [draftAttachments, setDraftAttachments] = useState<AgentDraftAttachment[]>([]);
 	const [hydrating, setHydrating] = useState(false);
+	const quote = useChatQuote();
 
 	const { call: callLoadDraft, reset: resetLoadDraft } = useApi<AgentDraftSnapshot | null>({
 		url: (api) => api.getAgentSessionDraftUrl(sessionId),
@@ -41,9 +44,7 @@ export const useDraftPersistence = (sessionId: string | null, sendingRef: { curr
 
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const hydratedFor = useRef<string | null>(null);
-	const hydratedBaseline = useRef<{ text: string; skill: string | null; attachments: AgentDraftAttachment[] } | null>(
-		null,
-	);
+	const hydratedBaseline = useRef<AgentDraftType | null>(null);
 	const dirtyRef = useRef(false);
 
 	const draftRef = useRef(draft);
@@ -52,10 +53,24 @@ export const useDraftPersistence = (sessionId: string | null, sendingRef: { curr
 	selectedSkillNameRef.current = selectedSkillName;
 	const draftAttachmentsRef = useRef(draftAttachments);
 	draftAttachmentsRef.current = draftAttachments;
+	const quoteRef = useRef(quote);
+	quoteRef.current = quote;
 
 	const persistDraft = useCallback(
-		(sid: string, text: string, skill: string | null, attachments: AgentDraftAttachment[] = []) => {
-			const snapshot: AgentDraftSnapshot = { text, selectedSkillName: skill, updatedAt: Date.now(), attachments };
+		(
+			sid: string,
+			text: string,
+			skill: string | null,
+			attachments: AgentDraftAttachment[] = [],
+			quote: AgentQuote | null = null,
+		) => {
+			const snapshot: AgentDraftSnapshot = {
+				text,
+				selectedSkillName: skill,
+				updatedAt: Date.now(),
+				attachments,
+				quote,
+			};
 			void callSaveDraft({ opts: { body: JSON.stringify({ sessionId: sid, draft: snapshot }) } });
 		},
 		[callSaveDraft],
@@ -64,7 +79,13 @@ export const useDraftPersistence = (sessionId: string | null, sendingRef: { curr
 	const saveSnapshot = useCallback(
 		(sid: string) => {
 			dirtyRef.current = false;
-			persistDraft(sid, draftRef.current, selectedSkillNameRef.current, draftAttachmentsRef.current);
+			persistDraft(
+				sid,
+				draftRef.current,
+				selectedSkillNameRef.current,
+				draftAttachmentsRef.current,
+				quoteRef.current,
+			);
 		},
 		[persistDraft],
 	);
@@ -81,7 +102,13 @@ export const useDraftPersistence = (sessionId: string | null, sendingRef: { curr
 				opts: {
 					body: JSON.stringify({
 						sessionId: sid,
-						draft: { text: "", selectedSkillName: skill, updatedAt: Date.now(), attachments: [] },
+						draft: {
+							text: "",
+							selectedSkillName: skill,
+							updatedAt: Date.now(),
+							attachments: [],
+							quote: null,
+						},
 					}),
 				},
 			});
@@ -89,9 +116,12 @@ export const useDraftPersistence = (sessionId: string | null, sendingRef: { curr
 		[callClearDraft],
 	);
 
-	const restoreBaseline = useCallback((text: string, skill: string | null, attachments: AgentDraftAttachment[]) => {
-		hydratedBaseline.current = { text, skill, attachments };
-	}, []);
+	const restoreBaseline = useCallback(
+		(text: string, skill: string | null, attachments: AgentDraftAttachment[], quote: AgentQuote | null) => {
+			hydratedBaseline.current = { text, skill, attachments, quote };
+		},
+		[],
+	);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: reset + hydrate on session change
 	useEffect(() => {
@@ -103,6 +133,7 @@ export const useDraftPersistence = (sessionId: string | null, sendingRef: { curr
 		setDraft("");
 		setSelectedSkillName(null);
 		setDraftAttachments([]);
+		setQuote(null);
 
 		let cancelled = false;
 		resetLoadDraft();
@@ -111,10 +142,12 @@ export const useDraftPersistence = (sessionId: string | null, sendingRef: { curr
 			const text = loaded?.text ?? "";
 			const skill = loaded?.selectedSkillName ?? null;
 			const attachments = loaded?.attachments ?? [];
-			hydratedBaseline.current = { text, skill, attachments };
+			const loadedQuote = loaded?.quote ?? null;
+			hydratedBaseline.current = { text, skill, attachments, quote: loadedQuote };
 			setDraft(text);
 			setSelectedSkillName(skill);
 			setDraftAttachments(attachments);
+			setQuote(loadedQuote);
 			hydratedFor.current = sessionId;
 			setHydrating(false);
 		});
@@ -132,6 +165,7 @@ export const useDraftPersistence = (sessionId: string | null, sendingRef: { curr
 			base &&
 			base.text === draft &&
 			base.skill === selectedSkillName &&
+			base.quote === quote &&
 			areDraftAttachmentsEqual(base.attachments, draftAttachments)
 		)
 			return;
@@ -147,7 +181,7 @@ export const useDraftPersistence = (sessionId: string | null, sendingRef: { curr
 		return () => {
 			if (saveTimer.current) clearTimeout(saveTimer.current);
 		};
-	}, [draft, selectedSkillName, sessionId, draftAttachments]);
+	}, [draft, selectedSkillName, sessionId, draftAttachments, quote]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: flush previous session's pending draft
 	useEffect(() => {

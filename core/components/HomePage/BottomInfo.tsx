@@ -14,8 +14,8 @@ const BottomInfo = () => {
 	);
 
 	return (
-		<div className="bottom-info flex flex-row flex-wrap items-center justify-end gap-1 py-5">
-			<div className="text-muted flex items-center gap-2 text-xs whitespace-nowrap">
+		<div className="bottom-info flex flex-row flex-wrap items-center gap-1 py-5">
+			<div className="text-muted ml-auto flex items-center gap-2 text-xs whitespace-nowrap">
 				{canShow && <span className="text-muted">{version}</span>}
 				<span className="text-muted">{cred}</span>
 			</div>

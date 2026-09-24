@@ -1,7 +1,7 @@
 import DateComponent from "@components/Atoms/Date";
 import useSetArticleDiffView from "@core-ui/hooks/diff/useSetArticleDiffView";
 import RevisionOidCopy from "@ext/git/actions/Revisions/components/RevisionsTab/Helpers/RevisionOidCopy";
-import { DiffEntries } from "@ext/git/core/Diff/components/Changes/DiffEntries";
+import { RevisionsDiffTree } from "@ext/git/actions/Revisions/components/RevisionsTab/RevisionsDiffTree";
 import ScrollableDiffEntriesLayout from "@ext/git/core/Diff/components/Changes/ScrollableDiffEntriesLayout";
 import { DiffCount } from "@ext/git/core/Diff/components/helpers/DiffCount";
 import type { DiffTree } from "@ext/git/core/GitDiffItemCreator/RevisionDiffPresenter";
@@ -24,7 +24,6 @@ const RevisionsDiffView = (props: RevisionsDiffViewProps) => {
 	const { revision, commitData, diffTree, isDiffTreeLoading } = props;
 	const scrollableRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
-	const entriesRef = useRef<HTMLDivElement>(null);
 
 	const parentOid = commitData?.parents?.[0];
 	const setArticleDiffView = useSetArticleDiffView({ commit: revision }, parentOid ? { commit: parentOid } : "HEAD");
@@ -77,14 +76,7 @@ const RevisionsDiffView = (props: RevisionsDiffViewProps) => {
 			<div className="text-xs">
 				<ScrollableDiffEntriesLayout maxHeight="20vh" ref={scrollableRef}>
 					{!isDiffTreeLoading ? (
-						<DiffEntries
-							changes={diffTree?.data}
-							noNegativeMargin
-							onClick={setArticleDiffView}
-							ref={entriesRef}
-							renderCommentsCount
-							scrollableRef={scrollableRef}
-						/>
+						<RevisionsDiffTree entries={diffTree?.data ?? []} onOpen={setArticleDiffView} />
 					) : (
 						<Loader className="p-6" size="md">
 							{t("loading")}

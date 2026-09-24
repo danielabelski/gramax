@@ -97,13 +97,10 @@ const move: Command<MoveProps, { redirectTo: string }> = Command.create({
 			sourceCategory = sourceItem as Category;
 		}
 
-		await sourceCatalog.updateItemProps(
-			{
-				logicPath: sourceItem.logicPath,
-				title: setTitle,
-			},
-			resourceUpdaterFactory,
-		);
+		// `sourceCategory`, not `sourceItem`: the article was turned into a category above — the old
+		// item is gone and a new one took its place in the tree. This used to rely on the catalog
+		// looking the new one up again by the same `logicPath`.
+		await sourceCatalog.updateItemProps(sourceCategory, { title: setTitle }, resourceUpdaterFactory);
 
 		const to = targetCatalog.getRootCategoryPath().join(new Path(setName));
 		await current.getFileProvider().move(sourceCategory.ref.path.parentDirectoryPath, to);

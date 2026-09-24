@@ -1,5 +1,3 @@
-import NavigationTabsService from "@components/Layouts/LeftNavigationTabs/NavigationTabsService";
-import { LeftNavigationTab } from "@components/Layouts/StatusBar/Extensions/ArticleStatusBar/ArticleStatusBar";
 import generateUniqueID from "@core/utils/generateUniqueID";
 import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import FetchService from "@core-ui/ApiServices/FetchService";
@@ -7,10 +5,11 @@ import ArticleViewService from "@core-ui/ContextServices/views/articleView/Artic
 import { usePlatform } from "@core-ui/hooks/usePlatform";
 import type { ProviderContextService, ProviderItemProps } from "@ext/articleProvider/models/types";
 import ArticleFragment from "@ext/markdown/elements/fragment/edit/components/Article/ArticleFragment";
+import type { FragmentItemProps } from "@ext/markdown/elements/fragment/edit/model/types";
 import { createContext, useContext, useState } from "react";
 
 export type FragmentContextType = {
-	fragments: Map<string, ProviderItemProps>;
+	fragments: Map<string, FragmentItemProps>;
 	selectedID: string;
 };
 
@@ -20,12 +19,12 @@ export const FragmentContext = createContext<FragmentContextType>({
 });
 
 class FragmentService implements ProviderContextService {
-	private _setFragments: (fragments: Map<string, ProviderItemProps>) => void = () => {};
+	private _setFragments: (fragments: Map<string, FragmentItemProps>) => void = () => {};
 	private _setSelectedID: (selectedID: string) => void = () => {};
 	private _isNext: boolean;
 
 	Init = ({ children }: { children: JSX.Element }): JSX.Element => {
-		const [fragments, setFragments] = useState<Map<string, ProviderItemProps>>(new Map());
+		const [fragments, setFragments] = useState<Map<string, FragmentItemProps>>(new Map());
 		const [selectedID, setSelectedID] = useState<string>(null);
 		const { isNext } = usePlatform();
 
@@ -50,7 +49,7 @@ class FragmentService implements ProviderContextService {
 		this.setItems(fragments);
 	}
 
-	setItems(fragments: ProviderItemProps[]) {
+	setItems(fragments: FragmentItemProps[]) {
 		this._setFragments(new Map(fragments.map((fragment) => [fragment.id, fragment])));
 	}
 
@@ -61,7 +60,6 @@ class FragmentService implements ProviderContextService {
 	}
 
 	openItem(fragment: ProviderItemProps) {
-		NavigationTabsService.setTop(LeftNavigationTab.Fragments);
 		ArticleViewService.setView(() => <ArticleFragment item={fragment} />);
 		this._setSelectedID(fragment.id);
 	}

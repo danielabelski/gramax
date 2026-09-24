@@ -13,7 +13,7 @@ export const NavigationItemCommentCounter = ({ pathname }: NavigationItemComment
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
-				<div className="min-w-4 rounded-full rounded-bl-none bg-status-warning-hover px-1 py-[3px] text-center text-[10px] leading-none text-secondary-bg">
+				<div className="min-w-4 shrink-0 rounded-full rounded-bl-none bg-status-warning-hover px-1 py-[3px] text-center text-[10px] leading-none text-secondary-bg">
 					{total}
 				</div>
 			</TooltipTrigger>

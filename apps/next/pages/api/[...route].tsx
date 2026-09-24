@@ -17,6 +17,7 @@ import { withContext } from "../../logic/Context/ContextHook";
 
 export default async (req: ApiRequest, res: ApiResponse) => {
 	const controller = new AbortController();
+	req.clientAbortSignal = controller.signal;
 	(res as unknown as NextApiResponse).on("close", () => controller.abort());
 
 	const path = (req.query.route as string[]).join("/");
@@ -34,24 +35,16 @@ export default async (req: ApiRequest, res: ApiResponse) => {
 
 	const process: Middleware = new ApiMiddleware(async (req, res) => {
 		const ctx = await app.contextFactory.fromNode({ req, res });
-		try {
-			// Next has already percent-decoded the query. Decoding it a second time here ate the escaping of
-			// any value that legitimately contains a percent sign: a versioned catalog name arrives as
-			// `test-docs:releases%2Fv1.0` and became `test-docs:releases/v1.0`, which matches no version, so
-			// every command silently answered for the actual (unversioned) catalog instead.
-			const params = command.params(ctx, req.query as Query, parseBody(req.body), controller.signal);
+		// Next has already percent-decoded the query. Decoding it a second time here ate the escaping of
+		// any value that legitimately contains a percent sign: a versioned catalog name arrives as
+		// `test-docs:releases%2Fv1.0` and became `test-docs:releases/v1.0`, which matches no version, so
+		// every command silently answered for the actual (unversioned) catalog instead.
+		const params = command.params(ctx, req.query as Query, parseBody(req.body), controller.signal);
 
-			const result = await withContext(ctx, async () => await command.do(params));
-			if (controller.signal.aborted) {
-				return;
-			}
+		const result = await withContext(ctx, async () => await command.do(params));
+		if (controller.signal.aborted) return;
 
-			await respond(app, req, res, command.kind, result);
-		} catch (e) {
-			if (!(e instanceof DOMException && e.name === "AbortError")) {
-				throw e;
-			}
-		}
+		await respond(app, req, res, command.kind, result);
 	});
 
 	await buildMiddleware(app, commands, command.middlewares, process).Process(req, res);

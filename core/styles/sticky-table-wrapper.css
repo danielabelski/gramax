@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noDescendingSpecificity: expected */
 .sticky-table-wrapper[data-sticky-row-active="true"]
 	> .width-wrapper-container
 	> .width-wrapper
@@ -123,9 +124,7 @@
 
 .sticky-table-wrapper[data-sticky-row-active="true"]
 	> .width-wrapper-container
-	> .width-wrapper:has(
-		> .scrollableContent > div[data-table-wrapper] > :is(table[data-header="row"], table[data-header="both"])
-	)
+	> .width-wrapper
 	.controls-container-horizontal {
 	position: fixed;
 	top: var(--sticky-helpers-top);
@@ -219,8 +218,8 @@
 		border-left: none;
 	}
 
-	> tbody > tr:has(> td:hover) > td[data-sticky-first-column-cell],
-	> tfoot > tr:has(> td:hover) > td:first-of-type {
+	> tbody > tr:hover > td[data-sticky-first-column-cell],
+	> tfoot > tr:hover > td:first-of-type {
 		background-color: var(--color-table-row-hover);
 	}
 }
@@ -247,7 +246,7 @@
 
 .sticky-table-wrapper[data-sticky-col-active="true"]
 	> .width-wrapper-container
-	> .width-wrapper:has(> .shadow-box.left:not([data-width="0"]))
+	> .width-wrapper[data-left-shadow-visible="true"]
 	> .scrollableContent {
 	> .left-shadow-container {
 		position: absolute;

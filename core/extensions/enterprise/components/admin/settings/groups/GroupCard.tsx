@@ -79,6 +79,7 @@ export const GroupCard = (props: GroupCardProps) => {
 								alignment="right"
 								checked={data.isWorkspaceOwner}
 								className="flex-1 justify-between"
+								disabled={data.isWorkspaceOwnerDisabled}
 								label={<>{getRoleName("workspaceOwner")}</>}
 								onCheckedChange={data.setWorkspaceOwner}
 								outline
