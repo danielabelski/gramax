@@ -116,6 +116,16 @@ const gitErrorLocalization: GitErrorLocalization = {
 		message: `${t("git.error.broken.healthcheck.body")}.<br>${t("git.error.broken.healthcheck.body2")}`,
 		showMessage: true,
 	}),
+	InvalidPathError: (props) => {
+		const path = /cannot checkout to invalid path '(.*)'/.exec(props.error.message)?.[1];
+		return {
+			title: t("git.error.checkout.invalid-path.title"),
+			message: path
+				? t("git.error.checkout.invalid-path.message").replace("{{path}}", path)
+				: t("git.error.checkout.invalid-path.message-generic"),
+			showMessage: true,
+		};
+	},
 };
 
 export default gitErrorLocalization;

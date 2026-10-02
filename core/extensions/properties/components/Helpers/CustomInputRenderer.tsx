@@ -1,4 +1,5 @@
 import Input from "@components/Atoms/Input";
+import parseNumber from "@core-ui/utils/parseNumber";
 import t from "@ext/localization/locale/translate";
 import { PropertyTypes } from "@ext/properties/models";
 import { Calendar } from "@ui-kit/Calendar";
@@ -40,13 +41,30 @@ const CalendarInput = (props: InputProps<Date>) => {
 	);
 };
 
+// A native number input drops everything it cannot read, so a comma typed as the decimal
+// separator never reached the property at all. The field keeps the raw text the user types and
+// reports the value through `parseNumber`, which reads the comma and the dot alike.
 const NumericInput = (props: InputProps<number>) => {
+	const [rawValue, setRawValue] = useState(props.value?.toString() ?? "");
+
+	// Only the value coming from outside belongs in the dependency list: rawValue is what the
+	// user is typing, and reacting to it would overwrite the text mid-entry.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: rawValue is read, never tracked
+	useEffect(() => {
+		if (parseNumber(rawValue) !== props.value) setRawValue(props.value?.toString() ?? "");
+	}, [props.value]);
+
+	const onChange = (value: string) => {
+		setRawValue(value);
+		props.onChange(parseNumber(value));
+	};
+
 	return (
 		<Input
-			onChange={(e) => props.onChange(Number(e.target.value))}
+			inputMode="decimal"
+			onChange={(e) => onChange(e.target.value)}
 			placeholder={t("enter-number")}
-			type="number"
-			value={props.value}
+			value={rawValue}
 		/>
 	);
 };

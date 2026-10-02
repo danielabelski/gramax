@@ -45,7 +45,12 @@ export function DraggableTableRow<T>({
 
 	return (
 		<DragHandleProvider value={{ attributes, listeners, setActivatorNodeRef }}>
-			<TableRow data-state={state} ref={setNodeRef} style={style}>
+			<TableRow
+				className="[&>*]:border-b [&>*]:border-secondary-border"
+				data-state={state}
+				ref={setNodeRef}
+				style={style}
+			>
 				{children}
 			</TableRow>
 		</DragHandleProvider>

@@ -4,6 +4,7 @@ import {
 	SortState,
 	type TableDataExtended,
 } from "@ext/markdown/elements/table/edit/model/tableTypes";
+import compareCellValues from "@ext/markdown/elements/table/render/logic/compareCellValues";
 import React, { type ReactElement } from "react";
 
 type RowMoveMap = Record<number, number>;
@@ -37,7 +38,7 @@ const getRowMoves = (tableData: TableDataExtended, activeSort: SortRecord, sorti
 			const aVal = a.row[colIndex].text ?? "";
 			const bVal = b.row[colIndex].text ?? "";
 
-			const result = aVal.localeCompare(bVal, undefined, { numeric: true });
+			const result = compareCellValues(aVal, bVal);
 
 			if (result !== 0) {
 				return direction === SortState.ASC ? result : -result;

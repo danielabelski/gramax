@@ -75,7 +75,7 @@ export const TableComponent = <T,>(props: TableComponentProps<T>) => {
 				ref={containerRef}
 				topOffset={41}
 			>
-				<Table>
+				<Table className="text-sm" containerClassName="border-0 rounded-none">
 					<TableHeaderComponent
 						className="sticky top-0 [box-shadow:0_1px_0_0_hsl(var(--border))] [&_tr]:border-0"
 						sortable={sortable}

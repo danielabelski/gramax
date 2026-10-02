@@ -10,6 +10,7 @@ import {
 	removeSession as storeRemoveSession,
 	setActiveSessionId as storeSetActiveSessionId,
 	setSessions as storeSetSessions,
+	upsertSession,
 	useStoredSessions,
 } from "../store/AgentStore";
 import { setChatState } from "../store/ChatStore";
@@ -63,6 +64,10 @@ export const useAgentSessions = () => {
 		opts: POST_OPTS,
 	});
 	const { call: callDelete } = useDeferApi<void>({ opts: POST_OPTS });
+	const { call: callRename } = useDeferApi<void>({
+		url: (api) => api.getAgentSessionRenameUrl(),
+		opts: POST_OPTS,
+	});
 
 	const activate = useCallback((id: string | null) => {
 		setActiveSessionId(id);
@@ -212,8 +217,40 @@ export const useAgentSessions = () => {
 		[activeSessionId, callDelete, ensureActiveSession, sessions, activate],
 	);
 
+	const renameSession = useCallback(
+		async (id: string, rawTitle: string) => {
+			const title = rawTitle.trim();
+			const session = sessions.find((s) => s.id === id);
+			if (!title || !session || session.title === title) return;
+
+			const prevTitle = session.title;
+			const applyTitle = (next: string) => {
+				setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title: next } : s)));
+				const stored = getSessions().find((s) => s.id === id);
+				if (stored) upsertSession({ ...stored, title: next });
+			};
+
+			applyTitle(title);
+
+			let failed = false;
+			await callRename({
+				opts: { body: JSON.stringify({ sessionId: id, title }) },
+				onError: () => {
+					failed = true;
+				},
+			});
+
+			if (!failed) return;
+			applyTitle(prevTitle);
+			setSessionError(t("agent.chat-error.rename-session-error"));
+		},
+		[callRename, sessions],
+	);
+
 	const deleteSessionRef = useRef(deleteSession);
 	deleteSessionRef.current = deleteSession;
+	const renameSessionRef = useRef(renameSession);
+	renameSessionRef.current = renameSession;
 	const createSessionRef = useRef(createSession);
 	createSessionRef.current = createSession;
 
@@ -223,6 +260,7 @@ export const useAgentSessions = () => {
 			onSelectSession: selectSession,
 			onNewSession: () => void createSessionRef.current(),
 			onCloseTab: (id) => void deleteSessionRef.current(id),
+			onRenameSession: (id, title) => void renameSessionRef.current(id, title),
 		});
 	}, []);
 
@@ -238,5 +276,6 @@ export const useAgentSessions = () => {
 		createSession,
 		selectSession,
 		removeSession: deleteSession,
+		renameSession,
 	};
 };

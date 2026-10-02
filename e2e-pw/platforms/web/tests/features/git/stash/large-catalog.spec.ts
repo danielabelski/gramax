@@ -41,7 +41,7 @@ const EDITED_TEXT = "Edited locally and never published";
  * A second article, changed on the remote while the clone is not looking.
  *
  * Without something to pull, `storage/sync` returns straight after the fetch
- * (`app/commands/storage/sync.ts:36`) — no stash, no merge, nothing to measure. The case would
+ * (`app/commands/storage/sync.ts:33`) — no stash, no merge, nothing to measure. The case would
  * still be green: the edit survives because nothing touched it.
  */
 const INCOMING_ARTICLE = "docs/incoming.md";

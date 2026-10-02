@@ -102,13 +102,14 @@ jest.mock("@core/GitLfs/hooks/useEditLfsOptions", () => ({
 
 import { useCatalogPropsEditorActions } from "./useCatalogPropsEditorActions";
 
-const clientProps = (lfs?: unknown): ClientCatalogProps =>
+const clientProps = (lfs?: unknown, extra?: Record<string, unknown>): ClientCatalogProps =>
 	({
 		title: "Catalog",
 		name: "catalog",
 		link: { pathname: "/catalog" },
 		properties: [],
 		...(lfs === undefined ? {} : { lfs }),
+		...extra,
 	}) as unknown as ClientCatalogProps;
 
 const formStub = (values: { exclude?: string[]; patterns?: string[] } = {}) =>
@@ -199,6 +200,19 @@ describe("useCatalogPropsEditorActions: exclusion seeding", () => {
 		const { result } = await render();
 
 		expect((await result.current.getOriginalProps()).lfs.exclude).toEqual(["*.gif"]);
+	});
+});
+
+describe("useCatalogPropsEditorActions: icon logo default value", () => {
+	it("seeds a null color for a stored icon logo that carries no color, not undefined", async () => {
+		mockCatalogData = clientProps(undefined, { logo: "icon:arrow-up-0-1" });
+		const { result } = await render();
+
+		expect((await result.current.getOriginalProps()).logo.light).toEqual({
+			type: "icon",
+			code: "arrow-up-0-1",
+			color: null,
+		});
 	});
 });
 

@@ -1,12 +1,17 @@
 import type { CommandTree } from "@app/commands";
 import { agentConfig } from "../../core/agentConfig";
+import { AgentArticleParser } from "../parser";
 import { fail, ok, type ToolExecutionContext, type ToolExecutionResult } from "../tool";
+import { CatalogItemLookup } from "../utils/catalogPaths";
 // import { buildPath } from "../utils/catalogPaths";
-import { compactSearchResults } from "../utils/searchResults";
+import { type ContentMatcher, type LineMatch, LineMatcher } from "../utils/lines";
+import { type CatalogSearchResults, SearchResults } from "../utils/searchResults";
 
 type SearchCatalogsInput = {
 	query: string;
 	catalogName?: string;
+	regex?: boolean;
+	maxHits?: number;
 	// scopePath?: string;
 };
 
@@ -80,22 +85,79 @@ async function waitUntilIndexingProgressDone(
 	}
 }
 
-export async function runSearchCatalogs({
-	app,
-	ctx,
-	input,
-	commands,
-}: ToolExecutionContext): Promise<ToolExecutionResult> {
-	const { query, catalogName } = input as SearchCatalogsInput;
+async function scanCatalogWithMatcher(
+	{ app, ctx, commands }: ToolExecutionContext,
+	catalogName: string,
+	matcher: ContentMatcher,
+	maxHits: number,
+): Promise<CatalogSearchResults> {
+	const { searchCatalogsMaxMatchesPerHit, searchScanDeadlineMs } = agentConfig;
+	const wm = app.wm.current();
+	const wmFp = wm.getFileProvider();
+	const catalog = await wm.getCatalog(catalogName, ctx);
+	const hits: CatalogSearchResults["hits"] = [];
+	const deadline = Date.now() + searchScanDeadlineMs;
+
+	for (const item of catalog.getContentItems()) {
+		if (Date.now() > deadline) return { hits, hasMore: true };
+
+		let rawMatches: LineMatch[];
+		try {
+			rawMatches = LineMatcher.findAll(await wmFp.read(item.ref.path), matcher, searchCatalogsMaxMatchesPerHit);
+		} catch {
+			continue;
+		}
+		if (!rawMatches.length) continue;
+		if (hits.length === maxHits) return { hits, hasMore: true };
+
+		const matches = await SearchResults.resolveAgentViewMatches(
+			() => AgentArticleParser.open(app, ctx, commands, catalog, item),
+			matcher,
+			searchCatalogsMaxMatchesPerHit,
+			SearchResults.withoutLineNumbers(rawMatches),
+		);
+		hits.push({ ...CatalogItemLookup.fromCatalogItem(catalog, item).asAgentJSON(), matches });
+	}
+
+	return { hits, hasMore: false };
+}
+
+export async function runSearchCatalogs(context: ToolExecutionContext): Promise<ToolExecutionResult> {
+	const { app, ctx, input, commands } = context;
+	const { query, catalogName, regex, maxHits } = input as SearchCatalogsInput;
 	const cat = catalogName?.trim();
 	// const scopeRaw = scopePath?.trim();
 	// if (scopeRaw && !cat) {
 	// 	return fail("scopePath is set without catalogName — provide catalogName.");
 	// }
 	const queryText = query.trim();
+	if (!queryText) return fail("query is required");
 	// const normalizedScopePath = scopeRaw ? normalizeScopePath(scopeRaw) : undefined;
 	// const gramaxSearchRootRef = cat && normalizedScopePath ? buildPath(cat, normalizedScopePath) : undefined;
-	const { searchHitsLimit, searchSnippetsPerHit, searchTimeoutMs, searchIndexProgressWaitMs } = agentConfig;
+	const isRegex = regex === true;
+	if (isRegex && !cat) return fail("catalogName is required when regex is true");
+
+	let hitsLimit: number;
+	let matcher: ContentMatcher;
+	try {
+		hitsLimit = SearchResults.resolveMaxHits(maxHits);
+		matcher = LineMatcher.build(queryText, isRegex);
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : String(e);
+		return fail(isRegex ? `Invalid search request: ${msg}` : msg);
+	}
+
+	if (isRegex) {
+		try {
+			const results = await scanCatalogWithMatcher(context, cat, matcher, hitsLimit);
+			return ok(results.hasMore ? results : { hits: results.hits });
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			return fail(`Failed to search catalogs: ${msg}`);
+		}
+	}
+
+	const { searchCatalogsMaxMatchesPerHit, searchTimeoutMs, searchIndexProgressWaitMs } = agentConfig;
 	const progressWaitSignal = timeoutSignal(searchIndexProgressWaitMs);
 
 	try {
@@ -116,8 +178,16 @@ export async function runSearchCatalogs({
 			resourceFilter: undefined,
 			articlesLanguage: undefined,
 		});
-		const hits = await compactSearchResults(app, ctx, results, searchHitsLimit, searchSnippetsPerHit);
-		return ok({ hits });
+		const compacted = await SearchResults.compact({
+			app,
+			ctx,
+			commands,
+			raw: results,
+			maxHits: hitsLimit,
+			maxMatchesPerHit: searchCatalogsMaxMatchesPerHit,
+			matcher,
+		});
+		return ok(compacted.hasMore ? compacted : { hits: compacted.hits });
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);
 		return fail(`Failed to search catalogs: ${msg}`);

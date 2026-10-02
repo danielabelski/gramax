@@ -50,7 +50,7 @@ const ChatToolsMenu = ({ catalogName, selectedSkillName, onSkillChange, onFileCh
 				<TooltipTrigger asChild>
 					<span className="inline-flex">
 						<DropdownMenuTrigger asChild>
-							<FloatingTriggerButton aria-label={t("agent.tooltips.add")} className="h-7">
+							<FloatingTriggerButton aria-label={t("agent.tooltips.add")} className="size-7">
 								<Icon className="h-4 w-4" icon="plus" />
 							</FloatingTriggerButton>
 						</DropdownMenuTrigger>

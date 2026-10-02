@@ -26,7 +26,11 @@ const compare = <T,>(prev: MemoizedTableRowProps<T>, next: MemoizedTableRowProps
 
 export const MemoizedTableRow = memo(
 	<T,>({ row, onRowClick }: MemoizedTableRowProps<T>) => (
-		<TableRow data-state={row.getIsSelected() && "selected"} key={row.id}>
+		<TableRow
+			className="[&>*]:border-b [&>*]:border-secondary-border"
+			data-state={row.getIsSelected() && "selected"}
+			key={row.id}
+		>
 			{row.getAllCells().map((cell) => (
 				<TableCellComponent
 					cell={cell}

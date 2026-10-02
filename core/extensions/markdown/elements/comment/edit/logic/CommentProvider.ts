@@ -91,14 +91,14 @@ class CommentProvider {
 
 	async saveComment(id: string, comment: CommentBlock, articlePath: Path, context: ParserContext) {
 		const articlePathString = articlePath.value;
-		const allComments = this._comments.get(articlePathString) || {};
+		if (!this._comments.has(articlePathString)) await this._parseComments(articlePath, context);
+		const allComments = this._comments.get(articlePathString);
 
 		allComments[id] = {
 			stringifiedData: await this._stringify(comment, context),
 			parsedData: comment,
 		};
 
-		this._comments.set(articlePathString, allComments);
 		const allStringifiedComments = Object.fromEntries(
 			Object.entries(allComments).map(([id, comment]) => [id, comment.stringifiedData]),
 		);

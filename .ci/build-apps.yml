@@ -69,6 +69,10 @@ build-desktop-linux:
     KUBERNETES_MEMORY_REQUEST: '2.5Gi'
     KUBERNETES_CPU_REQUEST: '2'
     KUBERNETES_CPU_LIMIT: '5'
+    # linuxdeploy mounts the AppImage via FUSE; the k8s pool has no /dev/fuse on every node, so
+    # `failed to run linuxdeploy` shows up depending on which node the job lands on. Falling back
+    # to extract-and-run makes the bundle step deterministic everywhere.
+    APPIMAGE_EXTRACT_AND_RUN: '1'
   script:
     - !reference [.template.github-ssh-key, before_script]
     - ./gx make-icons

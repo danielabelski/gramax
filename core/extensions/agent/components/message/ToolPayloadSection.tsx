@@ -256,6 +256,11 @@ export const PayloadValue = ({ value, depth = 0 }: PayloadValueProps) => {
 	);
 };
 
+export const hasToolPayload = (payload?: Record<string, unknown>, filterKeys?: string[]): boolean => {
+	if (!payload) return false;
+	return Object.entries(payload).some(([k, v]) => v !== undefined && !filterKeys?.includes(k));
+};
+
 export interface ToolPayloadSectionProps {
 	filterKeys?: string[];
 	label: string;
@@ -263,12 +268,11 @@ export interface ToolPayloadSectionProps {
 }
 
 export const ToolPayloadSection = ({ filterKeys, label, payload: payloadProp }: ToolPayloadSectionProps) => {
-	if (!payloadProp) return null;
+	if (!hasToolPayload(payloadProp, filterKeys)) return null;
 
 	const payload = Object.fromEntries(
-		Object.entries(payloadProp).filter(([k, v]) => v !== undefined && !filterKeys?.includes(k)),
+		Object.entries(payloadProp ?? {}).filter(([k, v]) => v !== undefined && !filterKeys?.includes(k)),
 	);
-	if (Object.keys(payload).length === 0) return null;
 
 	return (
 		<SectionBox label={label}>
@@ -284,8 +288,10 @@ export interface ToolResultSectionProps {
 	label: string;
 }
 
+export const hasToolResult = (content?: string, contentPreview?: string): boolean => !!content || !!contentPreview;
+
 export const ToolResultSection = ({ content, contentPreview, fullLength, label }: ToolResultSectionProps) => {
-	if (!content && !contentPreview) return null;
+	if (!hasToolResult(content, contentPreview)) return null;
 
 	const parsed = tryParseJson(content ?? contentPreview ?? "");
 	if (parsed.ok) {

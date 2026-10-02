@@ -66,3 +66,16 @@ describe("LibGit2Error.fromRaw — unreachable git server (#gx-network)", () => 
 		expect(fromRaw(5, undefined, 404, "no repo")).toBe(GitErrorCode.RemoteRepositoryNotFoundError);
 	});
 });
+
+describe("LibGit2Error.fromRaw — invalid path on checkout (NM-24)", () => {
+	const CHECKOUT_CLASS = 20;
+
+	test("a filename invalid on Windows (e.g. a double quote) is classified as InvalidPathError", () => {
+		const message = "cannot checkout to invalid path 'docs/Шаблон \"Информация для дубля\".rtf'";
+		expect(fromRaw(1, CHECKOUT_CLASS, 1, message)).toBe(GitErrorCode.InvalidPathError);
+	});
+
+	test("other checkout-class errors keep their existing classification", () => {
+		expect(fromRaw(1, CHECKOUT_CLASS, 11, "conflict")).toBe(GitErrorCode.CheckoutConflictError);
+	});
+});

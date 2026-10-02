@@ -1,6 +1,8 @@
 import type { CommandTree } from "@app/commands";
 import type Application from "@app/types/Application";
 import type Context from "@core/Context/Context";
+import type { CatalogProps } from "@core/FileStructue/Catalog/CatalogProps";
+import { type Property, SystemProperties } from "@ext/properties/models";
 import type { AgentAttachment } from "../core/attachmentStore";
 import type { AgentEvent, AgentQuote } from "../core/events";
 import { LinkAdapter } from "../mcp/parser/adapters/linkAdapter";
@@ -88,6 +90,23 @@ export async function getCurrentContextDescription(
 	return [openItemDescription, quoteDescription].filter(Boolean).join("\n\n");
 }
 
+function formatCatalogProperty(property: Property): string {
+	const head = `- ${property.name} (id: ${property.id}, ${property.type})`;
+	const values = property.values ?? [];
+	return values.length ? `${head}: ${values.join(", ")}` : head;
+}
+
+export function getCatalogPropertiesDescription(props: CatalogProps | undefined): string {
+	const properties = (props?.properties ?? []).filter((property) => !SystemProperties[property.id]);
+	if (!properties.length) return "";
+
+	const lines = properties.map(formatCatalogProperty);
+	const filterProperty = properties.find((property) => property.id === props?.filterProperty);
+	if (filterProperty) lines.push(`${AGENT_PROMPT_MAP.catalogFilterPropertyLabel} ${filterProperty.name}.`);
+
+	return `${AGENT_PROMPT_MAP.catalogPropertiesPreamble}\n${lines.join("\n")}`;
+}
+
 export async function getSystemPrompt(
 	app: Application,
 	ctx: Context,
@@ -96,18 +115,26 @@ export async function getSystemPrompt(
 	browserAllowed?: boolean,
 ): Promise<string> {
 	let systemText: string = AGENT_PROMPT_MAP.system;
+	let propertiesDescription = "";
 
 	if (catalogName) {
 		const catalogObj = await app.wm.current().getCatalog(catalogName, ctx);
 		if (catalogObj) {
 			const promptOverride = await catalogObj.customProviders.agentResourcesProvider.getSystemPrompt();
 			systemText = promptOverride ?? AGENT_PROMPT_MAP.system;
+			propertiesDescription = getCatalogPropertiesDescription(catalogObj.props);
 		}
 	}
 
 	const skillsDescription = getAgentSkillsDescriptions(catalogName, skills);
 	const secretsDescription = getSecretsDescription(Object.keys(app.agentManager.secrets.refs()));
-	return [systemText, browserAllowed ? AGENT_PROMPT_MAP.browserPreamble : "", secretsDescription, skillsDescription]
+	return [
+		systemText,
+		browserAllowed ? AGENT_PROMPT_MAP.browserPreamble : "",
+		secretsDescription,
+		propertiesDescription,
+		skillsDescription,
+	]
 		.filter(Boolean)
 		.join("\n\n");
 }

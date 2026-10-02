@@ -1,4 +1,4 @@
-import parseNumber from "@ext/markdown/elements/table/edit/logic/parseNumber";
+import parseNumber from "@core-ui/utils/parseNumber";
 import { AggregationMethod, type ColumnData } from "@ext/markdown/elements/table/edit/model/tableTypes";
 
 const getNumericData = (data: ColumnData): number[] => {

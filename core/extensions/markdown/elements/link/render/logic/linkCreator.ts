@@ -1,6 +1,7 @@
 import { CATEGORY_ROOT_FILENAME, GRAMAX_DIRECTORY } from "@app/config/const";
 import type { ReadonlyCatalog } from "@core/FileStructue/Catalog/ReadonlyCatalog";
 import ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
+import type ReadOnlyFileProvider from "../../../../../../logic/FileProvider/model/ReadOnlyFileProvider";
 import Path from "../../../../../../logic/FileProvider/Path/Path";
 import type { Catalog } from "../../../../../../logic/FileStructue/Catalog/Catalog";
 import type ParserContext from "../../../../core/Parser/ParserContext/ParserContext";
@@ -77,24 +78,32 @@ class LinkCreator {
 		const articleExtension = articlePath.extension;
 		const docsPath = catalog.getRootCategoryRef().path.parentDirectoryPath;
 
-		const resolved = this._resolveHrefPath(path, articlePath, articleExtension, docsPath, catalog);
+		const resolved = await this._resolveHrefPath(
+			path,
+			articlePath,
+			articleExtension,
+			docsPath,
+			catalog,
+			context.fp,
+		);
 		if (!resolved) return null;
 
-		const { hrefPath, relativeHrefPath, resourcePath } = resolved;
-		if (hrefPath.extension && hrefPath.extension !== articleExtension) {
+		const { hrefPath, relativeHrefPath, resourcePath, isFile } = resolved;
+		if (isFile || (hrefPath.extension && hrefPath.extension !== articleExtension)) {
 			return this._buildFileLink(basePath, catalog.name, articlePath, relativeHrefPath, resourcePath, hash);
 		}
 
 		return this._buildArticleLink(hrefPath, articlePath, hash, catalog);
 	}
 
-	private _resolveHrefPath(
+	private async _resolveHrefPath(
 		path: string,
 		articlePath: Path,
 		articleExtension: string,
 		docsPath: Path,
 		catalog: Catalog | ReadonlyCatalog,
-	): { hrefPath: Path; relativeHrefPath: Path; resourcePath: Path } {
+		fp: ReadOnlyFileProvider,
+	): Promise<{ hrefPath: Path; relativeHrefPath: Path; resourcePath: Path; isFile?: boolean }> {
 		const rootPath = this._getArticleProviderRootPath(articlePath, docsPath);
 
 		const currentArticleDir = articlePath.parentDirectoryPath;
@@ -144,6 +153,14 @@ class LinkCreator {
 			return { hrefPath, relativeHrefPath, resourcePath };
 		}
 
+		// No article, index or category matched the extensionless target. If it is an existing file
+		// (LICENSE, Dockerfile, an attachment without a suffix, …), link to it as a downloadable file
+		// instead of mis-resolving it to an article link (gh#675). Only a real file qualifies: a folder
+		// registered as a resource would be deleted or moved whole along with the article.
+		if (await this._isExistingFile(fp, absoluteHrefPath)) {
+			return { hrefPath: absoluteHrefPath, relativeHrefPath, resourcePath, isFile: true };
+		}
+
 		if (
 			path.startsWith("./") &&
 			absoluteHrefPath.parentDirectoryPath.value === articlePath.parentDirectoryPath.value
@@ -156,6 +173,11 @@ class LinkCreator {
 		}
 
 		return null;
+	}
+
+	private async _isExistingFile(fp: ReadOnlyFileProvider, path: Path): Promise<boolean> {
+		if (!fp) return false;
+		return (await fp.exists(path)) && !(await fp.isFolder(path));
 	}
 
 	private async _getCatalogFromPath(path: string, context: ParserContext): Promise<Catalog | ReadonlyCatalog> {

@@ -12,13 +12,20 @@ export const skillsSkill: AgentSkill = {
 
 - ПЕРВЫЙ АБЗАЦ ТЕКСТА СКИЛЛА считается его описанием и попадает в список доступных skills; остальное — инструкции.
 
-## Навигация 
-- get_navigation для skills не работает — не используй его.
+## Где живут skills
+
+- Пользовательские skills лежат внутри обычного каталога, отдельного каталога под них нет.
+- \`@skills\` — префикс itemPath, а не имя каталога. В catalogName подставляй настоящий каталог: тот, что открыт у пользователя, или тот, который он назвал.
+- \`@system\` — алиас только для чтения системных skills, создавать и менять в нём нельзя.
+
+## Навигация
+- get_navigation для skills не работает — обходить нечего, у \`@skills\` нет своего дерева.
 - Список существующих skills у тебя уже есть в контексте.
 
 ## Создание
 
-- Для нового skill вызови create_catalog_item с itemPath=@skills/<имя> и title.
+- Для нового skill вызови create_catalog_item с catalogName=<настоящий каталог>, itemPath=@skills/<имя> и title.
+- Пример: catalogName=\`new-catalog\`, itemPath=\`@skills/apple-calendar\`, title=\`Apple Calendar\`.
 
 ## Редактирование
 

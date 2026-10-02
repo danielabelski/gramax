@@ -43,7 +43,7 @@ const logoToFormState = (logo: string, fallback: string): LogoState => {
 	if (!logo) return null;
 	if (isLogoIcon(logo)) {
 		const { code, color } = parseLogoIcon(logo);
-		return { type: "icon", code, color: color as IconPickerColor };
+		return { type: "icon", code, color: (color ?? null) as IconPickerColor };
 	}
 	if (isLogoEmoji(logo)) return { type: "emoji", emoji: getLogoEmoji(logo) };
 	return fallback ? { type: "file", preview: fallback, content: undefined, file: null } : null;
@@ -309,7 +309,7 @@ export const useCatalogPropsEditorActions = (onClose: () => void): UseCatalogPro
 				catalogProps.update(newCatalogProps);
 
 				const newPath = buildNewPath(newCatalogProps);
-				router.pushPath(newPath);
+				void router.pushPath(newPath);
 
 				if (Object.keys(logoProps).length > 0) {
 					await refreshState();

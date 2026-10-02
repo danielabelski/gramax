@@ -23,6 +23,7 @@ export type AgentUsage = {
 export class AgentSession {
 	readonly id: string;
 	title: string;
+	titleManuallySet = false;
 	openCatalogName: string | null = null;
 	openItemPath: string | null = null;
 	cancelled = false;
@@ -140,7 +141,7 @@ export class AgentSession {
 
 	private async _generateAutoTitle(userMessage: string, llmClient: AgentLlmClient, app: Application): Promise<void> {
 		const content = userMessage.trim();
-		if (!content) return;
+		if (!content || this.titleManuallySet) return;
 		const messages = [
 			{
 				role: "system" as const,
@@ -160,7 +161,7 @@ export class AgentSession {
 				undefined,
 			);
 			const title = completion.content?.trim();
-			if (!title) return;
+			if (!title || this.titleManuallySet) return;
 			this.title = title;
 			await app.agentManager.sessions.update(this.id);
 		} catch {}

@@ -3,7 +3,7 @@ import { addRootArticleButton, catalogNav, navItem } from "@utils/catalogTree";
 import { catalogTest } from "@web/fixtures/catalog.fixture";
 
 // Creating an article must not depend on a pointer: the tree ends with a standing "Add article"
-// row, and every row's menu offers a sub-article. Both are what a keyboard, a screen reader and an
+// row, and every row carries a sub-article button. Both are what a keyboard, a screen reader and an
 // agent reading the accessibility tree find without hovering anything.
 
 catalogTest.use({
@@ -68,22 +68,11 @@ catalogTest(
 	},
 );
 
-catalogTest("the row menu offers a sub-article, reachable by keyboard", async ({ basePage, sharedPage }) => {
+catalogTest("the row offers a sub-article button, reachable by keyboard", async ({ basePage, sharedPage }) => {
 	await basePage.waitForLoad();
 
 	await navItem(sharedPage, "Start").focus();
-	await tabUntil(sharedPage, "Article actions");
-	await sharedPage.keyboard.press("Enter");
-
-	const menu = sharedPage.getByRole("menu");
-	await expect(menu).toMatchAriaSnapshot(`
-		- menu:
-		  - menuitem "Add a sub-article"
-	`);
-	await expect(menu.getByRole("menuitem").first()).toHaveAccessibleName("Add a sub-article");
-
-	// Opened from the keyboard, the menu hands focus to its first item; Enter there is the whole route.
-	await expect(menu.getByRole("menuitem").first()).toBeFocused();
+	await tabUntil(sharedPage, "Add a sub-article");
 	await sharedPage.keyboard.press("Enter");
 
 	await expect(async () => expect(sharedPage.url()).toContain("/start/untitled")).toPass({ timeout: 10_000 });

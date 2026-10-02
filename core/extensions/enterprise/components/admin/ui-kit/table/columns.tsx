@@ -30,6 +30,7 @@ export const selectColumn = <T,>(): ColumnDef<T> => ({
 		);
 	},
 	size: 32,
+	meta: { cellClassName: "!pr-0" },
 	enableSorting: false,
 	enableHiding: false,
 });
@@ -38,7 +39,7 @@ export const editColumn = <T,>(): ColumnDef<T> => ({
 	id: TABLE_EDIT_COLUMN_CODE,
 	cell: () => <Icon className="text-muted" icon="pen" />,
 	size: 32,
-	meta: { cellClassName: "cursor-pointer pr-0" },
+	meta: { cellClassName: "cursor-pointer !pr-0" },
 	enableSorting: false,
 	enableHiding: false,
 });
@@ -46,7 +47,7 @@ export const editColumn = <T,>(): ColumnDef<T> => ({
 export const dragColumn = <T,>(): ColumnDef<T> => ({
 	id: TABLE_DRAGGABLE_COLUMN_CODE,
 	cell: () => <TableDraggableButton />,
-	meta: { cellClassName: "pr-0" },
+	meta: { cellClassName: "!pr-0" },
 	size: 32,
 	enableSorting: false,
 	enableHiding: false,

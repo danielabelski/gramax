@@ -155,6 +155,181 @@ describe("MdParser корректно парсит", () => {
 			});
 		});
 
+		describe("подстановки и формулы", () => {
+			describe("не превращает подстановку в формулу", () => {
+				test("два плейсхолдера в абзаце", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "Use ${A.login} and ${A.password}.";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+
+				test("плейсхолдер и $VAR", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "Put ${API.token} into $HOME/.netrc.";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+
+				test("одинокий $ перед плейсхолдером", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "Price is $ and token ${A.token}.";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+
+				test("три подряд", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "три ${A.login} ${A.password} ${A.token}";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+
+				test("цены вокруг плейсхолдера", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "Стоит $5, токен ${A.token}, и $10";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+
+				test("точки и пробел в имени", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "${my.app.token} and ${my app.login}";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+
+				test("экранированный плейсхолдер", async () => {
+					const mdParser = await getMdParser();
+					const str = "$${A.token} escaped";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+
+				test("инлайн-код", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "`${A.login}` in code and ${A.password}";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+
+				test("блок кода", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "```\necho ${A.token} $URL $HOME\n```";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+
+				test("таблица", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "{% table %}\n* ${A.login}\n* ${A.password}\n{% /table %}";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} substitutions in the test title
+				test("вырожденный ${x}$ — цена правила", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} substitutions
+					const str = "a ${x}$ b";
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(str);
+				});
+			});
+
+			describe("формула остаётся формулой рядом с подстановкой", () => {
+				test("формула после плейсхолдера", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "${A.token} and $x$ formula";
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const parsedStr = '${A.token} and {%formula content="$x$" /%} formula';
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(parsedStr);
+				});
+
+				test("формула вплотную", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const str = "${A.token}$x$";
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} secret placeholders
+					const parsedStr = '${A.token}{%formula content="$x$" /%}';
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(parsedStr);
+				});
+
+				test("экранированный плейсхолдер и формула", async () => {
+					const mdParser = await getMdParser();
+					const str = "$${A.token} и $x$";
+					const parsedStr = '$${A.token} и {%formula content="$x$" /%}';
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(parsedStr);
+				});
+
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} substitutions in the test title
+				test("пустые скобки ${} — не подстановка", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} substitutions
+					const str = "${}^{14}$C isotope";
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} substitutions
+					const parsedStr = '{%formula content="${}^{14}$" /%}C isotope';
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(parsedStr);
+				});
+
+				test("подстановка не из секретов — тоже атомарна", async () => {
+					const mdParser = await getMdParser();
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} substitutions
+					const str = "${SOME_VAR} and $x$";
+					// biome-ignore lint/suspicious/noTemplateCurlyInString: testing ${} substitutions
+					const parsedStr = '${SOME_VAR} and {%formula content="$x$" /%}';
+
+					const testParseStr = mdParser.preParse(str);
+
+					expect(testParseStr).toEqual(parsedStr);
+				});
+			});
+		});
+
 		describe("тег id в тег Markdoc", () => {
 			const parsedStr = `{% #my-id %}`;
 

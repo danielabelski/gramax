@@ -22,6 +22,7 @@ const fileStore = {
 const makeSession = (id: string, ts: number): ReturnType<AgentSession["toSnapshot"]> => ({
 	id,
 	title: id,
+	titleManuallySet: false,
 	openCatalogName: null,
 	openItemPath: null,
 	cancelled: false,
@@ -94,5 +95,45 @@ describe("applySessionsLimit via load", () => {
 
 		expect(loaded.map((s) => s.id).sort()).toEqual(["new", "old"]);
 		expect(fileStore.deletePath).not.toHaveBeenCalledWith("sessions/old");
+	});
+});
+
+describe("rename", () => {
+	let sessions: AgentSessionStore;
+
+	beforeEach(async () => {
+		jest.clearAllMocks();
+		mockedMaxStoredSessions = 50;
+		fileStore.listDir = jest.fn().mockResolvedValue(["chat"]);
+		fileStore.readJsonFile = jest.fn().mockResolvedValue(makeSession("chat", 1));
+		fileStore.writeJsonFile = jest.fn().mockResolvedValue(undefined);
+		sessions = new AgentSessionStore(fileStore);
+		await sessions.load();
+	});
+
+	test("saves the new title and marks it as set by the user", async () => {
+		expect(await sessions.rename("chat", "My chat")).toBe(true);
+
+		const session = sessions.get("chat");
+		expect(session?.title).toBe("My chat");
+		expect(session?.titleManuallySet).toBe(true);
+		expect(fileStore.writeJsonFile).toHaveBeenCalledWith(
+			"sessions/chat/session.json",
+			expect.objectContaining({ title: "My chat", titleManuallySet: true }),
+		);
+	});
+
+	test("does nothing for an unknown session", async () => {
+		expect(await sessions.rename("missing", "My chat")).toBe(false);
+		expect(fileStore.writeJsonFile).not.toHaveBeenCalled();
+	});
+
+	test("keeps the current title when the new title is empty", async () => {
+		expect(await sessions.rename("chat", "   ")).toBe(true);
+
+		const session = sessions.get("chat");
+		expect(session?.title).toBe("chat");
+		expect(session?.titleManuallySet).toBe(false);
+		expect(fileStore.writeJsonFile).not.toHaveBeenCalled();
 	});
 });

@@ -269,6 +269,15 @@ web-e2e-pw:
   variables:
     CI_JOB_MAX_DURATION: '3600'
     KUBERNETES_MEMORY_REQUEST: '4Gi'
+    # The template's 2/2 is what the "reds name a different test every time" comment above it warns
+    # about: this suite builds the app, runs a real browser and drives a real GitLab repo, so it is
+    # the one most exposed to a node it shares with another job. A third core buys it headroom the
+    # rest of the suite doesn't need.
+    KUBERNETES_CPU_REQUEST: '3'
+    KUBERNETES_CPU_LIMIT: '3'
+    # A test that only passed on its second try still means the runner starved it once — worth
+    # knowing, not worth reddening 470 tests over. See playwright.config.ts's own comment on this flag.
+    PLAYWRIGHT_ALLOW_FLAKY: 'true'
   script:
     - |
       nice -n 15 ionice -c 3 bun run --cwd e2e-pw web:build

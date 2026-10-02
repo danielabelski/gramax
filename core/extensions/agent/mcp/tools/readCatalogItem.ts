@@ -7,8 +7,9 @@ import { AgentArticleParser } from "../parser";
 import { MarkdownDocumentParser } from "../parser/markdownParser";
 import { fail, ok, type ToolExecutionContext, type ToolExecutionResult } from "../tool";
 import { CatalogItemLookup } from "../utils/catalogPaths";
+import { LineRange, type LineRangeInput } from "../utils/lines";
 
-type ReadCatalogItemInput = {
+type ReadCatalogItemInput = LineRangeInput & {
 	catalogName: string;
 	itemPath: string;
 	headingId?: string;
@@ -20,18 +21,19 @@ export async function runReadCatalogItem({
 	commands,
 	input,
 }: ToolExecutionContext): Promise<ToolExecutionResult> {
-	const { catalogName, itemPath, headingId } = input as ReadCatalogItemInput;
+	const { catalogName, itemPath, headingId, fromLine, toLine } = input as ReadCatalogItemInput;
+	const range: LineRangeInput = { fromLine, toLine };
 	try {
+		LineRange.assertValid(range, headingId);
+
 		let lookup: CatalogItemLookup;
-		let content: string;
+		let fullMarkdown: string;
 		let headings: Promise<unknown> | unknown;
 
 		const skill = await AgentResourcesProvider.getSkill(app, ctx, commands, catalogName, itemPath);
 		if (skill) {
 			lookup = new CatalogItemLookup(catalogName, itemPath, skill.name);
-			content = headingId
-				? MarkdownDocumentParser.getHeadingSectionMarkdown(skill.content, headingId)
-				: skill.content;
+			fullMarkdown = skill.content;
 			headings = MarkdownDocumentParser.getHeadingHierarchy(skill.content);
 		} else {
 			const catalog = await app.wm.current().getCatalog(catalogName, ctx);
@@ -41,9 +43,21 @@ export async function runReadCatalogItem({
 			lookup = resolved.lookup;
 
 			const parser = await AgentArticleParser.open(app, ctx, commands, catalog, item as Article | Category);
-			content = headingId ? await parser.getMarkdownForHeading(headingId) : await parser.getMarkdownForAgent();
+			fullMarkdown = await parser.getMarkdownForAgent();
 			headings = parser.getHeadingHierarchy();
 		}
+
+		if (LineRange.has(range)) {
+			const slice = LineRange.apply(fullMarkdown, range);
+			if (slice.content.length > agentConfig.readMaxChars) {
+				return ok({ message: MCP_PROMPT_MAP.readCatalogItem.rangeTooLarge, totalLines: slice.totalLines });
+			}
+			return ok({ ...lookup.asAgentJSON(), ...slice });
+		}
+
+		const content = headingId
+			? MarkdownDocumentParser.getHeadingSectionMarkdown(fullMarkdown, headingId)
+			: fullMarkdown;
 
 		if (content.length > agentConfig.readMaxChars) {
 			return ok({

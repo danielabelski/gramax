@@ -37,6 +37,11 @@ export const createUpdateTitleFunction = () => {
 	return async (context: BaseEditorContext, router: Router, title: string, fileName?: string) => {
 		const { articleProps, apiUrlCreator } = context;
 
+		// An untranslated stub has no title (`null`, only `external` names it), and the editor shows the
+		// same as an empty first line. Callers compare with `!==`, so `null` vs "" reads as an edit here —
+		// and the write puts an empty file with `external` in its frontmatter on disk.
+		if (!fileName && (articleProps.title ?? "") === title) return;
+
 		articleProps.title = title;
 		// Not written into the shared props: a failed request would leave the article naming a file
 		// that does not exist.
@@ -61,7 +66,9 @@ export const createUpdateTitleFunction = () => {
 			MimeTypes.json,
 		);
 
-		if (fileName && res.ok) {
+		if (!res.ok) return;
+
+		if (fileName) {
 			const data: UpdateItemPropsResult = await res.json();
 			if (!data?.pathname) return;
 			const { pathname, ref, fileName: savedFileName, logicPath } = data;
@@ -78,9 +85,25 @@ export const createUpdateTitleFunction = () => {
 			}).catch((error) => span()?.recordException(error as Error));
 
 			// The file has already moved; an address left behind 404s on the next reload.
-			if (!mutable.preventGoto) router.pushPath(pathname, undefined, { replace: true });
+			if (!mutable.preventGoto) await router.pushPath(pathname, undefined, { replace: true });
 			return patch;
 		}
+
+		const patch: ItemRenamePatch = {
+			ref: articleProps.ref,
+			pathname: articleProps.pathname,
+			fileName: requestedFileName,
+			logicPath: articleProps.logicPath,
+			title,
+		};
+		await NavigationEvents.emit("item-rename", {
+			from: articleProps.ref,
+			patch,
+			view: context.view ?? null,
+			mutable: {},
+		}).catch((error) => span()?.recordException(error as Error));
+
+		return patch;
 	};
 };
 

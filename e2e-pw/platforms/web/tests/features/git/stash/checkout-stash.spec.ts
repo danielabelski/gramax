@@ -13,6 +13,7 @@ import {
 	readRepoState,
 	readWorkdirBytes,
 	readWorkdirFile,
+	waitForIndexed,
 	writeWorkdirBytes,
 	writeWorkdirFile,
 } from "./stash-helpers";
@@ -82,11 +83,17 @@ test.describe("checkout carries local changes across", () => {
 		await onFreshBranch(
 			catalogPage,
 			"co-02",
-			async () => await writeWorkdirFile(sharedPage, path("test.md"), edited),
+			async () => {
+				await writeWorkdirFile(sharedPage, path("test.md"), edited);
+				await waitForIndexed(sharedPage, catalogName, ["test.md"]);
+			},
 			async () => await measure(testInfo, "checkout-dirty-1-ui", () => catalogPage.git().switchBranch("co-02")),
 		);
 
-		expect(await readWorkdirFile(sharedPage, path("test.md"))).toBe(edited);
+		// The branch label changes before the checkout handler has finished applying the stash —
+		// wait for the operation's observable result rather than treating the label as its
+		// completion signal.
+		await expect.poll(async () => await readWorkdirFile(sharedPage, path("test.md"))).toBe(edited);
 
 		// A clean apply drops the stash and clears the state. Anything left behind here would be
 		// applied a second time on the next load.
@@ -103,19 +110,29 @@ test.describe("checkout carries local changes across", () => {
 
 	test("ten edited files all follow the checkout", async ({ catalogPage, sharedPage }, testInfo) => {
 		const marker = "Edited in bulk on master";
+		const bulkFiles = Array.from({ length: BULK_COUNT }, (_, index) => `${bulkArticle(index + 1)}.md`);
 
 		await onFreshBranch(
 			catalogPage,
 			"co-03",
 			async () => {
-				for (let i = 1; i <= BULK_COUNT; i++)
-					await writeWorkdirFile(sharedPage, path(`${bulkArticle(i)}.md`), `${marker} ${i}`);
+				for (const [index, file] of bulkFiles.entries())
+					await writeWorkdirFile(sharedPage, path(file), `${marker} ${index + 1}`);
+
+				await waitForIndexed(sharedPage, catalogName, bulkFiles);
 			},
 			async () => await measure(testInfo, "checkout-dirty-10-ui", () => catalogPage.git().switchBranch("co-03")),
 		);
 
-		for (let i = 1; i <= BULK_COUNT; i++)
-			expect(await readWorkdirFile(sharedPage, path(`${bulkArticle(i)}.md`))).toBe(`${marker} ${i}`);
+		// The branch label changes before the checkout handler has finished applying the stash. One
+		// file normally lands inside that gap; ten files make it visible, so wait for the operation's
+		// observable result rather than treating the label as its completion signal.
+		await expect
+			.poll(
+				async () =>
+					await Promise.all(bulkFiles.map(async (file) => await readWorkdirFile(sharedPage, path(file)))),
+			)
+			.toEqual(bulkFiles.map((_, index) => `${marker} ${index + 1}`));
 
 		expect((await readRepoState(sharedPage, catalogName)).value).toBe("default");
 
@@ -129,11 +146,14 @@ test.describe("checkout carries local changes across", () => {
 		await onFreshBranch(
 			catalogPage,
 			"co-04",
-			async () => await writeWorkdirFile(sharedPage, path("fresh.md"), created),
+			async () => {
+				await writeWorkdirFile(sharedPage, path("fresh.md"), created);
+				await waitForIndexed(sharedPage, catalogName, ["fresh.md"]);
+			},
 			async () => await catalogPage.git().switchBranch("co-04"),
 		);
 
-		expect(await fileExists(sharedPage, path("fresh.md"))).toBe(true);
+		await expect.poll(async () => await fileExists(sharedPage, path("fresh.md"))).toBe(true);
 		expect(await readWorkdirFile(sharedPage, path("fresh.md"))).toBe(created);
 
 		await backToMaster(catalogPage, sharedPage);
@@ -143,11 +163,14 @@ test.describe("checkout carries local changes across", () => {
 		await onFreshBranch(
 			catalogPage,
 			"co-06",
-			async () => await deleteWorkdirFile(sharedPage, path(`${OTHER_ARTICLE}.md`)),
+			async () => {
+				await deleteWorkdirFile(sharedPage, path(`${OTHER_ARTICLE}.md`));
+				await waitForIndexed(sharedPage, catalogName, [`${OTHER_ARTICLE}.md`]);
+			},
 			async () => await catalogPage.git().switchBranch("co-06"),
 		);
 
-		expect(await fileExists(sharedPage, path(`${OTHER_ARTICLE}.md`))).toBe(false);
+		await expect.poll(async () => await fileExists(sharedPage, path(`${OTHER_ARTICLE}.md`))).toBe(false);
 
 		await backToMaster(catalogPage, sharedPage);
 		expect(await fileExists(sharedPage, path(`${OTHER_ARTICLE}.md`))).toBe(true);
@@ -159,11 +182,14 @@ test.describe("checkout carries local changes across", () => {
 		await onFreshBranch(
 			catalogPage,
 			"co-07",
-			async () => await moveWorkdirFile(sharedPage, path(`${OTHER_ARTICLE}.md`), path("renamed.md")),
+			async () => {
+				await moveWorkdirFile(sharedPage, path(`${OTHER_ARTICLE}.md`), path("renamed.md"));
+				await waitForIndexed(sharedPage, catalogName, ["renamed.md"]);
+			},
 			async () => await catalogPage.git().switchBranch("co-07"),
 		);
 
-		expect(await fileExists(sharedPage, path(`${OTHER_ARTICLE}.md`))).toBe(false);
+		await expect.poll(async () => await fileExists(sharedPage, path(`${OTHER_ARTICLE}.md`))).toBe(false);
 		expect(await readWorkdirFile(sharedPage, path("renamed.md"))).toBe(before);
 
 		await backToMaster(catalogPage, sharedPage);
@@ -180,11 +206,12 @@ test.describe("checkout carries local changes across", () => {
 				await writeWorkdirFile(sharedPage, path("test.md"), edited);
 				await writeWorkdirFile(sharedPage, path("mixed.md"), created);
 				await deleteWorkdirFile(sharedPage, path(`${bulkArticle(1)}.md`));
+				await waitForIndexed(sharedPage, catalogName, ["test.md", "mixed.md", `${bulkArticle(1)}.md`]);
 			},
 			async () => await catalogPage.git().switchBranch("co-08"),
 		);
 
-		expect(await readWorkdirFile(sharedPage, path("test.md"))).toBe(edited);
+		await expect.poll(async () => await readWorkdirFile(sharedPage, path("test.md"))).toBe(edited);
 		expect(await readWorkdirFile(sharedPage, path("mixed.md"))).toBe(created);
 		expect(await fileExists(sharedPage, path(`${bulkArticle(1)}.md`))).toBe(false);
 
@@ -199,11 +226,14 @@ test.describe("checkout carries local changes across", () => {
 		await onFreshBranch(
 			catalogPage,
 			"co-09",
-			async () => await writeWorkdirBytes(sharedPage, path(RESOURCE_FILE), changed),
+			async () => {
+				await writeWorkdirBytes(sharedPage, path(RESOURCE_FILE), changed);
+				await waitForIndexed(sharedPage, catalogName, [RESOURCE_FILE]);
+			},
 			async () => await catalogPage.git().switchBranch("co-09"),
 		);
 
-		expect(await readWorkdirBytes(sharedPage, path(RESOURCE_FILE))).toEqual(changed);
+		await expect.poll(async () => await readWorkdirBytes(sharedPage, path(RESOURCE_FILE))).toEqual(changed);
 
 		await backToMaster(catalogPage, sharedPage);
 	});
@@ -219,6 +249,9 @@ test.describe("checkout carries local changes across", () => {
 			async () => {
 				await writeWorkdirFile(sharedPage, path(IGNORED_FILE), IGNORED_CONTENT);
 				await writeWorkdirFile(sharedPage, path("test.md"), edited);
+				// The ignored file never lands in the index (see the comment at the end of this test), so
+				// only the tracked edit is worth waiting for here.
+				await waitForIndexed(sharedPage, catalogName, ["test.md"]);
 			},
 			async () => await catalogPage.git().switchBranch("co-05"),
 		);
@@ -227,7 +260,7 @@ test.describe("checkout carries local changes across", () => {
 		// the failed-pull case is measured against.
 		expect(await fileExists(sharedPage, path(IGNORED_FILE))).toBe(true);
 		expect(await readWorkdirFile(sharedPage, path(IGNORED_FILE))).toBe(IGNORED_CONTENT);
-		expect(await readWorkdirFile(sharedPage, path("test.md"))).toBe(edited);
+		await expect.poll(async () => await readWorkdirFile(sharedPage, path("test.md"))).toBe(edited);
 
 		// Whether the file also sits in the index cannot be asserted here, and the attempt is worth
 		// leaving described rather than repeated: `_gitIndexAddFiles` does call `index.add_path`, which

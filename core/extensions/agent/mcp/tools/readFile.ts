@@ -4,17 +4,20 @@ import { MCP_PROMPT_MAP } from "../../prompts/mcpPromptMap";
 import { FileConverter, MarkdownDocumentParser } from "../parser";
 import { fail, ok, type ToolExecutionContext, type ToolExecutionResult } from "../tool";
 import { CatalogItemLookup } from "../utils/catalogPaths";
+import { LineRange, type LineRangeInput } from "../utils/lines";
 
-type ReadFileInput = {
+type ReadFileInput = LineRangeInput & {
 	catalogName: string;
 	filePath: string;
 	headingId?: string;
 };
 
 export async function runReadFile({ app, ctx, input }: ToolExecutionContext): Promise<ToolExecutionResult> {
-	const { catalogName, filePath, headingId } = input as ReadFileInput;
+	const { catalogName, filePath, headingId, fromLine, toLine } = input as ReadFileInput;
+	const range: LineRangeInput = { fromLine, toLine };
 
 	try {
+		LineRange.assertValid(range, headingId);
 		const catalog = await app.wm.current().getCatalog(catalogName, ctx);
 		const wmFp = app.wm.current().getFileProvider();
 		const normalizedFilePath = CatalogItemLookup.normalizePath(filePath ?? "");
@@ -38,6 +41,15 @@ export async function runReadFile({ app, ctx, input }: ToolExecutionContext): Pr
 
 		const fileName = resolvedPath.nameWithExtension;
 		const raw = await FileConverter.toAgentText(fileName, Uint8Array.from(await wmFp.readAsBinary(resolvedPath)));
+
+		if (LineRange.has(range)) {
+			const slice = LineRange.apply(raw, range);
+			if (slice.content.length > agentConfig.readMaxChars) {
+				return ok({ message: MCP_PROMPT_MAP.readFile.rangeTooLarge, totalLines: slice.totalLines });
+			}
+			return ok({ catalogName, filePath: repositoryRelativePath, ...slice });
+		}
+
 		const content = headingId ? MarkdownDocumentParser.getHeadingSectionMarkdown(raw, headingId, false) : raw;
 
 		if (content.length > agentConfig.readMaxChars) {

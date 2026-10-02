@@ -2,7 +2,7 @@ import { expect } from "@playwright/test";
 import { gitTest as test } from "@web/fixtures/git.fixture";
 import { ArticleEditorPom } from "@web/pom/editor.pom";
 import { remoteCatalogUrl } from "../catalog-setup";
-import { readBranchHead, readRepoState, readWorkdirFile } from "./stash-helpers";
+import { readBranchHead, readRepoState, readWorkdirFile, waitForIndexed } from "./stash-helpers";
 import { prepareStashCatalog } from "./stash-setup";
 
 test.use({ isolated: false });
@@ -54,10 +54,15 @@ test.describe("aborting a checkout whose stash cannot be replayed", () => {
 		const editor = new ArticleEditorPom(catalogPage);
 		await editor.rewrite(MASTER_TEXT);
 		await editor.assertMarkdownContains(MASTER_TEXT);
+		await waitForIndexed(sharedPage, catalogName, [ARTICLE]);
 
 		const git = catalogPage.git();
 		await git.switchBranch(BRANCH);
-		expect((await readRepoState(sharedPage, catalogName)).value).toBe("stashConflict");
+
+		// The branch label changes before the checkout handler has finished recording the conflict —
+		// wait for the operation's observable result rather than treating the label as its
+		// completion signal.
+		await expect.poll(async () => (await readRepoState(sharedPage, catalogName)).value).toBe("stashConflict");
 
 		// Cancelling aborts: the repository is reset to `commitHeadBefore`, which is a commit on the
 		// branch the checkout started from. Resetting without going back there first would move the

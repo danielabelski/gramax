@@ -9,7 +9,7 @@ class RouterPathProvider {
 		Event<"parse-path", { segments: string[]; mutable: { data?: PathnameData } }> &
 			Event<"is-editor-path", { segments: string[]; mutable: { value: boolean } }> &
 			Event<"generate-path", { data: PathnameData; mutable: { path: Path } }> &
-			Event<"unresolved-path", { path: string; mutable: { handled?: boolean } }>
+			Event<"unresolved-path", { path: string; mutable: { handled?: boolean; skipRedirect?: boolean } }>
 	>();
 	private static readonly _separator = "-";
 	private static readonly _readonlyPathPrefix = "/";

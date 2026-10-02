@@ -105,7 +105,7 @@ const EDITED_ARTICLE = "docs/edited.md";
  * A second article, changed on the remote while the clone is not looking.
  *
  * Without something to pull, `storage/sync` returns straight after the fetch
- * (`app/commands/storage/sync.ts:36`) — no merge, no stash, nothing to measure. The section would
+ * (`app/commands/storage/sync.ts:33`) — no merge, no stash, nothing to measure. The section would
  * still be green, and its number would be the cost of a fetch.
  */
 const INCOMING_ARTICLE = "docs/incoming.md";

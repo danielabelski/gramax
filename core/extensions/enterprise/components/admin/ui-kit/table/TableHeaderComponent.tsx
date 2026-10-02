@@ -23,7 +23,15 @@ export const TableHeaderComponent = <T,>({ table, sortable, className }: TableHe
 							? null
 							: flexRender(header.column.columnDef.header, header.getContext());
 						return (
-							<TableHead className="px-3" key={header.id} style={columnWidthStyle(colSize)}>
+							<TableHead
+								className={cn(
+									"px-3",
+									// biome-ignore lint/complexity/useLiteralKeys: idc
+									header.column.columnDef.meta?.["cellClassName"],
+								)}
+								key={header.id}
+								style={columnWidthStyle(colSize)}
+							>
 								{canSort ? (
 									<button
 										className="flex select-none items-center gap-1"

@@ -39,7 +39,12 @@ const FileInput = ({ editor, onSave, apiUrlCreator, resourceService, children }:
 	);
 
 	return (
-		<InputFile className="flex flex-row items-center w-full cursor-pointer" onAbort={onAbort} onChange={onChange}>
+		<InputFile
+			className="flex flex-row items-center w-full cursor-pointer"
+			multiple
+			onAbort={onAbort}
+			onChange={onChange}
+		>
 			{children}
 		</InputFile>
 	);

@@ -38,6 +38,21 @@ export async function runMoveCatalogItem({ app, ctx, input }: ToolExecutionConte
 			return fail(`Target already exists`);
 		}
 
+		const { parentAgentItemPath } = CatalogItemLookup.parseItemPath(toItemPath);
+		if (parentAgentItemPath) {
+			const parentPath = parentAgentItemPath.replace(/\/+$/, "");
+			const parentItem =
+				CatalogItemLookup.findItem(catalog, parentAgentItemPath) ??
+				CatalogItemLookup.findItem(catalog, parentPath);
+			if (!parentItem) return fail(`Parent not found. itemPath: ${parentPath}`);
+			if (parentItem.type !== ItemType.category) {
+				return fail(
+					`Parent is an article and cannot hold children. itemPath: ${parentPath}. ` +
+						`Convert it first: move_catalog_item with fromItemPath "${parentPath}" and toItemPath "${parentPath}/", then repeat this move.`,
+				);
+			}
+		}
+
 		if (sourceItem.type === ItemType.category) {
 			if (targetType === ItemType.article) {
 				return fail("Converting category to article is not supported");

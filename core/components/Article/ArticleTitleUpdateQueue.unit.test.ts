@@ -55,4 +55,37 @@ describe("ArticleTitleUpdateQueue", () => {
 
 		expect(started).toEqual(["1:First", "2:Second"]);
 	});
+
+	test("drop() skips an update still waiting to run", async () => {
+		const first = deferred();
+		const started: string[] = [];
+		const queue = createArticleTitleUpdateQueue(async (title) => {
+			started.push(title);
+			if (title === "First") await first.promise;
+		});
+
+		const firstUpdate = queue("First");
+		await Promise.resolve(); // let "First" actually start before anything is dropped
+
+		const droppedUpdate = queue("Stale title from a different article");
+		queue.drop();
+		first.resolve();
+		await Promise.all([firstUpdate, droppedUpdate]);
+
+		expect(started).toEqual(["First"]);
+	});
+
+	test("drop() does not affect an update already sent to the caller", async () => {
+		const started: string[] = [];
+		const queue = createArticleTitleUpdateQueue(async (title) => {
+			started.push(title);
+		});
+
+		await queue("First");
+		queue.drop();
+		await queue("First");
+
+		// The duplicate-suppression state was cleared by drop(), so the repeated title runs again.
+		expect(started).toEqual(["First", "First"]);
+	});
 });

@@ -7,7 +7,8 @@ review-ai:
   variables:
     GIT_STRATEGY: none
     # Claude refuses --dangerously-skip-permissions as root; CI runs as root.
-    HTTPS_PROXY: $RUNNER_HTTPS_PROXY
+    HTTPS_PROXY: $AI_HTTPS_PROXY
+    NO_PROXY: $CI_SERVER_HOST
     IS_SANDBOX: '1'
     GITLAB_HOST: $CI_SERVER_HOST
     GITLAB_TOKEN: $AI_GITLAB_TOKEN
@@ -110,7 +111,8 @@ fix-pipelines-ai:
   timeout: 180m
   variables:
     GIT_STRATEGY: none
-    HTTPS_PROXY: $RUNNER_HTTPS_PROXY
+    HTTPS_PROXY: $AI_HTTPS_PROXY
+    NO_PROXY: $CI_SERVER_HOST
     IS_SANDBOX: '1'
     GITLAB_HOST: $CI_SERVER_HOST
     GITLAB_TOKEN: $AI_GITLAB_TOKEN

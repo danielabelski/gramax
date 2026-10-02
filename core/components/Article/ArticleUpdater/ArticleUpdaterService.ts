@@ -1,13 +1,16 @@
+import type { ClientItemRef } from "@core/SitePresenter/SitePresenter";
 import type { EditArticlePageData } from "@core/SitePresenter/types/ArticlePage";
 import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import FetchService from "@core-ui/ApiServices/FetchService";
 
 class ArticleUpdater {
 	private _onUpdate: (data: EditArticlePageData) => void;
+	private _isShown: (ref: ClientItemRef) => boolean;
 	private _listeners = new Set<(data: EditArticlePageData) => void>();
 
-	bindOnUpdate(onUpdate: (data: EditArticlePageData) => void) {
+	bindOnUpdate(onUpdate: (data: EditArticlePageData) => void, isShown: (ref: ClientItemRef) => boolean) {
 		this._onUpdate = onUpdate;
+		this._isShown = isShown;
 	}
 
 	onUpdated(listener: (data: EditArticlePageData) => void) {
@@ -21,7 +24,8 @@ class ArticleUpdater {
 		// Asking `page/getArticlePageData` without a path crashed the app instead (#910).
 		if (!apiUrlCreator?.articlePath) return;
 		const data = await this._getUpdateDate(apiUrlCreator);
-		if (!data) return;
+		// The reader may have moved to another article while this was read — a sync finishing late.
+		if (!data || !this._isShown(data.articleProps.ref)) return;
 
 		this._onUpdate?.(data);
 		this._listeners.forEach((listener) => listener(data));

@@ -10,8 +10,24 @@ import { SectionBlock } from "./SectionBlock";
 Object.defineProperty(globalThis, "crypto", { value: webcrypto, configurable: true });
 
 jest.mock("./ThinkingCollapsible", () => ({
-	ThinkingCollapsible: ({ children }: { children: React.ReactNode }) =>
-		require("react").createElement("div", { "data-testid": "thinking-collapsible" }, children),
+	ThinkingCollapsible: ({
+		children,
+		durationMs,
+		startedAt,
+	}: {
+		children: React.ReactNode;
+		durationMs?: number;
+		startedAt: number;
+	}) =>
+		require("react").createElement(
+			"div",
+			{
+				"data-duration-ms": durationMs,
+				"data-started-at": startedAt,
+				"data-testid": "thinking-collapsible",
+			},
+			children,
+		),
 }));
 
 jest.mock("./ToolActivityBundle", () => ({
@@ -37,7 +53,7 @@ jest.mock("@ext/agent/components/utils/openAgentSecretsSettings", () => ({
 	openAgentSecretsSettings: () => mockOpenAgentSecretsSettings(),
 }));
 
-const user: ChatMessage = { id: "u1", kind: "user", userText: "call the youtrack api" };
+const user: ChatMessage = { id: "u1", kind: "user", userText: "call the youtrack api", ts: 1 };
 
 const toolCall: ChatMessage = {
 	id: "t1",
@@ -88,7 +104,7 @@ const renderSection = (isLast: boolean) =>
 describe("SectionBlock — missing-secret warning placement", () => {
 	beforeEach(() => {
 		mockOpenAgentSecretsSettings.mockClear();
-		useAgentSecretDraftStore.getState().consumePendingDraft();
+		useAgentSecretDraftStore.getState().consumePendingDrafts();
 	});
 
 	test("attaches the warning after the final assistant answer and before the copy button, when this is the last section", () => {
@@ -192,7 +208,7 @@ describe("SectionBlock — missing-secret warning placement", () => {
 			}),
 		);
 
-		const cancelled = getByText(t("agent.turn-cancelled"));
+		const cancelled = getByText((content) => content.startsWith(t("agent.stopped-after")));
 		const addTokenButton = getByText(t("agent.missing-secret.button"));
 
 		expect(cancelled.compareDocumentPosition(addTokenButton) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
@@ -248,11 +264,116 @@ describe("SectionBlock — missing-secret warning placement", () => {
 
 		fireEvent.click(getByText(t("agent.missing-secret.button")));
 
-		expect(useAgentSecretDraftStore.getState().pendingDraft).toMatchObject({
-			key: "Ютрек",
-			kind: "token",
-			focus: "value",
-		});
+		expect(useAgentSecretDraftStore.getState().pendingDrafts).toMatchObject([
+			{ key: "Ютрек", kind: "token", focus: "value" },
+		]);
 		expect(mockOpenAgentSecretsSettings).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("SectionBlock thinking indicator", () => {
+	test("shows the thinking indicator after tool messages when a turn has no assistant text yet", () => {
+		const toolPhaseSection: Section = {
+			user,
+			responses: [toolCall, { ...missingSecretToolResult, toolResultIsError: false }],
+		};
+
+		const { container, getByText } = render(
+			createElement(SectionBlock, {
+				section: toolPhaseSection,
+				isLast: true,
+				streamingMessageId: null,
+				showThinking: true,
+			}),
+		);
+
+		const toolActivity = container.querySelector('[data-testid="tool-activity"]');
+		const indicator = getByText(t("agent.thinking"));
+
+		expect(toolActivity).not.toBeNull();
+		expect(toolActivity?.compareDocumentPosition(indicator) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+	});
+
+	test("measures active work from the first agent response timestamp, not from the user message", () => {
+		const timedSection: Section = {
+			user: { ...user, ts: 1_000 },
+			responses: [
+				{ ...assistantAnswer, ts: 5_000 },
+				{ ...toolCall, ts: 6_000 },
+				{ ...missingSecretToolResult, ts: 9_000 },
+			],
+		};
+
+		const { container } = render(
+			createElement(SectionBlock, {
+				section: timedSection,
+				isLast: true,
+				streamingMessageId: null,
+				showThinking: true,
+			}),
+		);
+
+		const collapsible = container.querySelector('[data-testid="thinking-collapsible"]');
+		expect(collapsible?.getAttribute("data-started-at")).toBe("5000");
+	});
+
+	test("measures finished work from the first agent response timestamp, not from the user message", () => {
+		const timedSection: Section = {
+			user: { ...user, ts: 1_000 },
+			responses: [
+				{ ...assistantAnswer, ts: 5_000 },
+				{ ...toolCall, ts: 6_000 },
+				{ ...turnDuration, ts: 9_000 },
+			],
+		};
+
+		const { container } = render(
+			createElement(SectionBlock, {
+				section: timedSection,
+				isLast: true,
+				streamingMessageId: null,
+				showThinking: false,
+			}),
+		);
+
+		const collapsible = container.querySelector('[data-testid="thinking-collapsible"]');
+		expect(collapsible?.getAttribute("data-duration-ms")).toBe("4000");
+	});
+
+	test("keeps the same start reference for the live counter and the final duration, so there is no jump when the turn finishes", () => {
+		const responses: ChatMessage[] = [
+			{ ...toolCall, id: "tc1", ts: 5_000 },
+			{ ...assistantAnswer, ts: 8_000 },
+			{ ...toolCall, id: "tc2", ts: 12_000 },
+		];
+
+		const { container, rerender } = render(
+			createElement(SectionBlock, {
+				section: { user: { ...user, ts: 1_000 }, responses },
+				isLast: true,
+				streamingMessageId: null,
+				showThinking: true,
+			}),
+		);
+
+		const liveCollapsible = container.querySelector('[data-testid="thinking-collapsible"]');
+		const startedAt = liveCollapsible?.getAttribute("data-started-at");
+		expect(startedAt).toBe("5000");
+
+		rerender(
+			createElement(SectionBlock, {
+				section: {
+					user: { ...user, ts: 1_000 },
+					responses: [...responses, { ...turnDuration, ts: 20_000 }],
+				},
+				isLast: true,
+				streamingMessageId: null,
+				showThinking: false,
+			}),
+		);
+
+		const finishedCollapsible = container.querySelector('[data-testid="thinking-collapsible"]');
+		expect(finishedCollapsible?.getAttribute("data-started-at")).toBe(startedAt);
+		expect(finishedCollapsible?.getAttribute("data-duration-ms")).toBe(String(20_000 - Number(startedAt)));
 	});
 });

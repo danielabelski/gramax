@@ -21,6 +21,11 @@ enum PreParseSyntax {
 
 const allPreParseSyntax = (1 << 12) - 1;
 
+/** `${…}` is a value substitution — a secret placeholder, a shell variable in a command example — not a
+ *  formula delimiter: `$…$` can neither open nor close on one. */
+const substitutionBody = String.raw`\{[^}\r\n]+\}`;
+const substitution = String.raw`\$${substitutionBody}`;
+
 export default class MdParser {
 	private _tags: { [name: string]: Schema };
 	private _escapeDoubleQuotesRegExp: RegExp;
@@ -62,7 +67,8 @@ export default class MdParser {
 		this._removeCommentsRegExp = this._createIgnoreRegExp(String.raw`(<!--[\s\S]*?-->)`);
 		this._includeRegExp = this._createIgnoreRegExp(String.raw`^ *(#*) *\[include:([^\n\]]*)\]`);
 		this._formulaRegExp = this._createIgnoreRegExp(
-			String.raw`{\s?.*?\s?}|(\${1}[^\$].*?\${1})|(\${2}[^\$].*?\${2})`,
+			String.raw`{\s?.*?\s?}|(\$[^\$][^\$\r\n]*?\$(?!${substitutionBody}))|(\$\$[^\$].*?\$\$)`,
+			substitution,
 		);
 		this._squareRegExp = this._createIgnoreRegExp(String.raw`\[(.*?)\](\()?`);
 		this._arrowRegExp = this._createIgnoreRegExp(String.raw`\\->|[^\\\r\n]?(->)`);

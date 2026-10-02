@@ -128,11 +128,7 @@ const move: Command<MoveProps, { redirectTo: string }> = Command.create({
 
 		if (sourceCatalogName !== targetCatalogName) {
 			const config = await current.config();
-			const lastVisited = new LastVisited(ctx, config.name);
-			const prevPathname = lastVisited.getLastVisitedArticle(sourceCatalog);
-			if (prevPathname && (prevPathname === sourcePathname || prevPathname.startsWith(`${sourcePathname}/`))) {
-				lastVisited.remove(sourceCatalogName);
-			}
+			new LastVisited(ctx, config.name).forget(sourceCatalog, sourcePathname);
 		}
 
 		return { redirectTo: await targetCatalogUpdated.getPathname(targetItem) };

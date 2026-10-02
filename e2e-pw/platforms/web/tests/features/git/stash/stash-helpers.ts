@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { evaluateOnApp } from "@utils/app";
 
 /** Mirrors `RepositoryState` — only the parts a test asserts on. */
@@ -60,6 +60,24 @@ export const readIndexChanges = async (page: Page, catalogName: string): Promise
 		},
 		catalogName,
 	);
+};
+
+/**
+ * Waits for the given file names to show up in the index against HEAD.
+ *
+ * `Repository.stash()` decides what to stash off this same query, but the write that puts a file
+ * there is a fire-and-forget event — a checkout triggered right after `write`/`move`/`delete` (or an
+ * editor save) can land before that event has run, and the stash it takes then simply skips the
+ * file. Call this after dirtying the working copy and before triggering the checkout that is
+ * supposed to stash it.
+ */
+export const waitForIndexed = async (page: Page, catalogName: string, files: string[]): Promise<void> => {
+	await expect
+		.poll(async () => {
+			const changes = await readIndexChanges(page, catalogName);
+			return files.filter((file) => changes.some((change) => change.endsWith(file))).length;
+		})
+		.toBe(files.length);
 };
 
 /** Stash oids Gramax has created for this catalog, newest first — the `WebStashCache` log. */

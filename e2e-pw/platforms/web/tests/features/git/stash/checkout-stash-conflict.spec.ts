@@ -3,7 +3,7 @@ import { attachTimings, measure } from "@utils/timings";
 import { gitTest as test } from "@web/fixtures/git.fixture";
 import { ArticleEditorPom } from "@web/pom/editor.pom";
 import { remoteCatalogUrl } from "../catalog-setup";
-import { listRepoStashes, readRepoState, readWorkdirFile, resolveConflict } from "./stash-helpers";
+import { listRepoStashes, readRepoState, readWorkdirFile, resolveConflict, waitForIndexed } from "./stash-helpers";
 import { prepareStashCatalog } from "./stash-setup";
 
 test.use({ isolated: false });
@@ -54,12 +54,17 @@ test.describe("a checkout whose stash cannot be replayed", () => {
 		const editor = new ArticleEditorPom(catalogPage);
 		await editor.rewrite(MASTER_TEXT);
 		await editor.assertMarkdownContains(MASTER_TEXT);
+		await waitForIndexed(sharedPage, catalogName, [ARTICLE]);
 
 		const git = catalogPage.git();
 		await measure(testInfo, "checkout-conflict-ui", () => git.switchBranch(BRANCH));
 
+		// The branch label changes before the checkout handler has finished recording the conflict —
+		// wait for the operation's observable result rather than treating the label as its
+		// completion signal.
+		await expect.poll(async () => (await readRepoState(sharedPage, catalogName)).value).toBe("stashConflict");
+
 		const state = await readRepoState(sharedPage, catalogName);
-		expect(state.value).toBe("stashConflict");
 		expect(state.stashHash).toBeTruthy();
 		expect(state.conflictPaths).toContainEqual(expect.stringContaining(ARTICLE));
 		expect(await listRepoStashes(sharedPage, catalogName)).toContain(state.stashHash);

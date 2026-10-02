@@ -88,6 +88,11 @@ export function buildCatalogMenu(ctx: CatalogActionsContextValue): MenuItemDescr
 			visible: !platform.isDocPortal && hasSource,
 		},
 		{
+			id: "repository-permission",
+			component: (children) => <RepositoryPermissionItem>{children}</RepositoryPermissionItem>,
+			visible: hasWorkspaceGesUrl && canConfigure && (platform.isWeb || platform.isDesktop),
+		},
+		{
 			id: "toggle-favorite",
 			visible: !platform.isStatic && !platform.isStaticCli,
 			component: (children) => <FavoriteMenuItem>{children}</FavoriteMenuItem>,
@@ -107,14 +112,6 @@ export function buildCatalogMenu(ctx: CatalogActionsContextValue): MenuItemDescr
 			],
 		},
 	];
-
-	const accessGroup: MenuItemDescriptorApp[] = [
-		{
-			id: "repository-permission",
-			component: (children) => <RepositoryPermissionItem>{children}</RepositoryPermissionItem>,
-			visible: hasWorkspaceGesUrl && canConfigure && (platform.isWeb || platform.isDesktop),
-		},
-	] as const;
 
 	const toolsGroup: MenuItemDescriptorApp[] = [
 		{
@@ -212,7 +209,6 @@ export function buildCatalogMenu(ctx: CatalogActionsContextValue): MenuItemDescr
 		},
 
 		...createGroupWithSeparator(catalogActionsGroup),
-		...createGroupWithSeparator(accessGroup),
 		...createGroupWithSeparator(toolsGroup),
 		...createGroupWithSeparator(exportGroup),
 		...createGroupWithSeparator(healthcheck),

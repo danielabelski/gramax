@@ -21,6 +21,12 @@ const maxTs = (messages: ChatMessage[]): number => {
 	return max;
 };
 
+const minTs = (messages: ChatMessage[]): number | undefined => {
+	let min = Number.POSITIVE_INFINITY;
+	for (const m of messages) if (m.ts && m.ts < min) min = m.ts;
+	return Number.isFinite(min) ? min : undefined;
+};
+
 type SectionBlockProps = {
 	section: Section;
 	isLast: boolean;
@@ -37,6 +43,7 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 
 	const turnDuration = useMemo(() => responses.find((m) => m.kind === "turn_duration"), [responses]);
 	const isFinished = !!turnDuration;
+	const turnStartedAt = user.ts ?? minTs(responses) ?? Date.now();
 
 	const firstCompletedExpIdx = useMemo(
 		() => responses.findIndex((m) => m.kind === "assistant" && !m.isLoading),
@@ -45,21 +52,17 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 	const hasThinkingBlock = firstCompletedExpIdx !== -1;
 
 	if (hasThinkingBlock && thinkingStartRef.current === null) {
-		const phaseStartTs = responses[firstCompletedExpIdx]?.ts;
-		const lastTs = maxTs(responses);
-		const workSoFarMs = phaseStartTs && lastTs > phaseStartTs ? lastTs - phaseStartTs : 0;
-		thinkingStartRef.current = Date.now() - workSoFarMs;
+		thinkingStartRef.current = minTs(responses) ?? turnStartedAt;
 	}
 
 	const effectiveDurationMs = useMemo(() => {
 		if (!hasThinkingBlock) return undefined;
-		const phaseStartTs = responses[firstCompletedExpIdx]?.ts;
-		if (phaseStartTs == null) return undefined;
-		if (turnDuration?.ts !== undefined) return turnDuration.ts - phaseStartTs;
+		const workStartedAt = thinkingStartRef.current ?? turnStartedAt;
+		if (turnDuration?.ts !== undefined) return turnDuration.ts - workStartedAt;
 		if (turnEverActiveRef.current) return undefined;
 		const lastTs = maxTs(responses);
-		return lastTs > phaseStartTs ? lastTs - phaseStartTs : undefined;
-	}, [hasThinkingBlock, responses, firstCompletedExpIdx, turnDuration]);
+		return lastTs > workStartedAt ? lastTs - workStartedAt : undefined;
+	}, [hasThinkingBlock, responses, turnDuration, turnStartedAt]);
 
 	const statusMessages = useMemo(
 		() => responses.filter((m) => m.kind === "cancelled" || m.kind === "error" || m.kind === "warning"),
@@ -162,7 +165,7 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 						/>
 					)}
 
-					{!hasThinkingBlock && showThinking && preThinkingMessages.length === 0 && (
+					{!hasThinkingBlock && showThinking && streamingMessageId === null && (
 						<div className="flex select-none items-center gap-2 text-sm text-muted-foreground">
 							<Loader className="px-0 text-muted-foreground" size="sm" />
 							<span>{t("agent.thinking")}</span>

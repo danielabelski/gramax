@@ -10,6 +10,7 @@ import type SitePresenter from "@core/SitePresenter/SitePresenter";
 import type { ArticlePageData } from "@core/SitePresenter/types/ArticlePage";
 import type { ArticlePageDataParams } from "@core/SitePresenter/types/PageDataParams";
 import { GitVersion } from "@ext/git/core/model/GitVersion";
+import Localizer from "@ext/localization/core/Localizer";
 import { GitTreeScopeParser } from "@ext/versioning/GitTreeScopeParser";
 import isCatalogReadOnly from "@ext/workspace/utils/isCatalogReadOnly";
 import type { Workspace } from "@ext/workspace/Workspace";
@@ -27,6 +28,12 @@ type HandleArticlePageDataProps = ArticlePageDataParams & CatalogContext;
 type HandleArticleErrorProps = ArticlePageDataParams & CatalogContext & { error: unknown };
 
 type HandlePageDataResult = { data: ArticlePageData };
+
+// The record spells an address the way the page does, the request the way the router does.
+const isRemembered = (lastVisited: LastVisited, catalog: ContextualCatalog<CatalogProps>, pathname: string) => {
+	const remembered = lastVisited.getLastVisitedArticle(catalog);
+	return !!remembered && !!pathname && Localizer.sanitize(remembered) === Localizer.sanitize(pathname);
+};
 
 const prepareCatalogContext = async (app: Application, props: ArticlePageDataParams): Promise<CatalogContext> => {
 	const { ctx, path, options } = props;
@@ -54,7 +61,7 @@ const handleArticlePageData = async (
 	props: HandleArticlePageDataProps,
 ): Promise<HandlePageDataResult> => {
 	const { customArticlePresenter } = app;
-	const { ctx, path, catalog, dataProvider, lastVisited, options } = props;
+	const { ctx, path, pathname, catalog, dataProvider, lastVisited, options } = props;
 	const splitPath = path.split("/").filter((x) => x);
 	let data: ArticlePageData;
 
@@ -63,12 +70,8 @@ const handleArticlePageData = async (
 		data = await commands.page.getDiffModeArticlePageData.do({ ctx, path, options });
 	}
 
-	if (
-		(!data || data?.articleProps?.errorCode) &&
-		lastVisited.getLastVisitedArticle(catalog) === path.replace(/^\//, "")
-	)
-		data = await dataProvider.getArticlePageDataByPath(splitPath, options);
-	else data && lastVisited.setLastVisitedArticle(catalog, data.articleProps);
+	if (data?.articleProps?.errorCode === 404 && isRemembered(lastVisited, catalog, pathname))
+		data = await dataProvider.getArticlePageDataByPath([catalog.name], options);
 
 	if (!data) {
 		const errorArticleName = catalog ? "Article404" : "Catalog404";

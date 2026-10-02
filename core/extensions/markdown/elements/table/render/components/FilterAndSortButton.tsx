@@ -4,6 +4,7 @@ import ActionButton from "@components/controls/HoverController/ActionButton";
 import { cn } from "@core-ui/utils/cn";
 import t from "@ext/localization/locale/translate";
 import { SortState } from "@ext/markdown/elements/table/edit/model/tableTypes";
+import compareCellValues from "@ext/markdown/elements/table/render/logic/compareCellValues";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { CheckboxField, type CheckedState } from "@ui-kit/Checkbox";
 import { Command, CommandItem, CommandList } from "@ui-kit/Command";
@@ -73,10 +74,7 @@ const FilterAndSortButton = (props: FilterButtonProps) => {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const emptyValueLabel = t("properties.empty");
 
-	const sortedColumnValues = useMemo(
-		() => [...columnValues].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
-		[columnValues],
-	);
+	const sortedColumnValues = useMemo(() => [...columnValues].sort(compareCellValues), [columnValues]);
 
 	const filteredColumnValues = useMemo(() => {
 		const normalizedSearch = searchQuery.trim().toLowerCase();

@@ -1,5 +1,6 @@
 import type { ArticlePageData } from "@core/SitePresenter/types/ArticlePage";
 import ArticleViewService from "@core-ui/ContextServices/views/articleView/ArticleViewService";
+import { useLastVisitedArticle } from "@core-ui/hooks/useLastVisitedArticle";
 import { usePluginEvent } from "@plugins/api/events";
 import type { ReactNode } from "react";
 
@@ -8,6 +9,7 @@ const ArticleViewContainer = ({ data, children }: { data: ArticlePageData; child
 	const ArticleBottomView = ArticleViewService.getBottomView();
 
 	usePluginEvent("article:open", data);
+	useLastVisitedArticle(data);
 
 	return (
 		<>

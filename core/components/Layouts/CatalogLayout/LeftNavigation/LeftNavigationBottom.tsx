@@ -32,7 +32,7 @@ const LeftNavigationBottom = () => {
 	const isPublishDisabled = isOffline || (!isNext && isReadOnly);
 	const publishDisabledReason = isRevision ? t("git.publish.error.at-revision") : t("git.publish.error.main-branch");
 	const actionsToolbar = (
-		<GlassToolbar className="w-fit pr-1">
+		<GlassToolbar className={isNext ? "w-fit" : "w-fit pr-1"} variant={isNext ? "single" : "default"}>
 			<Sync disable={isOffline} />
 			{!isNext && (
 				<>

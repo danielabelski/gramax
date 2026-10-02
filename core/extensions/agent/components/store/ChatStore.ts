@@ -25,6 +25,7 @@ interface ChatStoreState {
 
 	onSelectSession: (id: string) => void;
 	onCloseTab: (id: string) => void;
+	onRenameSession: (id: string, title: string) => void;
 	onNewSession: () => void;
 	onDraftChange: (value: string) => void;
 	onAttachmentsChange: (files: AgentDraftAttachment[]) => void;
@@ -58,6 +59,7 @@ const useChatStore = create<ChatStoreState>()((set) => ({
 
 	onSelectSession: () => {},
 	onCloseTab: () => {},
+	onRenameSession: () => {},
 	onNewSession: () => {},
 	onDraftChange: () => {},
 	onAttachmentsChange: () => {},
@@ -115,6 +117,7 @@ export const useChatHeaderActions = () =>
 			activeSessionId: s.activeSessionId,
 			onSelectSession: s.onSelectSession,
 			onCloseTab: s.onCloseTab,
+			onRenameSession: s.onRenameSession,
 			onNewSession: s.onNewSession,
 		})),
 	);

@@ -43,6 +43,19 @@ export default class EnterpriseRouterPathEvents implements EventHandlerCollectio
 				const config = this._workspaceManager?.maybeCurrent()?.yaml().inner();
 				const isManagedWorkspace = config?.enterprise?.gesUrl || config?.enterpriseCloud?.url;
 				if (!isShortEditorPath(segments) || isManagedWorkspace) return;
+
+				const gesWorkspaces = (this._workspaceManager?.workspaces?.() ?? []).filter(
+					(workspace) => workspace.enterprise?.gesUrl || workspace.enterpriseCloud?.url,
+				);
+				if (gesWorkspaces.length === 1) {
+					mutable.handled = true;
+					mutable.skipRedirect = true;
+					void this._workspaceManager
+						?.setWorkspace(gesWorkspaces[0].path)
+						.then(() => window.location.reload());
+					return;
+				}
+
 				mutable.handled = true;
 				showGesRequiredModal();
 			}),

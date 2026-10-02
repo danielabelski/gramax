@@ -25,13 +25,27 @@ type UseAppSettingsEditorFormParams = {
 
 const schemaDefaults = extractDefaults(AppSettings) as Record<string, unknown>;
 
+// A service GES states but deliberately leaves empty resolves to `endpoint: null`
+// (see resolveWorkspaceServices) — normalize it to "" so the field renders blank
+// instead of tripping the endpoint schema's URL check on submit.
+export const normalizeServices = (services: Record<string, unknown>): AppSettingsFormData["services"] =>
+	Object.fromEntries(
+		Object.entries(services).map(([key, service]) => [
+			key,
+			{
+				...(service as { endpoint?: string | null }),
+				endpoint: (service as { endpoint?: string | null })?.endpoint ?? "",
+			},
+		]),
+	) as AppSettingsFormData["services"];
+
 const buildDefaults = (values: Record<string, unknown>): AppSettingsFormData => {
 	// AI is configured at the workspace level (EditWorkspaceFormBody), so its
 	// keys never reach the app-level form.
 	const { ai: _ai, ...services } = (values.services ?? {}) as Record<string, unknown>;
 	return {
 		general: (values.general ?? {}) as AppSettingsFormData["general"],
-		services: services as AppSettingsFormData["services"],
+		services: normalizeServices(services),
 		"compress-images": {
 			...(schemaDefaults["compress-images"] as AppSettingsFormData["compress-images"]),
 			...((values["compress-images"] ?? {}) as Partial<AppSettingsFormData["compress-images"]>),

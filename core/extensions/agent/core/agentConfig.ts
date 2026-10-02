@@ -5,9 +5,14 @@ class AgentConfig {
 	compactionTailUserCharsBudget = 20_000;
 	toolPreviewMaxChars = 8_000;
 	readMaxChars = 60_000;
-	searchHitsLimit = 15;
-	searchSnippetsPerHit = 2;
-	searchSnippetSize = 160;
+	searchHitsDefault = 15;
+	searchHitsMax = 100;
+	searchQueryMaxChars = 500;
+	searchScanDeadlineMs = 30_000;
+	searchCatalogsMaxMatchesPerHit = 2;
+	searchFilesMaxMatchesDefault = 1;
+	searchFilesMaxMatchesLimit = 3;
+	searchMatchLineMaxChars = 320;
 	searchTimeoutMs = 120_000;
 	searchIndexProgressWaitMs = 300_000;
 	repoExcludedPathPatterns = [/(^|\/)\.git(\/|$)/i];

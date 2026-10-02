@@ -19,7 +19,7 @@ const useClonePublic = () => {
 	const { startClone } = useCloneRepo({
 		skipCheck: true,
 		onStart: () => {
-			router.pushPath("/");
+			void router.pushPath("/");
 		},
 	});
 
@@ -60,11 +60,11 @@ const usePathnameCloneHandler = () => {
 	useEffect(() => {
 		if (!router || !shareData) return;
 
-		const mutable: { handled?: boolean } = {};
+		const mutable: { handled?: boolean; skipRedirect?: boolean } = {};
 		if (!isReadOnly) RouterPathProvider.events.emitSync("unresolved-path", { path: router.path, mutable });
 		if (mutable.handled) {
 			pageDataContext.shareData = null;
-			void router.pushPath("/");
+			if (!mutable.skipRedirect) void router.pushPath("/");
 			return;
 		}
 

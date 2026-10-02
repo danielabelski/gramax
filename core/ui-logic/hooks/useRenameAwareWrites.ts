@@ -29,6 +29,7 @@ const useRenameAwareWrites = ({
 	const apiUrlCreatorRef = useRef(apiUrlCreator);
 	const articlePropsRef = useRef(articleProps);
 	const propertyServiceRef = useRef(propertyService);
+	const ownPathRef = useRef(articleProps.ref.path);
 
 	useWatch(() => {
 		apiUrlCreatorRef.current = apiUrlCreator;
@@ -43,6 +44,7 @@ const useRenameAwareWrites = ({
 			if (view !== null && renamedView !== view) return;
 			if (!isSameItemRef(articlePropsRef.current?.ref, from)) return;
 			articlePropsRef.current = { ...articlePropsRef.current, ...patch };
+			ownPathRef.current = patch.ref.path;
 			updateArticleProps(patch);
 		});
 		return () => NavigationEvents.off(token);
@@ -59,6 +61,7 @@ const useRenameAwareWrites = ({
 				(patch) => {
 					if (!patch) return undefined;
 					articlePropsRef.current = { ...articlePropsRef.current, ...patch };
+					ownPathRef.current = patch.ref.path;
 					return from ? { from, to: patch.ref.path } : undefined;
 				},
 				// A failed rename is the caller's problem; waiters only care that it is over.
@@ -81,7 +84,7 @@ const useRenameAwareWrites = ({
 		};
 	}, [view]);
 
-	return { articlePropsRef, apiUrlCreatorRef, sendContext, trackRename };
+	return { articlePropsRef, apiUrlCreatorRef, sendContext, trackRename, ownPathRef };
 };
 
 export default useRenameAwareWrites;

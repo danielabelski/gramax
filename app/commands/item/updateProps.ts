@@ -4,6 +4,7 @@ import { DesktopModeMiddleware } from "@core/Api/middleware/DesktopModeMiddlewar
 import ReloadConfirmMiddleware from "@core/Api/middleware/ReloadConfirmMiddleware";
 import type Context from "@core/Context/Context";
 import Path from "@core/FileProvider/Path/Path";
+import LastVisited from "@core/SitePresenter/LastVisited";
 import type { ClientArticleProps, ClientItemRef } from "@core/SitePresenter/SitePresenter";
 import { Command } from "../../types/Command";
 
@@ -36,15 +37,20 @@ const updateProps: Command<{ ctx: Context; catalogName: string; props: ClientArt
 			const item = catalog.findItemByItemPath(new Path(props.ref.path));
 			if (!item) return;
 
+			const pathnameBefore = await catalog.getPathname(item);
 			const updatedItem = await catalog.updateItemProps(item, props, resourceUpdaterFactory);
 			if (!updatedItem) return;
+
+			const pathname = await catalog.getPathname(updatedItem);
+			// Otherwise recorded by a page read, and none follows a rename.
+			new LastVisited(ctx, (await workspace.config()).name).move(catalog, pathnameBefore, pathname);
 
 			const ref = { path: updatedItem.ref.path.value, storageId: updatedItem.ref.storageId };
 			// The file name was a guess: the server takes another one when that is occupied. Returning
 			// the actual one — with the rest of the address — is the only way the client learns it: the
 			// page is not re-read after a rename, so anything left from the old path would stay forever.
 			return {
-				pathname: await catalog.getPathname(updatedItem),
+				pathname,
 				ref,
 				fileName: updatedItem.getFileName(),
 				logicPath: updatedItem.logicPath,

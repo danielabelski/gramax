@@ -1995,6 +1995,15 @@ title: Unable to display the article
 				title: "Error when requesting Git storage",
 				message: "An unexpected error occurred when requesting the Git repository",
 			},
+			checkout: {
+				"invalid-path": {
+					title: "File name not valid on Windows",
+					message:
+						'The operation failed: a file name contains characters not allowed on Windows (e.g. quotes ", *, ?, <, >, :, |). Rename the file from Linux/macOS or via the GitLab web IDE and try again.\n\nFile: {{path}}',
+					"message-generic":
+						'The operation failed: one of the files has a name not valid on Windows (e.g. it contains quotes ", *, ?, <, >, :, |, or the path is too long). Rename the file from Linux/macOS or via the GitLab web IDE and try again.',
+				},
+			},
 		},
 		"merge-requests": {
 			"empty-state": {
@@ -3916,6 +3925,7 @@ title: Unable to display the article
 	upload: "Upload",
 	"fileupload-description": "Drag & drop or click to browse",
 	"file-not-found": "File not found",
+	"file-upload-failed": "Failed to insert files",
 	"open-in-supported-app": "Open in supported app",
 	welcome: {
 		empty: {
@@ -4385,6 +4395,8 @@ title: Unable to display the article
 			empty: "No chat history",
 			"new-chat": "New chat",
 			"search-placeholder": "Search recent chats...",
+			"delete-confirm-title": "Delete chat?",
+			"delete-confirm-description": "The chat “{{title}}” and its message history will be permanently deleted.",
 		},
 		usage: {
 			"tooltip-label": "Show context usage",
@@ -4416,6 +4428,7 @@ title: Unable to display the article
 			"get-response-error": "Failed to get response. Please try again.",
 			"chat-connection-failed": "Failed to connect to chat. Please check your connection and try again.",
 			"delete-session-error": "Failed to delete session. Please try again.",
+			"rename-session-error": "Failed to rename chat. Please try again.",
 		},
 		"error-type": {
 			unauthorized:
@@ -4428,12 +4441,14 @@ title: Unable to display the article
 			"unexpected-with-message": "Unexpected error: {{message}}",
 		},
 		"missing-secret": {
-			"title-token": "Missing token",
-			"title-login": "Missing login",
+			verb: { one: "Missing", few: "Missing", many: "Missing" },
+			"noun-token": { one: "token", few: "tokens", many: "tokens" },
+			"noun-login": { one: "login", few: "logins", many: "logins" },
+			and: "and",
 			"description-one":
-				"Without it, the request wasn't completed. Add it in settings — the agent will be able to continue.",
+				"Without it, the request wasn't completed. Add it in settings — the agent will be able to continue working.",
 			"description-many":
-				"Without them, the request wasn't completed. Add them in settings — the agent will be able to continue.",
+				"Without them, the request wasn't completed. Add them in settings — the agent will be able to continue working.",
 			button: "Add",
 		},
 		"warning-type": {
@@ -4457,6 +4472,7 @@ title: Unable to display the article
 			history: "Chat history",
 			"new-chat": "New chat",
 			close: "Close",
+			"rename-session": "Rename chat",
 			"delete-session": "Delete chat",
 			"remove-quote": "Remove quote",
 		},
@@ -4466,7 +4482,7 @@ title: Unable to display the article
 			parameters: "Parameters",
 			result: "Result",
 			list_catalogs: "Retrieving catalog list",
-			get_navigation: "Retrieving catalog navigation tree",
+			get_navigation: "Retrieving navigation tree",
 			search_catalogs: "Searching articles",
 			search_files: "Searching files",
 			read_catalog_item: "Reading article",
@@ -4482,7 +4498,7 @@ title: Unable to display the article
 			git_discard: "Discarding git changes",
 			git_branch: "Working with git branches",
 			git_restore: "Restoring files from git",
-			read_agent_skill: "Reading agent skills",
+			read_agent_skill: "Reading skill",
 			read_document: "Reading document",
 			save_chat_attachment: "Saving attachment to article",
 			transcribe_audio: "Transcribing audio",

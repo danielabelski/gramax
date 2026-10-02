@@ -264,6 +264,57 @@ describe("linkCreator", () => {
 			expect(result.hash).toBeFalsy();
 			expect(result.href).toEqual(parantCategoryReadOnlyPathname);
 		});
+
+		describe("extensionless target that is not an article or a category", () => {
+			const articlePath = new Path("catalog/docs/folder/article.md");
+
+			const createContext = (entries: Record<string, "file" | "dir">) => {
+				const catalog = {
+					name: "catalog",
+					getRootCategoryRef: () => ({ path: new Path("catalog/docs/_index.md") }),
+					// No article/index matches the target.
+					findItemByItemPath: (): null => null,
+				};
+				const fp = {
+					exists: async (path: Path) => path.value in entries,
+					isFolder: async (path: Path) => entries[path.value] === "dir",
+				};
+				return {
+					getCatalog: () => catalog,
+					getArticle: () => ({ ref: { path: articlePath } }),
+					getBasePath: () => ({ value: "" }),
+					fp,
+				} as unknown as ParserContext;
+			};
+
+			test("returns a file link when href points to an existing extensionless file (gh#675)", async () => {
+				const context = createContext({ "catalog/docs/folder/LICENSE": "file" });
+
+				const result = await linkCreater.getLink("./LICENSE", context);
+
+				expect(result.isFile).toBe(true);
+				expect(result.resourcePath.value).toEqual("./LICENSE");
+			});
+
+			test.each([
+				["./attachments", "catalog/docs/folder/attachments"],
+				["../assets", "catalog/docs/assets"],
+			])("does not return a file link when href %s points to a folder", async (href, absolutePath) => {
+				const context = createContext({ [absolutePath]: "dir" });
+
+				const result = await linkCreater.getLink(href, context);
+
+				expect(result.isFile).toBeFalsy();
+			});
+
+			test("does not return a file link when href points to a missing target", async () => {
+				const context = createContext({});
+
+				const result = await linkCreater.getLink("./missing", context);
+
+				expect(result.isFile).toBeFalsy();
+			});
+		});
 	});
 
 	describe("correctly returns root path", () => {

@@ -87,6 +87,12 @@ export default styled(Table)`
 		border-radius: var(--radius-small);
 	}
 
+	@media screen {
+		table {
+			box-sizing: content-box;
+		}
+	}
+
 	td,
 	tr {
 		text-align: left;

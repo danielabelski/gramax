@@ -1,9 +1,19 @@
+import { agentConfig } from "../core/agentConfig";
+
 const parameterDescriptions = {
 	catalogName: "Имя каталога из списка list_catalogs.",
 	itemPath:
-		"Адрес узла внутри каталога (без catalogName). Статья — guides/setup, раздел — guides/ (хвостовой слэш). Корень — пустая строка. Без .md и _index.md. Для agent skill — @skills/<имя>.",
+		"Адрес узла внутри каталога (без catalogName). Статья — guides/setup, раздел — guides/ (хвостовой слэш). Хвостовой слэш — тип узла, а не оформление: без него это статья, и дочерних у неё быть не может, пока она не сконвертирована в раздел. Корень — пустая строка. Без .md и _index.md. Для agent skill — @skills/<имя>.",
 	attachmentItemPath:
 		"Источник: @attachments/<name.ext> из блока прикрепленных файлов, catalogName/itemPath@resources/<name.ext> из статьи, или http(s) URL.",
+	fromLine:
+		"Необязательно: номер первой строки фрагмента, нумерация с 1. Без fromLine и toLine документ читается целиком. Только fromLine — от этой строки до конца документа. fromLine вместе с toLine — точный диапазон. Бери число из поля line в результатах поиска; если строка заранее не известна, читай по headingId, а не подбирай диапазон. Нельзя передавать вместе с headingId.",
+	toLine: "Необязательно: номер последней строки фрагмента, включительно. Допустим только вместе с fromLine — toLine без fromLine это ошибка. Значение больше длины документа обрезается до последней строки. Нельзя передавать вместе с headingId.",
+	regexQuery:
+		"Необязательно: true — query разбирается как регулярное выражение JavaScript (шаблоны вида \\d{3}-\\d{2}, TODO|FIXME, ^## ). По умолчанию false — поиск по подстроке. Шаблон применяется ко всему тексту документа. Флаги заданы заранее и переопределить их нельзя: регистр не учитывается (i), ^ и $ — границы строки (m), точка через перевод строки НЕ переходит (s выключен). Групп инлайновых флагов (?i) (?m) (?s) в JavaScript не существует — такой шаблон вернёт ошибку; для многострочного шаблона пиши \\n или [\\s\\S] явно. Группа, внутри которой уже есть * или +, не может повторяться больше одного раза: (a+)+, (\\s*)* и (a+){2} вернут ошибку — такой шаблон может считаться часами. Внешний квантификатор обычно лишний: вместо (a+)+ пиши a+. В поле line указана строка, где совпадение начинается, в text — её текст. Если совпадение захватило несколько строк, в ответе есть ещё endLine и endText — строка, где совпадение заканчивается, и её текст: по ним видно, чем именно шаблон совпал на другом конце.",
+	maxHits: `Необязательно: сколько документов вернуть в hits, по умолчанию ${agentConfig.searchHitsDefault}, не больше ${agentConfig.searchHitsMax}: большее значение урезается до ${agentConfig.searchHitsMax}.`,
+	readRange:
+		"Фрагмент читается двумя способами, вместе они не передаются. По смыслу — headingId: вернётся глава целиком, id бери из оглавления. По адресу — fromLine/toLine: номер строки бери из поля line в результатах поиска, в ответе будут fromLine, toLine и totalLines. Строку уже нашёл поиском — читай по ней, оглавление для этого не нужно.",
 } as const;
 
 export const MCP_PROMPT_MAP = {
@@ -47,13 +57,16 @@ export const MCP_PROMPT_MAP = {
 		input: {},
 	},
 	readDocument: {
-		description:
-			"Прочитать документ по attachmentItemPath: @attachments/<name.ext>, catalogName/itemPath@resources/<name.ext> или http(s) URL. Ответ: content — текст. Без headingId — весь файл; с headingId (chunk~1, section-chunk~1, …) — чанк. Не все типы файлов можно прочитать как текст.",
+		description: `Прочитать документ по attachmentItemPath: @attachments/<name.ext>, catalogName/itemPath@resources/<name.ext> или http(s) URL. Ответ: content — текст. Без headingId и без диапазона — весь файл; с headingId (chunk~1, section-chunk~1, …) — чанк. Не все типы файлов можно прочитать как текст. ${parameterDescriptions.readRange}`,
 		tooLarge: "Документ слишком большой. Возьми data.headings из этого ответа и повтори с более узким headingId.",
+		rangeTooLarge:
+			"Фрагмент слишком большой. Повтори с более узким диапазоном fromLine/toLine — длина документа в data.totalLines.",
 		input: {
 			attachmentItemPath: parameterDescriptions.attachmentItemPath,
 			headingId:
 				"Необязательно: используй только если чтение всего файла вернуло ошибку. id чанка для чтения (chunk~1, section-chunk~1, …).",
+			fromLine: parameterDescriptions.fromLine,
+			toLine: parameterDescriptions.toLine,
 		},
 	},
 	transcribeAudio: {
@@ -66,13 +79,17 @@ export const MCP_PROMPT_MAP = {
 		description: "Список имён каталогов Gramax. Первый шаг навигации. Ответ: список каталогов (name, title).",
 	},
 	readCatalogItem: {
-		description:
-			"Прочитать узел каталога Gramax (статью или раздел). Без headingId — полный markdown. С headingId из get_catalog_item_headings — глава или её чанк (id вида section-chunk~1).",
-		tooLarge: "Фрагмент слишком большой. Повтори с более узким headingId.",
+		description: `Прочитать узел каталога Gramax (статью или раздел). Без headingId и без диапазона — полный markdown. С headingId из get_catalog_item_headings — глава или её чанк (id вида section-chunk~1). ${parameterDescriptions.readRange}`,
+		tooLarge: "Документ слишком большой. Возьми data.headings из этого ответа и повтори с более узким headingId.",
+		rangeTooLarge:
+			"Фрагмент слишком большой. Повтори с более узким диапазоном fromLine/toLine — длина документа в data.totalLines.",
 		input: {
 			catalogName: parameterDescriptions.catalogName,
 			itemPath: parameterDescriptions.itemPath,
-			headingId: "Необязательно: id заголовка из get_catalog_item_headings.",
+			headingId:
+				"Необязательно: id заголовка из get_catalog_item_headings или из data.headings предыдущего ответа. Вернётся глава целиком, вместе с подзаголовками.",
+			fromLine: parameterDescriptions.fromLine,
+			toLine: parameterDescriptions.toLine,
 		},
 	},
 	getCatalogItemHeadings: {
@@ -84,11 +101,13 @@ export const MCP_PROMPT_MAP = {
 		},
 	},
 	searchCatalogs: {
-		description:
-			"Полнотекстовый поиск по каталогам Gramax. Ответ: hits (catalogName, itemPath, title, snippets). catalogName и itemPath — для аргументов других инструментов, title для контекста. За один вызов поиска указывай в query ТОЛЬКО ОДНО слово.",
+		description: `Поиск по статьям и разделам каталогов Gramax. Ответ: hits (catalogName, itemPath, title, matches) и hasMore — поле есть только когда выдано не всё — либо найдено больше maxHits, либо обход прерван по времени: повтори с большим maxHits или сузь запрос. matches — список совпадений вида { line, text }: line — номер строки, который можно передать в read_catalog_item как fromLine, text — сама строка. catalogName и itemPath — для аргументов других инструментов, title для контекста. Два режима. regex=false (по умолчанию) — тот же движок, что поиск в интерфейсе: находит и по части слова, прощает опечатки и неверную раскладку, учитывает словоформы. В query пиши ключевые слова, которые должны встретиться в тексте статьи, а не вопрос целиком; поддерживаются "точная фраза" в кавычках, -слово для исключения и +слово для обязательного. Если совпадение найдено по словоформе, а не буквально, у него line=null. regex=true — точный поиск по шаблону без учёта словоформ, ТРЕБУЕТ catalogName. Шаблон применяется к исходному тексту документа, а не к тому, что вернёт чтение: раскрытые диаграммы и текст комментариев в поиск не попадают, а ссылки видны в исходном виде. Если совпавшая строка при чтении выглядит иначе, у совпадения будет line=null.`,
 		input: {
-			query: "Поисковая строка.",
-			catalogName: "Ограничить одним каталогом из list_catalogs. Без параметра — поиск по всем каталогам.",
+			query: 'Ключевые слова (поддерживаются "фраза", -исключение, +обязательное слово) или, при regex=true, регулярное выражение.',
+			catalogName:
+				"Ограничить одним каталогом из list_catalogs. Без параметра — поиск по всем каталогам. При regex=true параметр обязателен.",
+			regex: parameterDescriptions.regexQuery,
+			maxHits: parameterDescriptions.maxHits,
 		},
 	},
 	getNavigation: {
@@ -109,7 +128,7 @@ export const MCP_PROMPT_MAP = {
 	},
 	moveCatalogItem: {
 		description:
-			"Перенести статью или категорию в пределах каталога. Для категории — рекурсивно со всем содержимым. Передавай конечный toItemPath целиком. Если занят — ошибка, без переноса. Статья→раздел: toItemPath со слэшем; обратное не поддерживается.",
+			"Перенести статью или категорию в пределах каталога. Для категории — рекурсивно со всем содержимым. Передавай конечный toItemPath целиком. Если занят — ошибка, без переноса. Статья→раздел: toItemPath со слэшем; обратное не поддерживается. Родитель в toItemPath обязан быть разделом: если это статья, сначала преобразуй её этим же инструментом (fromItemPath и toItemPath — её путь, второй со слэшем), затем повтори перенос для будущих дочерних элементов.",
 		input: {
 			catalogName: parameterDescriptions.catalogName,
 			fromItemPath: parameterDescriptions.itemPath,
@@ -168,21 +187,27 @@ export const MCP_PROMPT_MAP = {
 		},
 	},
 	searchFiles: {
-		description:
-			"Полнотекстовый поиск по репозиторию указанного каталога. Ответ: hits (catalogName, filePath, snippets). За один вызов поиска указывай в query ТОЛЬКО ОДНО слово.",
+		description: `Поиск по текстовым файлам репозитория каталога, включая служебные файлы и исходники статей в формате хранения. Бинарные файлы, изображения, pdf, docx и xlsx не просматриваются. Файлы идут в порядке обхода директорий, без ранжирования. Для поиска по статьям и разделам используй search_catalogs. Ответ: hits (catalogName, filePath, matches) и hasMore — поле есть только когда выдано не всё — либо найдено больше maxHits, либо обход прерван по времени: повтори с большим maxHits или сузь запрос. matches — список совпадений вида { line, text }: line — номер строки, который можно передать в read_file как fromLine, text — сама строка. При regex=false совпадение буквальное и без учёта регистра: без морфологии и без разбиения на слова, несколько слов ищутся как одна фраза подряд; словоформы покрывай основой слова («настро» найдёт «настройка» и «настроить»).`,
 		input: {
-			query: "Поисковая строка.",
+			query: "Искомая подстрока — ищется буквально, без учёта регистра — или, при regex=true, регулярное выражение.",
 			catalogName: parameterDescriptions.catalogName,
+			maxMatches:
+				"Необязательно: сколько совпадений возвращать внутри одного файла, от 1 до 3. Если не передан — 1. Проси больше одного только когда нужен контекст нескольких вхождений в одном файле.",
+			regex: parameterDescriptions.regexQuery,
+			maxHits: parameterDescriptions.maxHits,
 		},
 	},
 	readFile: {
-		description:
-			"Прочитать файл из репозитория каталога. Без headingId — полный текст; с headingId из data.headings — чанк.",
+		description: `Прочитать файл из репозитория каталога. Без headingId и без диапазона — полный текст; с headingId из data.headings — чанк. ${parameterDescriptions.readRange}`,
 		tooLarge: "Файл слишком большой. Возьми data.headings из этого ответа и повтори с более узким headingId.",
+		rangeTooLarge:
+			"Фрагмент слишком большой. Повтори с более узким диапазоном fromLine/toLine — длина файла в data.totalLines.",
 		input: {
 			catalogName: parameterDescriptions.catalogName,
 			filePath: "Путь к файлу относительно корня каталога.",
 			headingId: "Необязательно: используй только если чтение всего файла вернуло ошибку.",
+			fromLine: parameterDescriptions.fromLine,
+			toLine: parameterDescriptions.toLine,
 		},
 	},
 	gitInspect: {

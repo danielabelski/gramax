@@ -3,7 +3,7 @@ import type { ArticleProps } from "@gramax/core/logic/FileStructue/Article/Artic
 import { expect, type Locator } from "@playwright/test";
 import { Dropdown } from "@shared-pom/dropdown";
 import type { JSONContent } from "@tiptap/core";
-import { addSubArticleButton, navItem } from "@utils/catalogTree";
+import { addRootArticleButton, addSubArticleButton, navItem } from "@utils/catalogTree";
 import BasePage from "./base.page";
 import { SearchPom } from "./search.pom";
 
@@ -103,6 +103,15 @@ export default class CatalogPage extends BasePage {
 		await navItem(this._page, parentTitle).hover();
 		await addSubArticleButton(this._page, parentTitle).click();
 		await this.waitForLoad();
+	}
+
+	/** The tree's own "Add article" control under the last root article. */
+	async createRootArticle(): Promise<void> {
+		await addRootArticleButton(this._page).click();
+		await this.waitForLoad();
+		await expect(this._page).toHaveURL(/\/untitled$/);
+		// The click only sends the request; typing before the caret is in the new article goes into the one being left.
+		await expect(this._page.getByRole("textbox")).toBeFocused();
 	}
 
 	async getArticleActions(title: string): Promise<Dropdown> {

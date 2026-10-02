@@ -37,21 +37,21 @@ jest.mock("@ext/agent/components/utils/secret/useAgentSecretNames", () => ({
 describe("useAgentSecrets — missing-secret draft consumption", () => {
 	beforeEach(() => {
 		mockListStatus = "loading";
-		useAgentSecretDraftStore.getState().consumePendingDraft();
+		useAgentSecretDraftStore.getState().consumePendingDrafts();
 	});
 
-	test("does not consume a pending draft while the secret list is still loading", async () => {
-		useAgentSecretDraftStore.getState().setPendingDraft({ key: "Ютрек", kind: "token", focus: "value" });
+	test("does not consume pending drafts while the secret list is still loading", async () => {
+		useAgentSecretDraftStore.getState().setPendingDrafts([{ key: "Ютрек", kind: "token", focus: "value" }]);
 
 		const { result } = renderHook(() => useAgentSecrets());
 		await act(async () => {});
 
 		expect(result.current.fields).toHaveLength(0);
-		expect(useAgentSecretDraftStore.getState().pendingDraft).not.toBeNull();
+		expect(useAgentSecretDraftStore.getState().pendingDrafts).not.toEqual([]);
 	});
 
 	test("consumes a pending draft once loading finishes, prepending an unsaved draft row", async () => {
-		useAgentSecretDraftStore.getState().setPendingDraft({ key: "Ютрек", kind: "token", focus: "value" });
+		useAgentSecretDraftStore.getState().setPendingDrafts([{ key: "Ютрек", kind: "token", focus: "value" }]);
 
 		const { result, rerender } = renderHook(() => useAgentSecrets());
 		await act(async () => {});
@@ -59,15 +59,37 @@ describe("useAgentSecrets — missing-secret draft consumption", () => {
 		mockListStatus = "done";
 		rerender();
 
-		expect(useAgentSecretDraftStore.getState().pendingDraft).toBeNull();
+		expect(useAgentSecretDraftStore.getState().pendingDrafts).toEqual([]);
 		expect(result.current.fields).toHaveLength(1);
 		expect(result.current.secrets[0]).toMatchObject({ key: "Ютрек", kind: "token", savedKey: "", value: "" });
 		expect(result.current.focusedDraftField).toBe("value");
 		expect(result.current.focusedDraftRowId).toBe(result.current.secrets[0].id);
 	});
 
+	test("consumes several pending drafts at once, prepending a row for each and focusing only the first", async () => {
+		useAgentSecretDraftStore.getState().setPendingDrafts([
+			{ key: "Яндекс", kind: "token", focus: "value" },
+			{ key: "Вконтакте", kind: "login", focus: "login" },
+		]);
+
+		const { result, rerender } = renderHook(() => useAgentSecrets());
+		await act(async () => {});
+
+		mockListStatus = "done";
+		rerender();
+
+		expect(useAgentSecretDraftStore.getState().pendingDrafts).toEqual([]);
+		expect(result.current.fields).toHaveLength(2);
+		expect(result.current.secrets).toMatchObject([
+			{ key: "Яндекс", kind: "token", savedKey: "", value: "" },
+			{ key: "Вконтакте", kind: "login", savedKey: "", login: "" },
+		]);
+		expect(result.current.focusedDraftField).toBe("value");
+		expect(result.current.focusedDraftRowId).toBe(result.current.secrets[0].id);
+	});
+
 	test("does not add a duplicate row on further rerenders once a draft has been consumed", async () => {
-		useAgentSecretDraftStore.getState().setPendingDraft({ key: "Ютрек", kind: "token", focus: "value" });
+		useAgentSecretDraftStore.getState().setPendingDrafts([{ key: "Ютрек", kind: "token", focus: "value" }]);
 
 		const { result, rerender } = renderHook(() => useAgentSecrets());
 		await act(async () => {});
@@ -80,7 +102,7 @@ describe("useAgentSecrets — missing-secret draft consumption", () => {
 	});
 
 	test("does not remount into a duplicate row: a second hook instance sees the already-cleared draft", async () => {
-		useAgentSecretDraftStore.getState().setPendingDraft({ key: "Ютрек", kind: "token", focus: "value" });
+		useAgentSecretDraftStore.getState().setPendingDrafts([{ key: "Ютрек", kind: "token", focus: "value" }]);
 		mockListStatus = "done";
 
 		const { result: first } = renderHook(() => useAgentSecrets());
@@ -111,13 +133,13 @@ describe("useAgentSecrets — missing-secret draft consumption", () => {
 				],
 			});
 		});
-		useAgentSecretDraftStore.getState().setPendingDraft({ key: " Ютрек ", kind: "token", focus: "value" });
+		useAgentSecretDraftStore.getState().setPendingDrafts([{ key: " Ютрек ", kind: "token", focus: "value" }]);
 		mockListStatus = "done";
 		rerender();
 
 		expect(result.current.fields).toHaveLength(1);
 		expect(result.current.secrets[0].id).toBe("existing-1");
-		expect(useAgentSecretDraftStore.getState().pendingDraft).toBeNull();
+		expect(useAgentSecretDraftStore.getState().pendingDrafts).toEqual([]);
 		expect(result.current.focusedDraftRowId).toBe("existing-1");
 	});
 

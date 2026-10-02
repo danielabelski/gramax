@@ -59,7 +59,7 @@ export const BranchButton = ({ collapseWithRightNavigation, disabled, iconOnly, 
 			<GlassToolbarToggleButton
 				active={isOpen}
 				aria-label={t("git.branch.current")}
-				className="max-w-56 h-8"
+				className="max-w-56"
 				data-testid="branch-trigger"
 				disabled={disabled}
 				onClick={handleClick}

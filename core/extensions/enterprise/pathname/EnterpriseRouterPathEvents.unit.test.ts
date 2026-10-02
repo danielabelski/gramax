@@ -57,6 +57,57 @@ describe("EnterpriseRouterPathEvents", () => {
 		expect(ModalToOpenService.setValue).not.toHaveBeenCalled();
 	});
 
+	it("переключает воркспейс на единственный настроенный GES вместо показа модалки", async () => {
+		const setWorkspace = jest.fn().mockResolvedValue(undefined);
+		const reload = jest.fn();
+		Object.defineProperty(window, "location", { value: { reload }, writable: true });
+		const wm = {
+			maybeCurrent: () => ({ yaml: () => ({ inner: () => ({}) }) }),
+			workspaces: () => [
+				{ path: "os-workspace" },
+				{ path: "ges-workspace", enterprise: { gesUrl: "https://ges.example" } },
+			],
+			setWorkspace,
+		} as unknown as WorkspaceManager;
+		const managedHandler = new EnterpriseRouterPathEvents(wm);
+		managedHandler.mount();
+		const mutable: { handled?: boolean; skipRedirect?: boolean } = {};
+
+		RouterPathProvider.events.emitSync("unresolved-path", { path: "/dr/repo/main/-/article", mutable });
+		managedHandler.unmount();
+
+		expect(mutable.handled).toBe(true);
+		expect(mutable.skipRedirect).toBe(true);
+		expect(setWorkspace).toHaveBeenCalledWith("ges-workspace");
+		expect(ModalToOpenService.setValue).not.toHaveBeenCalled();
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(reload).toHaveBeenCalled();
+	});
+
+	it("показывает модалку, если настроено несколько GES-воркспейсов (неоднозначно, какой выбрать)", () => {
+		const setWorkspace = jest.fn();
+		const wm = {
+			maybeCurrent: () => ({ yaml: () => ({ inner: () => ({}) }) }),
+			workspaces: () => [
+				{ path: "ges-one", enterprise: { gesUrl: "https://ges-one.example" } },
+				{ path: "ges-two", enterpriseCloud: { url: "https://ges-two.example" } },
+			],
+			setWorkspace,
+		} as unknown as WorkspaceManager;
+		const managedHandler = new EnterpriseRouterPathEvents(wm);
+		managedHandler.mount();
+		const mutable: { handled?: boolean; skipRedirect?: boolean } = {};
+
+		RouterPathProvider.events.emitSync("unresolved-path", { path: "/dr/repo/main/-/article", mutable });
+		managedHandler.unmount();
+
+		expect(mutable.handled).toBe(true);
+		expect(mutable.skipRedirect).toBeUndefined();
+		expect(setWorkspace).not.toHaveBeenCalled();
+		expect(ModalToOpenService.setValue).toHaveBeenCalledWith(ModalToOpen.AlertConfirm, expect.any(Object));
+	});
+
 	it.each(["dr", "team.docs"])("parses short URL for the %s group through events", (group) => {
 		handler.mount();
 		const path = `${group}/repo/main/-/article`;

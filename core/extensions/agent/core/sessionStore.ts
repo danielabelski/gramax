@@ -120,6 +120,16 @@ export class AgentSessionStore {
 		return true;
 	}
 
+	async rename(id: string, title: string): Promise<boolean> {
+		const session = this._sessions.get(id);
+		if (!session) return false;
+		if (!title.trim()) return true;
+		session.title = title;
+		session.titleManuallySet = true;
+		await this._save(id);
+		return true;
+	}
+
 	async update(id: string): Promise<void> {
 		await this._save(id);
 	}

@@ -72,4 +72,43 @@ describe("useRenameAwareWrites", () => {
 		const context = await result.current.sendContext();
 		expect(context.articleProps.ref.path).toBe("cat/untitled.md");
 	});
+
+	test("ownPathRef follows a rename this hook performed", async () => {
+		const { result } = renderHook(() =>
+			useRenameAwareWrites({
+				articleProps: props("cat/untitled.md"),
+				updateArticleProps: () => undefined,
+				apiUrlCreator,
+				propertyService,
+				view: "1",
+			}),
+		);
+		expect(result.current.ownPathRef.current).toBe("cat/untitled.md");
+
+		await result.current.trackRename(Promise.resolve(patch));
+
+		expect(result.current.ownPathRef.current).toBe("cat/alpha.md");
+	});
+
+	// The parent can hand this same, still-mounted hook instance a different article's props without
+	// this hook ever having renamed anything (see ArticleEditRenderer's own-slot-reused guard, which
+	// relies on exactly this gap between articlePropsRef and ownPathRef to detect the swap).
+	test("ownPathRef does not follow a props change this hook did not perform", () => {
+		const { result, rerender } = renderHook(
+			(currentProps: ClientArticleProps) =>
+				useRenameAwareWrites({
+					articleProps: currentProps,
+					updateArticleProps: () => undefined,
+					apiUrlCreator,
+					propertyService,
+					view: "1",
+				}),
+			{ initialProps: props("cat/untitled.md") },
+		);
+
+		rerender(props("other-cat/unrelated.md"));
+
+		expect(result.current.articlePropsRef.current.ref.path).toBe("other-cat/unrelated.md");
+		expect(result.current.ownPathRef.current).toBe("cat/untitled.md");
+	});
 });

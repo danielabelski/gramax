@@ -6,7 +6,9 @@ import type { ProviderItemProps } from "@ext/articleProvider/models/types";
 import t from "@ext/localization/locale/translate";
 import { Placeholder } from "@ext/markdown/elements/placeholder/placeholder";
 import SecretNode from "@ext/markdown/elements/secret/edit/model/secretNode";
+import NavigationEvents from "@ext/navigation/NavigationEvents";
 import type { JSONContent } from "@tiptap/core";
+import { useEffect } from "react";
 
 const AgentSkillPlaceholder = Placeholder.configure({
 	placeholder: ({ editor, node }) => {
@@ -24,6 +26,16 @@ const ArticleAgentSkill = ({ item }: ArticleAgentSkillProps) => {
 	const { skills, remoteVersion } = AgentSkillService.value;
 	const liveItem = skills.get(item.id) ?? item;
 	const knownSecretNames = useAgentSecretNames();
+
+	useEffect(() => {
+		const closeItem = () => AgentSkillService.closeItem();
+		const tokens = [
+			NavigationEvents.on("item-click", closeItem),
+			NavigationEvents.on("item-create", closeItem),
+			NavigationEvents.on("item-delete", closeItem),
+		];
+		return () => tokens.forEach((token) => NavigationEvents.off(token));
+	}, []);
 
 	const updateContent = (id: string, _content: JSONContent, title: string) => {
 		const skill = skills.get(id);

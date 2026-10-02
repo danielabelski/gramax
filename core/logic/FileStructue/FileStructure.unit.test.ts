@@ -396,6 +396,41 @@ describe.each(BACKENDS)("FileStructure (%s backend)", (kind) => {
 			expect(article.props.order).toBe(5);
 			expect(frontmatterKeys(raw)).toEqual(["title", "description", "order"]);
 		});
+
+		test("serialize() preserves an explicit order: 0 (top position)", () => {
+			// `order: 0` is a legitimate value — an item placed at the very top. It comes from
+			// authored or imported frontmatter, not from the UI: `rawOrderAfter` halves and
+			// rounds to one digit (Item/ItemOrderUtils.ts:40,48), so moving to the top goes
+			// 1 -> 0.5 -> 0.3 -> 0.2 -> 0.1 and stops there, while a Notion import writes
+			// `order: pageTree.indexOf(page)` (extensions/notion/logic/NotionStorage.ts:112) — zero for the first page.
+			// A falsy-value filter strips the key on every save, silently losing the position.
+			const raw = fsOrder.serialize({
+				props: { title: "T", order: 0 } as never,
+				content: "body",
+			});
+			expect(frontmatterKeys(raw)).toContain("order");
+			expect(fsOrder.parseMarkdown(raw).props.order).toBe(0);
+		});
+
+		test("serialize() preserves an explicit orderAsc: false", () => {
+			// `orderAsc` is read as `this._props.orderAsc ?? true`, so `false` is the only way
+			// to ask for a descending category — a falsy filter would flip it back on save.
+			const raw = fsOrder.serialize({
+				props: { title: "T", orderAsc: false } as never,
+				content: "body",
+			});
+			expect(frontmatterKeys(raw)).toContain("orderAsc");
+			// orderAsc lives on CategoryProps; parseMarkdown types its props as an article.
+			expect((fsOrder.parseMarkdown(raw).props as { orderAsc?: boolean }).orderAsc).toBe(false);
+		});
+
+		test("serialize() still drops props that carry nothing", () => {
+			const raw = fsOrder.serialize({
+				props: { title: "T", description: "", order: undefined, tags: null } as never,
+				content: "body",
+			});
+			expect(frontmatterKeys(raw)).toEqual(["title"]);
+		});
 	});
 
 	describe("heals article/category name collisions", () => {

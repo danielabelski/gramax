@@ -1,6 +1,8 @@
 import Path from "@core/FileProvider/Path/Path";
+import { PropertyTypes, SystemProperties } from "@ext/properties/models";
 import type { AgentEvent } from "../core/events";
 import {
+	getCatalogPropertiesDescription,
 	getForcedSkillDescription,
 	getOpenCatalogItemDescription,
 	getSecretsDescription,
@@ -75,6 +77,46 @@ describe("prompts/index", () => {
 		}
 	});
 
+	test("getCatalogPropertiesDescription lists user properties and skips system ones", () => {
+		const text = getCatalogPropertiesDescription({
+			filterProperty: "status",
+			properties: [
+				{
+					id: "status",
+					name: "\u0421\u0442\u0430\u0442\u0443\u0441",
+					type: PropertyTypes.enum,
+					style: "blue",
+					values: ["draft", "ready"],
+				},
+				{
+					id: "important",
+					name: "\u0412\u0430\u0436\u043d\u043e\u0435",
+					type: PropertyTypes.flag,
+					style: "red",
+				},
+				{ id: SystemProperties.hierarchy, name: "hierarchy", type: PropertyTypes.many, style: "gray" },
+			],
+		} as never);
+
+		expect(text).toContain(AGENT_PROMPT_MAP.catalogPropertiesPreamble);
+		expect(text).toContain("- \u0421\u0442\u0430\u0442\u0443\u0441 (id: status, Enum): draft, ready");
+		expect(text).toContain("- \u0412\u0430\u0436\u043d\u043e\u0435 (id: important, Flag)");
+		expect(text).not.toContain(SystemProperties.hierarchy);
+		expect(text).toContain(`${AGENT_PROMPT_MAP.catalogFilterPropertyLabel} \u0421\u0442\u0430\u0442\u0443\u0441.`);
+	});
+
+	test("getCatalogPropertiesDescription returns empty string when there are no user properties", () => {
+		expect(getCatalogPropertiesDescription(undefined)).toBe("");
+		expect(getCatalogPropertiesDescription({ properties: [] } as never)).toBe("");
+		expect(
+			getCatalogPropertiesDescription({
+				properties: [
+					{ id: SystemProperties.hierarchy, name: "hierarchy", type: PropertyTypes.many, style: "gray" },
+				],
+			} as never),
+		).toBe("");
+	});
+
 	test("getSystemPrompt returns system text from map when catalog is missing", async () => {
 		const app = {
 			agentManager: { secrets: { refs: () => ({}) } },
@@ -96,6 +138,17 @@ describe("prompts/index", () => {
 				current: () => ({
 					getCatalog: async () => ({
 						ctx: () => ({ name: "docs" }),
+						props: {
+							properties: [
+								{
+									id: "status",
+									name: "\u0421\u0442\u0430\u0442\u0443\u0441",
+									type: PropertyTypes.enum,
+									style: "blue",
+									values: ["draft"],
+								},
+							],
+						},
 						customProviders: {
 							agentResourcesProvider: {
 								getSkills: async () => [],
@@ -109,6 +162,7 @@ describe("prompts/index", () => {
 		const text = await getSystemPrompt(app, {} as never, "docs");
 		expect(text).toContain("custom system prompt");
 		expect(text).not.toContain("## Оформление");
+		expect(text).toContain(AGENT_PROMPT_MAP.catalogPropertiesPreamble);
 	});
 
 	test("getSystemPrompt joins system prompt, secrets and skills list", async () => {

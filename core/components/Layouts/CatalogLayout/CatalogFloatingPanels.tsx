@@ -30,7 +30,7 @@ export const CatalogFloatingPanels = () => {
 				</>
 			)}
 			{!isNext && <HistoryPanel />}
-			{!isReadonly && <BranchPanel />}
+			{(isNext || !isReadonly) && <BranchPanel />}
 		</>
 	);
 };

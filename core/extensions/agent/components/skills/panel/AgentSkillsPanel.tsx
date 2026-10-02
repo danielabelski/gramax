@@ -11,7 +11,6 @@ import {
 } from "@ext/agent/components/utils/skillListUtils";
 import type { ProviderItemProps } from "@ext/articleProvider/models/types";
 import t from "@ext/localization/locale/translate";
-import NavigationEvents from "@ext/navigation/NavigationEvents";
 import { EmptyState } from "@ui-kit/EmptyState";
 import {
 	FloatingIconButton,
@@ -68,16 +67,6 @@ export const AgentSkillsPanel = () => {
 	useEffect(() => {
 		if (isOpen) void fetchSkills();
 	}, [fetchSkills, isOpen]);
-
-	useEffect(() => {
-		const closeItem = () => AgentSkillService.closeItem();
-		const tokens = [
-			NavigationEvents.on("item-click", closeItem),
-			NavigationEvents.on("item-create", closeItem),
-			NavigationEvents.on("item-delete", closeItem),
-		];
-		return () => tokens.forEach((token) => NavigationEvents.off(token));
-	}, []);
 
 	const addNewSkill = useCallback(async () => {
 		if (!apiUrlCreator) return;

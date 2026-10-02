@@ -725,7 +725,11 @@ export default class FileStructure {
 	}
 
 	private _serializeProps(props: FSProps): string {
-		const p = Object.fromEntries(Object.entries(props).filter(([, v]) => !!v));
+		// Drop only props that carry nothing. Truthiness would also erase meaningful values:
+		// `order: 0` is the top position, `orderAsc: false` is a descending category.
+		const p = Object.fromEntries(
+			Object.entries(props).filter(([, v]) => v !== undefined && v !== null && v !== ""),
+		);
 		delete p.welcome;
 		if (p.lang === resolveLanguage()) delete p.lang;
 		// Keys keep the position they were read in — no reordering. The scan hands props over in

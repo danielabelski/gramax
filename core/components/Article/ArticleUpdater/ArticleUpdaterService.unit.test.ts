@@ -16,6 +16,8 @@ jest.mock("@core-ui/ApiServices/FetchService", () => ({
 
 const fetchMock = FetchService.fetch as jest.Mock;
 
+const ref = (path: string) => ({ path, storageId: "local" });
+
 const apiUrlCreatorWith = (articlePath: string) =>
 	({
 		articlePath,
@@ -25,7 +27,10 @@ const apiUrlCreatorWith = (articlePath: string) =>
 beforeEach(() => {
 	fetchMock.mockReset();
 	// `update` returns early until a callback is bound, which would mask everything below.
-	ArticleUpdaterService.bindOnUpdate(() => {});
+	ArticleUpdaterService.bindOnUpdate(
+		() => {},
+		() => true,
+	);
 });
 
 test("no article open — nothing is fetched", async () => {
@@ -35,13 +40,28 @@ test("no article open — nothing is fetched", async () => {
 });
 
 test("an article is open — the page data is fetched and delivered", async () => {
-	const data = { articleProps: { title: "Article" } };
+	const data = { articleProps: { title: "Article", ref: ref("catalog/article.md") } };
 	fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data }) });
 	const onUpdate = jest.fn();
-	ArticleUpdaterService.bindOnUpdate(onUpdate);
+	ArticleUpdaterService.bindOnUpdate(onUpdate, (shown) => shown.path === "catalog/article.md");
 
 	await ArticleUpdaterService.update(apiUrlCreatorWith("catalog/article"));
 
 	expect(fetchMock).toHaveBeenCalledTimes(1);
 	expect(onUpdate).toHaveBeenCalledWith(data);
+});
+
+test("the reader moved to another article while it was read — nothing is delivered", async () => {
+	const data = { articleProps: { title: "Left behind", ref: ref("catalog/left.md") } };
+	fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data }) });
+	const onUpdate = jest.fn();
+	const listener = jest.fn();
+	ArticleUpdaterService.bindOnUpdate(onUpdate, (shown) => shown.path === "catalog/on-screen.md");
+	const unsubscribe = ArticleUpdaterService.onUpdated(listener);
+
+	await ArticleUpdaterService.update(apiUrlCreatorWith("catalog/left"));
+	unsubscribe();
+
+	expect(onUpdate).not.toHaveBeenCalled();
+	expect(listener).not.toHaveBeenCalled();
 });

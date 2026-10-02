@@ -41,25 +41,40 @@ export const useAgentSecretDraftFocus = ({ form, prepend, isLoading }: UseAgentS
 		[prepend],
 	);
 
-	/** Consumes a pending draft (e.g. from a missing-secret warning click) once the secret list has loaded. */
+	/**
+	 * Consumes pending drafts (e.g. from a missing-secret warning click) once the secret list has
+	 * loaded. Several drafts can arrive together — one warning can name a missing token and a missing
+	 * login at once — so every draft without a matching row gets prepended in one batch; only the
+	 * first draft (matched or newly added) receives focus, since a single field can be focused at a time.
+	 */
 	useEffect(() => {
 		if (isLoading) return;
 
-		const draft = useAgentSecretDraftStore.getState().consumePendingDraft();
-		if (!draft) return;
+		const drafts = useAgentSecretDraftStore.getState().consumePendingDrafts();
+		if (!drafts.length) return;
 
-		const key = normalizeSecretKey(draft.key);
-		const existing = form.getValues("rows").find((row) => normalizeSecretKey(row.key) === key);
-		if (existing) {
-			const focus = draft.focus ?? "value";
-			const canFocus = focus !== "login" || existing.kind === "login";
-			setPendingFocus({ rowId: existing.id, focus: canFocus ? focus : "value" });
-			return;
+		const existingRows = form.getValues("rows");
+		const newRows: SecretRow[] = [];
+		let firstFocus: PendingFocus | null = null;
+
+		for (const draft of drafts) {
+			const key = normalizeSecretKey(draft.key);
+			const existing = existingRows.find((row) => normalizeSecretKey(row.key) === key);
+			if (existing) {
+				const focus = draft.focus ?? "value";
+				const canFocus = focus !== "login" || existing.kind === "login";
+				firstFocus ??= { rowId: existing.id, focus: canFocus ? focus : "value" };
+				continue;
+			}
+
+			const row = draftRow({ key, kind: draft.kind, requestId: draft.requestId });
+			newRows.push(row);
+			firstFocus ??= { rowId: row.id, focus: draft.focus ?? "value" };
 		}
 
-		addDraftSecret({ key, kind: draft.kind, requestId: draft.requestId });
-		setPendingFocus({ rowId: draft.requestId, focus: draft.focus ?? "value" });
-	}, [isLoading, form, addDraftSecret]);
+		if (newRows.length) prepend(newRows, { shouldFocus: false });
+		if (firstFocus) setPendingFocus(firstFocus);
+	}, [isLoading, form, prepend]);
 
 	const clearFocusedDraft = useCallback(() => setPendingFocus(null), []);
 

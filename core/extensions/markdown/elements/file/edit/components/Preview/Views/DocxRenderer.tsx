@@ -2,6 +2,17 @@ import { cn } from "@core-ui/utils/cn";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RendererProps } from "../FilePreview";
 
+// docx-preview maps w:textDirection val="lrTb" (OOXML's own horizontal default) to
+// writing-mode: vertical-lr instead of horizontal-tb; both real vertical directions
+// (btLr, tbRl) map to vertical-rl, so vertical-lr only ever comes from this bug.
+// https://github.com/VolodymyrBaydalka/docxjs/blob/develop/src/document-parser.ts
+const fixDocxPreviewVerticalTextBug = (root: HTMLElement) => {
+	root.querySelectorAll<HTMLElement>('[style*="vertical-lr"]').forEach((cell) => {
+		if (cell.style.writingMode !== "vertical-lr") return;
+		cell.style.writingMode = "horizontal-tb";
+	});
+};
+
 const DocxRenderer = ({ file, onLoad, onError, onMetaChange }: RendererProps) => {
 	const [pageCount, setPageCount] = useState(0);
 	const ref = useRef<HTMLDivElement>(null);
@@ -32,6 +43,7 @@ const DocxRenderer = ({ file, onLoad, onError, onMetaChange }: RendererProps) =>
 				const { renderAsync } = await import("docx-preview");
 				ref.current.innerHTML = "";
 				await renderAsync(file, ref.current);
+				fixDocxPreviewVerticalTextBug(ref.current);
 				setupPages();
 			} catch (error) {
 				onError?.(error);
@@ -73,9 +85,13 @@ const DocxRenderer = ({ file, onLoad, onError, onMetaChange }: RendererProps) =>
 			className={cn(
 				"flex min-h-full w-full justify-center overflow-visible",
 				"[&_.docx-wrapper]:flex [&_.docx-wrapper]:w-full [&_.docx-wrapper]:flex-col [&_.docx-wrapper]:items-center",
-				"[&_.docx-wrapper]:bg-transparent [&_.docx-wrapper]:[padding:unset] [&_.docx-wrapper>section]:!mx-0 [&_.docx-wrapper>section]:![max-width:min(100%,210mm)]",
+				"[&_.docx-wrapper]:bg-transparent [&_.docx-wrapper]:[padding:unset] [&_.docx-wrapper>section]:!mx-0 [&_.docx-wrapper>section]:!max-w-full",
 				"[&_.docx-wrapper>section]:!bg-secondary-bg [&_.docx-wrapper>section]:!shadow-soft-xl",
 				"[&_.docx-wrapper>section_*]:text-primary-fg",
+				// Word's built-in table cell margins (108 dxa / 5.4pt left+right, 0 top+bottom) apply even
+				// when a document never declares w:tblCellMar; docx-preview has no such fallback, so cells
+				// without an explicit margin render with zero padding and text touches the border.
+				"[&_.docx-wrapper_td]:[padding:0_5.4pt] [&_.docx-wrapper_th]:[padding:0_5.4pt]",
 			)}
 			ref={ref}
 		/>

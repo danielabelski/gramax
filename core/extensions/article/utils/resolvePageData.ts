@@ -50,7 +50,7 @@ const resolvePageData = async (
 			const { data, context } = await getHomePageData(commands, props);
 			return { page: "home" as const, data, context };
 		}
-		const { data, context } = await getArticlePageData(commands, { ctx, path, options });
+		const { data, context } = await getArticlePageData(commands, { ctx, path, pathname: path, options });
 		return { page: "article" as const, data, context };
 	}
 
@@ -74,6 +74,7 @@ const resolvePageData = async (
 	if (pageDataType === PageDataType.article) {
 		const { data, context } = await getArticlePageData(commands, {
 			path: itemLogicPath.join("/"),
+			pathname: path,
 			options: { ...options },
 			ctx,
 		});

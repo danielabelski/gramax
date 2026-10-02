@@ -99,8 +99,8 @@ export const UserMessage = ({
 							))}
 						</div>
 					)}
-					<div className="min-w-0 flex-1 text-sm text-primary-fg">
-						<span className="whitespace-pre-line">{userText}</span>
+					<div className="min-w-0 flex-1 text-sm text-primary-fg" data-agent-quotable>
+						<span className="whitespace-pre-line break-words">{userText}</span>
 					</div>
 				</div>
 			</div>

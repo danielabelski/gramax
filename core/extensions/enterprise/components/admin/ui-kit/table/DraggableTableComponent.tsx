@@ -29,7 +29,7 @@ export function DraggableTableComponent<T>({ table, columns, onDragChange, rowKe
 			sensors={sensors}
 		>
 			<div className="overflow-hidden rounded-md border">
-				<Table>
+				<Table className="text-sm" containerClassName="border-0 rounded-none">
 					<colgroup>
 						{columns.map((column) => (
 							<col key={column.id} style={column.size ? { width: `${column.size}px` } : undefined} />

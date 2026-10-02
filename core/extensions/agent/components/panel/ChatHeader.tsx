@@ -5,13 +5,15 @@ import { useAgentChatVisibility } from "@ext/agent/components/hooks/useAgentChat
 import { ChatDropdown } from "@ext/agent/components/panel/ChatDropdown";
 import { useActiveSessionBrowser } from "@ext/agent/components/store/AgentStore";
 import t from "@ext/localization/locale/translate";
+import { Button } from "@ui-kit/Button";
 import { FloatingIconButton } from "@ui-kit/FloatingPanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-kit/Tooltip";
 import { memo, useCallback } from "react";
 import { useChatHeaderActions } from "../store/ChatStore";
 
 export const ChatHeader = memo(() => {
-	const { sessions, activeSessionId, onSelectSession, onCloseTab, onNewSession } = useChatHeaderActions();
+	const { sessions, activeSessionId, onSelectSession, onCloseTab, onRenameSession, onNewSession } =
+		useChatHeaderActions();
 	const browser = useActiveSessionBrowser();
 	const { showBrowserReveal } = useAgentChatVisibility();
 	const { call: callReveal } = useDeferApi({});
@@ -39,18 +41,16 @@ export const ChatHeader = memo(() => {
 					<TooltipContent>{t("agent.browser.tooltip")}</TooltipContent>
 				</Tooltip>
 			)}
+			<Button className="text-muted" onClick={onNewSession} size="xs" startIcon="square-pen" variant="ghost">
+				{t("agent.tooltips.new-chat")}
+			</Button>
 			<ChatDropdown
 				activeId={activeSessionId}
 				onClose={onCloseTab}
+				onRename={onRenameSession}
 				onSelect={onSelectSession}
 				sessions={sessions}
 			/>
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<FloatingIconButton icon="squarePen" iconClassName="h-3.5 w-3.5" onClick={onNewSession} />
-				</TooltipTrigger>
-				<TooltipContent>{t("agent.tooltips.new-chat")}</TooltipContent>
-			</Tooltip>
 		</>
 	);
 });

@@ -71,7 +71,10 @@ export const SERVICE_SETTING_KEYS = ["web-editor", "auth", "diagram-renderer", "
 
 // Each service is an object so it can grow beyond `endpoint` (mirrors `ai`,
 // which carries endpoint + token). Single-field today, extensible tomorrow.
-const serviceSchema = z.object({ endpoint: z.string().url().or(z.literal("")).optional() }).optional();
+// `endpoint` accepts `null` alongside `""`/`undefined`: GES states a service
+// it deliberately doesn't use as `{ url: null }` (see resolveWorkspaceServices),
+// and that sentinel can reach the form's default values unchanged.
+const serviceSchema = z.object({ endpoint: z.string().url().or(z.literal("")).nullable().optional() }).optional();
 
 export const servicesSchema = z.object({
 	"web-editor": serviceSchema,

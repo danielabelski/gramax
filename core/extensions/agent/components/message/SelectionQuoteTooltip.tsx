@@ -9,6 +9,13 @@ interface Position {
 	left: number;
 }
 
+const QUOTABLE_SELECTOR = "[data-agent-quotable]";
+
+const getQuotableRoot = (node: Node | null): HTMLElement | null => {
+	const element = node?.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node?.parentElement;
+	return element?.closest<HTMLElement>(QUOTABLE_SELECTOR) ?? null;
+};
+
 export interface SelectionQuoteTooltipProps {
 	containerRef: RefObject<HTMLElement>;
 }
@@ -32,7 +39,8 @@ export const SelectionQuoteTooltip = ({ containerRef }: SelectionQuoteTooltipPro
 			}
 
 			const range = selection.getRangeAt(0);
-			if (!container.contains(range.commonAncestorContainer)) {
+			const quotableRoot = getQuotableRoot(range.commonAncestorContainer);
+			if (!quotableRoot || !container.contains(quotableRoot)) {
 				hide();
 				return;
 			}

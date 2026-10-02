@@ -1,15 +1,19 @@
 import { agentConfig } from "../../core/agentConfig";
 import { FileConverter } from "../parser";
 import { fail, ok, type ToolExecutionContext, type ToolExecutionResult } from "../tool";
-import { collectSnippetsFromContent } from "../utils/searchResults";
+import { type LineMatch, LineMatcher } from "../utils/lines";
+import { SearchResults } from "../utils/searchResults";
 
 type SearchFilesInput = {
 	query: string;
 	catalogName: string;
+	maxMatches?: number;
+	maxHits?: number;
+	regex?: boolean;
 };
 
 export async function runSearchFiles({ app, ctx, input }: ToolExecutionContext): Promise<ToolExecutionResult> {
-	const { query, catalogName } = input as SearchFilesInput;
+	const { query, catalogName, maxMatches, maxHits, regex } = input as SearchFilesInput;
 	const queryText = query.trim();
 	if (!queryText) return fail("query is required");
 	const targetCatalogName = typeof catalogName === "string" ? catalogName.trim() : "";
@@ -17,18 +21,39 @@ export async function runSearchFiles({ app, ctx, input }: ToolExecutionContext):
 
 	const wm = app.wm.current();
 	const wmFp = wm.getFileProvider();
-	const { searchHitsLimit } = agentConfig;
-	const hits: { catalogName: string; filePath: string; snippets: string[] }[] = [];
+	const { searchFilesMaxMatchesDefault, searchFilesMaxMatchesLimit, searchScanDeadlineMs } = agentConfig;
+	const requested = Number(maxMatches);
+	const matchesPerHit = Number.isFinite(requested)
+		? Math.min(Math.max(Math.floor(requested), 1), searchFilesMaxMatchesLimit)
+		: searchFilesMaxMatchesDefault;
+	const hits: { catalogName: string; filePath: string; matches: LineMatch[] }[] = [];
+	let hasMore = false;
+
+	let hitsLimit: number;
+	let matcher: ReturnType<typeof LineMatcher.build>;
+	try {
+		hitsLimit = SearchResults.resolveMaxHits(maxHits);
+		matcher = LineMatcher.build(queryText, regex === true);
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : String(e);
+		return fail(regex === true ? `Invalid search request: ${msg}` : msg);
+	}
 
 	try {
 		const catalog = await wm.getCatalog(targetCatalogName, ctx);
 		const dirs = [catalog.basePath];
+		const deadline = Date.now() + searchScanDeadlineMs;
 
-		while (dirs.length > 0 && hits.length < searchHitsLimit) {
+		while (dirs.length > 0 && !hasMore) {
 			const dir = dirs.pop();
 			if (!dir) break;
 
 			for (const item of await wmFp.getItems(dir)) {
+				if (Date.now() > deadline) {
+					hasMore = true;
+					break;
+				}
+
 				const relativePath = catalog.getRepositoryRelativePath(item.path).value;
 				const isExcluded = agentConfig.repoExcludedPathPatterns.some((pattern) => pattern.test(relativePath));
 				if (isExcluded) {
@@ -48,15 +73,18 @@ export async function runSearchFiles({ app, ctx, input }: ToolExecutionContext):
 				)
 					continue;
 
-				const snippets = collectSnippetsFromContent(await wmFp.read(item.path), queryText);
-				if (snippets.length > 0) {
-					hits.push({ catalogName: targetCatalogName, filePath: relativePath, snippets });
-					if (hits.length >= searchHitsLimit) break;
+				const matches = LineMatcher.findAll(await wmFp.read(item.path), matcher, matchesPerHit);
+				if (matches.length === 0) continue;
+
+				if (hits.length === hitsLimit) {
+					hasMore = true;
+					break;
 				}
+				hits.push({ catalogName: targetCatalogName, filePath: relativePath, matches });
 			}
 		}
 
-		return ok({ hits });
+		return ok(hasMore ? { hits, hasMore } : { hits });
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);
 		return fail(`Failed to search repository: ${msg}`);

@@ -8,22 +8,22 @@ export type PendingAgentSecretDraft = {
 };
 
 type AgentSecretDraftState = {
-	pendingDraft: PendingAgentSecretDraft | null;
-	setPendingDraft: (draft: Omit<PendingAgentSecretDraft, "requestId">) => void;
-	consumePendingDraft: () => PendingAgentSecretDraft | null;
+	pendingDrafts: PendingAgentSecretDraft[];
+	setPendingDrafts: (drafts: Omit<PendingAgentSecretDraft, "requestId">[]) => void;
+	consumePendingDrafts: () => PendingAgentSecretDraft[];
 };
 
-/** One-shot, non-persisted request to prefill a keys-and-passwords draft row — cleared on read or reload. */
+/** One-shot, non-persisted request to prefill one or more keys-and-passwords draft rows — cleared on read or reload. */
 export const useAgentSecretDraftStore = create<AgentSecretDraftState>((set, get) => ({
-	pendingDraft: null,
+	pendingDrafts: [],
 
-	setPendingDraft: (draft) => {
-		set({ pendingDraft: { ...draft, requestId: crypto.randomUUID() } });
+	setPendingDrafts: (drafts) => {
+		set({ pendingDrafts: drafts.map((draft) => ({ ...draft, requestId: crypto.randomUUID() })) });
 	},
 
-	consumePendingDraft: () => {
-		const draft = get().pendingDraft;
-		set({ pendingDraft: null });
-		return draft;
+	consumePendingDrafts: () => {
+		const drafts = get().pendingDrafts;
+		set({ pendingDrafts: [] });
+		return drafts;
 	},
 }));

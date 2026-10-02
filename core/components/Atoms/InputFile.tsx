@@ -1,4 +1,4 @@
-import styled from "@emotion/styled";
+import { cn } from "@core-ui/utils/cn";
 import { type ChangeEventHandler, useEffect, useRef } from "react";
 
 let idCounter = 0;
@@ -8,9 +8,10 @@ interface InputFileProps {
 	className?: string;
 	onChange?: ChangeEventHandler<HTMLInputElement>;
 	onAbort?: () => void;
+	multiple?: boolean;
 }
 
-const InputFile = ({ children, onChange, onAbort, className }: InputFileProps) => {
+const InputFile = ({ children, onChange, onAbort, className, multiple }: InputFileProps) => {
 	const inputRef = useRef<HTMLInputElement>(null);
 	const uniqueId = `file-input-${idCounter++}`;
 
@@ -23,26 +24,18 @@ const InputFile = ({ children, onChange, onAbort, className }: InputFileProps) =
 	}, [onAbort]);
 
 	return (
-		<label className={className} htmlFor={uniqueId}>
-			<input id={uniqueId} onChange={onChange} ref={inputRef} type="file" />
+		<label className={cn("relative inline-block", className)} htmlFor={uniqueId}>
+			<input
+				className="sr-only"
+				id={uniqueId}
+				multiple={multiple}
+				onChange={onChange}
+				ref={inputRef}
+				type="file"
+			/>
 			{children}
 		</label>
 	);
 };
 
-export default styled(InputFile)`
-	position: relative;
-	display: inline-block;
-
-	input[type="file"] {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip: rect(0, 0, 0, 0);
-		white-space: nowrap;
-		border: 0;
-	}
-`;
+export default InputFile;

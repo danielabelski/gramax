@@ -1,5 +1,6 @@
 import type { IconCode } from "@components/Atoms/Icon/LucideIcon";
 import { cn } from "@core-ui/utils/cn";
+import { agentConfig } from "@ext/agent/core/agentConfig";
 import type UiLanguage from "@ext/localization/core/model/Language";
 import t from "@ext/localization/locale/translate";
 import { useSetting } from "@ext/settings/logic/hooks";
@@ -11,7 +12,8 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { useAutoScrollGuard } from "../context/scrollGuardContext";
 import type { ChatMessage, ToolCallMessage, ToolResultMessage } from "../types/chat";
 import { isPlainObject } from "../utils/agentTimeline";
-import { ToolPayloadSection, ToolResultSection } from "./ToolPayloadSection";
+import { hasToolPayload, hasToolResult, ToolPayloadSection, ToolResultSection } from "./ToolPayloadSection";
+import { ToolStatusIcons } from "./ToolStatusIcons";
 
 const buildToolLabels = (language: UiLanguage): Record<string, string> => ({
 	list_catalogs: t("agent.tools.list_catalogs", language),
@@ -19,6 +21,7 @@ const buildToolLabels = (language: UiLanguage): Record<string, string> => ({
 	search_catalogs: t("agent.tools.search_catalogs", language),
 	search_files: t("agent.tools.search_files", language),
 	read_catalog_item: t("agent.tools.read_catalog_item", language),
+	read_agent_skill: t("agent.tools.read_agent_skill", language),
 	get_files_navigation: t("agent.tools.get_files_navigation", language),
 	read_file: t("agent.tools.read_file", language),
 	get_catalog_item_headings: t("agent.tools.get_catalog_item_headings", language),
@@ -52,6 +55,7 @@ const TOOL_ICONS: Record<string, IconCode> = {
 	search_catalogs: "search",
 	search_files: "folder-search",
 	read_catalog_item: "file-text",
+	read_agent_skill: "file-text",
 	get_files_navigation: "folder-open",
 	read_file: "file-code",
 	get_catalog_item_headings: "file-text",
@@ -61,7 +65,7 @@ const TOOL_ICONS: Record<string, IconCode> = {
 	delete_catalog_item: "file-x",
 	move_catalog_item: "folder-input",
 	git_inspect: "git-compare",
-	git_discard: "undo2",
+	git_discard: "undo-2",
 	git_branch: "git-branch",
 	git_restore: "history",
 	read_document: "paperclip",
@@ -79,27 +83,32 @@ const TOOL_ICONS: Record<string, IconCode> = {
 	compact_context: "package",
 };
 
+const getToolLabelKey = (toolName: string, args: Record<string, unknown> | undefined): string => {
+	const itemPath = typeof args?.itemPath === "string" ? args.itemPath : undefined;
+	if (toolName === "read_catalog_item" && itemPath?.includes(agentConfig.skillPrefix)) return "read_agent_skill";
+	return toolName;
+};
+
 const getToolLabel = (labels: Record<string, string>, toolName: string, args?: unknown, itemTitle?: string): string => {
-	const base = labels[toolName] ?? toolName.replace(/_/g, " ");
+	const argsObject = isPlainObject(args) ? args : undefined;
+	const labelKey = getToolLabelKey(toolName, argsObject);
+	const base = labels[labelKey] ?? toolName.replace(/_/g, " ");
 	if (itemTitle) return `${base} «${itemTitle}»`;
-	if (!isPlainObject(args)) return base;
+	if (!argsObject) return base;
 	if (
 		(toolName === "search_catalogs" || toolName === "search_files") &&
-		typeof args.query === "string" &&
-		args.query
+		typeof argsObject.query === "string" &&
+		argsObject.query
 	) {
-		return `${base} «${args.query}»`;
+		return `${base} «${argsObject.query}»`;
 	}
-	// const path = args.itemPath ?? args.path ?? args.id;
-	// if (typeof path === "string") {
-	// 	const basename = path.split("/").pop() ?? path;
-	// 	return `${base}: ${basename}`;
-	// }
 	return base;
 };
 
-const getToolIcon = (toolName: string): IconCode => {
-	return TOOL_ICONS[toolName] ?? "wrench";
+const getToolIcon = (toolName: string, args?: unknown): IconCode => {
+	const argsObject = isPlainObject(args) ? args : undefined;
+	const iconKey = getToolLabelKey(toolName, argsObject);
+	return TOOL_ICONS[iconKey] ?? "wrench";
 };
 
 type ToolPair = {
@@ -153,7 +162,29 @@ const ToolPairCard = ({ pair, labels }: { pair: ToolPair; labels: Record<string,
 	const toolItemTitle = call.kind === "tool_call" ? call.toolItemTitle : undefined;
 	const toolName = call.toolName;
 	const label = getToolLabel(labels, toolName, toolArguments, toolItemTitle);
-	const toolIcon = getToolIcon(toolName);
+	const toolIcon = getToolIcon(toolName, toolArguments);
+	const toolResultContent = result?.toolResultContent;
+	const toolResultContentPreview = result?.toolResultContentPreview;
+	const isExpandable = useMemo(
+		() => hasToolPayload(toolArguments) || hasToolResult(toolResultContent, toolResultContentPreview),
+		[toolArguments, toolResultContent, toolResultContentPreview],
+	);
+
+	if (!isExpandable) {
+		return (
+			<div className="flex w-full items-center gap-2 rounded py-0.5 text-left">
+				<span className="grid h-4 w-4 shrink-0 place-content-center place-items-center text-muted-foreground">
+					<Icon className="h-4 w-4" icon={toolIcon} />
+				</span>
+
+				<TextOverflowTooltip className={cn("min-w-0 flex-1 truncate text-sm", "text-muted-foreground")}>
+					{label}
+				</TextOverflowTooltip>
+
+				<ToolStatusIcons isError={isError} isPending={isPending} showCheck={showCheck} />
+			</div>
+		);
+	}
 
 	return (
 		<Collapsible onOpenChange={setOpen} open={open}>
@@ -185,11 +216,7 @@ const ToolPairCard = ({ pair, labels }: { pair: ToolPair; labels: Record<string,
 						{label}
 					</TextOverflowTooltip>
 
-					{isPending && (
-						<Icon className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" icon="loader2" />
-					)}
-					{showCheck && <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" icon="check" />}
-					{isError && <Icon className="h-3.5 w-3.5 shrink-0 text-destructive" icon="alert-circle" />}
+					<ToolStatusIcons isError={isError} isPending={isPending} showCheck={showCheck} />
 				</div>
 			</CollapsibleTrigger>
 

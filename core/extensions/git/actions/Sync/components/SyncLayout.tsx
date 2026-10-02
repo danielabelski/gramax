@@ -10,13 +10,12 @@ interface SyncLayoutProps {
 	sourceInvalid: boolean;
 	syncProccess: boolean;
 	style?: CSSProperties;
-	className?: string;
 	disabled?: boolean;
 	onClick?: () => void;
 }
 
 const SyncLayout = (props: SyncLayoutProps) => {
-	const { pullCounter, pushCounter, sourceInvalid, syncProccess, onClick, style, className, disabled } = props;
+	const { pullCounter, pushCounter, sourceInvalid, syncProccess, onClick, style, disabled } = props;
 
 	const changesTooltip = [
 		pullCounter > 0 &&
@@ -38,20 +37,20 @@ const SyncLayout = (props: SyncLayoutProps) => {
 	const err = t("storage-not-connected");
 
 	return (
-		<span className={className} style={style}>
-			<GlassToolbarButton
-				aria-label={t("sync")}
-				className="sync-icons"
-				data-testid="sync-trigger"
-				disabled={disabled}
-				onClick={onClick}
-				tooltipText={sourceInvalid ? err : ok}
-			>
-				<Icon icon={syncProccess ? "refresh-cw-animated" : "refresh-cw"} />
-				{sourceInvalid && <GlassToolbarText className="text-xs font-medium">!</GlassToolbarText>}
-				<PullPushCounter pullCounter={pullCounter} pushCounter={pushCounter} />
-			</GlassToolbarButton>
-		</span>
+		<GlassToolbarButton
+			aria-busy={syncProccess}
+			aria-label={t("sync")}
+			className="sync-icons"
+			data-testid="sync-trigger"
+			disabled={disabled}
+			onClick={onClick}
+			style={style}
+			tooltipText={sourceInvalid ? err : ok}
+		>
+			<Icon icon={syncProccess ? "refresh-cw-animated" : "refresh-cw"} />
+			{sourceInvalid && <GlassToolbarText className="text-xs font-medium">!</GlassToolbarText>}
+			<PullPushCounter pullCounter={pullCounter} pushCounter={pushCounter} />
+		</GlassToolbarButton>
 	);
 };
 export default SyncLayout;

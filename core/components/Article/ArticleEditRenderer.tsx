@@ -51,7 +51,7 @@ export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps
 	const propertyService = PropertyService.value;
 
 	const view = useArticleViewKey();
-	const { articlePropsRef, apiUrlCreatorRef, sendContext, trackRename } = useRenameAwareWrites({
+	const { articlePropsRef, apiUrlCreatorRef, sendContext, trackRename, ownPathRef } = useRenameAwareWrites({
 		articleProps,
 		updateArticleProps,
 		apiUrlCreator,
@@ -99,6 +99,13 @@ export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps
 		},
 		500,
 	);
+
+	useWatch(() => {
+		if (articleProps.ref.path === ownPathRef.current) return;
+		ownPathRef.current = articleProps.ref.path;
+		cancelDebouncedUpdateTitle();
+		enqueueTitleUpdate.drop();
+	}, [articleProps.ref.path]);
 
 	// Pending saves are cancelled when the article closes, and only then. The file path as a dependency
 	// would mean "another article", but it also changes under the same one — on rename — and the

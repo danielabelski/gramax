@@ -34,7 +34,11 @@ export const AssistantMessage = ({
 
 	return (
 		<div className="w-full min-w-0" ref={responseRef}>
-			{hasContent && <AssistantMarkdown text={displayDescription} />}
+			{hasContent && (
+				<div data-agent-quotable>
+					<AssistantMarkdown text={displayDescription} />
+				</div>
+			)}
 			{missingSecretWarning && <MissingSecretWarning warning={missingSecretWarning} />}
 			{showFooter && (
 				<div

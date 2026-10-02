@@ -1,11 +1,12 @@
 import resolveModule from "@app/resolveModule/backend";
 import type Context from "@core/Context/Context";
 import type { ReadonlyBaseCatalog } from "@core/FileStructue/Catalog/ReadonlyCatalog";
-import type { ClientArticleProps } from "@core/SitePresenter/SitePresenter";
 
 type LastVisitedDto = { [workspace: string]: { [key: string]: string } };
 
 const LAST_VISITED_COOKIE_NAME = "last-visited-articles";
+
+const leadsInto = (visited: string, pathname: string) => visited === pathname || visited.startsWith(`${pathname}/`);
 
 export default class LastVisited {
 	private _cached: LastVisitedDto;
@@ -35,13 +36,28 @@ export default class LastVisited {
 		return this.getLastVisitedArticles()?.[this._workspace]?.[catalog?.name];
 	}
 
-	setLastVisitedArticle(catalog: ReadonlyBaseCatalog, article: ClientArticleProps) {
-		if (!catalog || article.errorCode || article.welcome) return;
+	setLastVisitedArticle(catalog: ReadonlyBaseCatalog, pathname: string) {
 		const lastVisited = this.getLastVisitedArticles();
 
 		if (typeof lastVisited[this._workspace] !== "object") lastVisited[this._workspace] = {};
-		lastVisited[this._workspace][catalog.name] = article.pathname;
+		lastVisited[this._workspace][catalog.name] = pathname;
 		this._save(lastVisited);
+	}
+
+	/** The item at `from` now lives at `to`: the record follows it, and a section takes the article inside it along. */
+	move(catalog: ReadonlyBaseCatalog, from: string, to: string) {
+		const visited = this.getLastVisitedArticle(catalog);
+		if (from === to || !visited || !leadsInto(visited, from)) return;
+
+		const lastVisited = this.getLastVisitedArticles();
+		lastVisited[this._workspace][catalog.name] = to + visited.slice(from.length);
+		this._save(lastVisited);
+	}
+
+	/** The item at `pathname` left the catalog: a record leading to it or inside it goes too. */
+	forget(catalog: ReadonlyBaseCatalog, pathname: string) {
+		const visited = this.getLastVisitedArticle(catalog);
+		if (visited && leadsInto(visited, pathname)) this.remove(catalog.name);
 	}
 
 	retain(catalogNames: string[]) {
@@ -49,7 +65,9 @@ export default class LastVisited {
 		const visited = { [this._workspace]: {} };
 		const current = typeof lastVisited[this._workspace] === "object" ? lastVisited[this._workspace] : {};
 
-		Object.entries(current).forEach(([k, v]) => catalogNames.includes(k) && (visited[this._workspace][k] = v));
+		for (const [k, v] of Object.entries(current)) {
+			if (catalogNames.includes(k)) visited[this._workspace][k] = v;
+		}
 		this._save({ ...lastVisited, ...visited });
 	}
 

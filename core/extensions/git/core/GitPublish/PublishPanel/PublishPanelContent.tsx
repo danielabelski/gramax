@@ -6,6 +6,7 @@ import { RequestStatus, useApi } from "@core-ui/hooks/useApi";
 import { useScrollPositionStore } from "@core-ui/stores/ScrollPositionStore";
 import { useDiffExtendedMode } from "@ext/git/core/Diff/components/store/DiffExtendedModeStore";
 import { useDiffToggle } from "@ext/git/core/Diff/logic/hooks/useDiffToggle";
+import { useLeaveDiffView } from "@ext/git/core/Diff/logic/hooks/useLeaveDiffView";
 import { countSelectedVisibleEntries, isDiffEntryVisible } from "@ext/git/core/Diff/logic/utils/visibleDiffEntries";
 import type { DiffFlattenTreeAnyItem } from "@ext/git/core/GitDiffItemCreator/RevisionDiffPresenter";
 import { PublishHealthcheckCode, type PublishHealthcheckResult } from "@ext/git/core/GitPublish/PublishHealthcheck";
@@ -63,10 +64,16 @@ export const PublishPanelContent = () => {
 		setIsOpen(PUBLISH_PANEL_ID, false);
 	}, [resetSelection, clearAllPositions, setIsOpen]);
 
+	const leaveDiffView = useLeaveDiffView();
+	const onPublished = useCallback(() => {
+		onChangesClear();
+		leaveDiffView();
+	}, [onChangesClear, leaveDiffView]);
+
 	const { isPublishing, message, publish, setMessage } = usePublish({
 		diffTree,
 		selectedFiles,
-		onPublished: onChangesClear,
+		onPublished,
 	});
 
 	const { discard } = useDiscard(selectedFiles);

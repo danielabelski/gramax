@@ -578,10 +578,7 @@ export default class ApiUrlCreator {
 	}
 
 	public getStorageSyncUrl() {
-		return Url.fromBasePath(`/api/storage/sync`, this._basePath, {
-			catalogName: this._catalogName,
-			articlePath: this._articlePath,
-		});
+		return Url.fromBasePath(`/api/storage/sync`, this._basePath, { catalogName: this._catalogName });
 	}
 
 	public markRepositoryAsBroken(message?: string) {
@@ -833,6 +830,10 @@ export default class ApiUrlCreator {
 
 	public getAgentSessionDeleteUrl(sessionId: string) {
 		return Url.fromBasePath(`/api/agent/session/delete`, this._basePath, { sessionId });
+	}
+
+	public getAgentSessionRenameUrl() {
+		return Url.fromBasePath(`/api/agent/session/rename`, this._basePath, {});
 	}
 
 	public getAgentSessionRestoreUrl() {
@@ -1118,6 +1119,10 @@ export default class ApiUrlCreator {
 			path: encodeURIComponent(path),
 			catalogName: catalogName || this._catalogName,
 		});
+	}
+
+	public setLastVisitedArticle() {
+		return Url.fromBasePath(`/api/page/setLastVisitedArticle`, this._basePath, { catalogName: this._catalogName });
 	}
 
 	public getArticlePageData(articlePath?: string, catalogName?: string) {

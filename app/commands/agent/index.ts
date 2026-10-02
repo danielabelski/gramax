@@ -18,6 +18,7 @@ import createSession from "./session/create";
 import sessionDelete from "./session/delete";
 import sessionDraft from "./session/draft";
 import sessionList from "./session/list";
+import sessionRename from "./session/rename";
 import sessionRestore from "./session/restore";
 import sessionSaveDraft from "./session/saveDraft";
 import sessionState from "./session/state";
@@ -31,6 +32,7 @@ export default {
 		cancel: sessionCancel,
 		delete: sessionDelete,
 		list: sessionList,
+		rename: sessionRename,
 		restore: sessionRestore,
 		draft: sessionDraft,
 		saveDraft: sessionSaveDraft,

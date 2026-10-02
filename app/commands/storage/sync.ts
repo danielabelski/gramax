@@ -1,9 +1,6 @@
 import { ResponseKind } from "@app/types/ResponseKind";
 import { NetworkConnectMiddleware } from "@core/Api/middleware/NetworkConnectMiddleware";
 import ReloadConfirmMiddleware from "@core/Api/middleware/ReloadConfirmMiddleware";
-import Path from "@core/FileProvider/Path/Path";
-import type { Article } from "@core/FileStructue/Article/Article";
-import LastVisited from "@core/SitePresenter/LastVisited";
 import MergeConflictCaller from "@ext/git/actions/MergeConflictHandler/model/MergeConflictCaller";
 import type ClientSyncResult from "@ext/git/core/model/ClientSyncResult";
 import type GitSourceData from "@ext/git/core/model/GitSourceData.schema";
@@ -12,15 +9,15 @@ import { AuthorizeMiddleware } from "../../../core/logic/Api/middleware/Authoriz
 import type Context from "../../../core/logic/Context/Context";
 import { Command } from "../../types/Command";
 
-const sync: Command<{ ctx: Context; catalogName: string; articlePath: Path }, ClientSyncResult> = Command.create({
+const sync: Command<{ ctx: Context; catalogName: string }, ClientSyncResult> = Command.create({
 	path: "storage/sync",
 
 	kind: ResponseKind.json,
 
 	middlewares: [new NetworkConnectMiddleware(), new AuthorizeMiddleware(), new ReloadConfirmMiddleware()],
 
-	async do({ ctx, catalogName, articlePath }) {
-		const { wm, rp, logger, sitePresenterFactory } = this._app;
+	async do({ ctx, catalogName }) {
+		const { wm, rp, logger } = this._app;
 		const workspace = wm.current();
 
 		const catalog = await workspace.getContextlessCatalog(catalogName);
@@ -57,15 +54,6 @@ const sync: Command<{ ctx: Context; catalogName: string; articlePath: Path }, Cl
 		const isOk = !mergeResult.length;
 		const state = await catalog.repo.getState();
 
-		const article = catalog.findItemByItemPath<Article>(articlePath);
-		if (!article) {
-			const dataProvider = sitePresenterFactory.fromContext(ctx);
-			const config = await workspace.config();
-			const lastVisited = new LastVisited(ctx, config.name);
-			const articleData = await dataProvider.getArticlePageDataByPath([catalogName]);
-			lastVisited.setLastVisitedArticle(catalog, articleData.articleProps);
-		}
-
 		const mergeData = isOk
 			? { ok: true }
 			: {
@@ -79,11 +67,7 @@ const sync: Command<{ ctx: Context; catalogName: string; articlePath: Path }, Cl
 	},
 
 	params(ctx, q) {
-		return {
-			ctx,
-			catalogName: q.catalogName?.split("/")[0],
-			articlePath: new Path(q.articlePath),
-		};
+		return { ctx, catalogName: q.catalogName?.split("/")[0] };
 	},
 });
 

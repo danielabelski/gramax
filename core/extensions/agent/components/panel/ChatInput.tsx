@@ -178,11 +178,11 @@ const ChatInput = ({
 			)}
 			<div
 				className={cn(
-					"relative w-full flex flex-col py-1 bg-background shadow-soft-sm after:absolute after:inset-0 after:pointer-events-none after:rounded-[inherit] after:border-[0.5px] after:border-primary-border after:content-['']",
+					"relative w-full flex flex-col gap-1 p-2 bg-background shadow-soft-sm after:absolute after:inset-0 after:pointer-events-none after:rounded-[inherit] after:border-[0.5px] after:border-primary-border after:content-['']",
 					quotedText ? "rounded-b-xl after:border-t-0" : "rounded-xl",
 				)}
 			>
-				<div className="flex items-center flex-col py-2 px-2.5" ref={containerRef}>
+				<div className="flex items-stretch flex-col py-1 px-2" ref={containerRef}>
 					{attachments.length > 0 && (
 						<div className="flex flex-wrap gap-1.5 mb-2">
 							{attachments.map((attachment, index) => (
@@ -222,7 +222,7 @@ const ChatInput = ({
 					/>
 				</div>
 
-				<div className="flex justify-between items-center gap-2 pl-1 pr-1">
+				<div className="flex justify-between items-center gap-1">
 					<div className="flex min-w-0 h-7">
 						<div className="shrink-0">
 							<ChatToolsMenu
@@ -233,7 +233,7 @@ const ChatInput = ({
 							/>
 						</div>
 
-						<div className="shrink-0 ml-1 h-7">
+						<div className="shrink-0 h-7">
 							<Tooltip>
 								<TooltipTrigger asChild>
 									<span
@@ -243,7 +243,7 @@ const ChatInput = ({
 										<IconButton
 											aria-label={t("agent.browser.allow")}
 											aria-pressed={browserAllowed}
-											className="p-1"
+											className="p-1.5"
 											disabled={!isTauri}
 											icon="globe"
 											iconClassName="h-4 w-4"
@@ -284,8 +284,8 @@ const ChatInput = ({
 							</div>
 						)}
 					</div>
-					<div className="flex items-center gap-3 shrink-0">
-						<SessionContextUsage />
+					<div className="flex items-center gap-1 shrink-0">
+						<SessionContextUsage sending={sending} />
 
 						<Tooltip>
 							<TooltipTrigger asChild>

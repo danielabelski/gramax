@@ -5,7 +5,7 @@ import ReloadConfirmMiddleware from "@core/Api/middleware/ReloadConfirmMiddlewar
 import type Context from "@core/Context/Context";
 import Path from "@core/FileProvider/Path/Path";
 import ArticleParser from "@core/FileStructue/Article/ArticleParser";
-import getParentPathname from "@core/utils/getParentPathname";
+import getPrevSiblingPathname from "@core/utils/getPrevSiblingPathname";
 import { Command } from "../../types/Command";
 
 const remove: Command<{ ctx: Context; catalogName: string; path: Path; currentArticlePath: Path }, string> =
@@ -29,7 +29,7 @@ const remove: Command<{ ctx: Context; catalogName: string; path: Path; currentAr
 				(path.value && currentArticlePath.value.startsWith(`${path.value}/`));
 
 			const redirectPath = isCurrentArticleAffected
-				? await getParentPathname(catalog, path)
+				? await getPrevSiblingPathname(catalog, path)
 				: await catalog.getPathname(catalog.findItemByItemPath(currentArticlePath));
 
 			await catalog.deleteItem(fp.getItemRef(path), articleParser);

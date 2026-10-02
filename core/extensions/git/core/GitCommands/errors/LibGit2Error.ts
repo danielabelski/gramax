@@ -57,6 +57,11 @@ export const fromRaw = (
 		case eq(20, 13):
 			return GitErrorCode.CheckoutConflictError;
 
+		// A file whose name is invalid on Windows (e.g. contains `"`) can be committed from Linux/macOS,
+		// then breaks `checkout`/`stash` for anyone on Windows (NM-24).
+		case klass === 20 && message.includes("cannot checkout to invalid path"):
+			return GitErrorCode.InvalidPathError;
+
 		case eq(22, 22):
 		case eq(22, 11):
 		case eq(22, 0):
