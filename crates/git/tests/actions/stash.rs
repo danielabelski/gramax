@@ -453,10 +453,7 @@ fn stash_leaves_the_index_at_head(sandbox: TempDir, #[with(&sandbox)] mut repo: 
 /// stash has to put them back. A conflict is the case where it matters most: resolving it drops the
 /// stash, and anything still inside the stash goes with it.
 #[rstest]
-fn untracked_files_of_a_foreign_stash_survive_a_conflict(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn untracked_files_of_a_foreign_stash_survive_a_conflict(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "committed")?;
@@ -468,8 +465,9 @@ fn untracked_files_of_a_foreign_stash_survive_a_conflict(
 	fs::write(path.join("untracked"), "never committed")?;
 
 	let signature = git2::Signature::now("test", "test@test.test")?;
-	let oid =
-		repo.repo_mut().stash_save(&signature, "made by git stash -u", Some(git2::StashFlags::INCLUDE_UNTRACKED))?;
+	let oid = repo
+		.repo_mut()
+		.stash_save(&signature, "made by git stash -u", Some(git2::StashFlags::INCLUDE_UNTRACKED))?;
 
 	assert!(!path.join("untracked").exists());
 
@@ -494,10 +492,7 @@ fn untracked_files_of_a_foreign_stash_survive_a_conflict(
 /// *else* conflicted. The apply refuses instead, exactly as `git stash apply` does, and refuses
 /// before writing anything.
 #[rstest]
-fn a_conflict_does_not_overwrite_a_file_edited_meanwhile(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn a_conflict_does_not_overwrite_a_file_edited_meanwhile(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("a"), "base")?;
@@ -538,10 +533,7 @@ fn a_conflict_does_not_overwrite_a_file_edited_meanwhile(
 /// into the index, so an edit made while the operation was running is staged by the time the stash
 /// comes back.
 #[rstest]
-fn an_apply_refuses_rather_than_reporting_a_success_it_did_not_have(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn an_apply_refuses_rather_than_reporting_a_success_it_did_not_have(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "committed")?;

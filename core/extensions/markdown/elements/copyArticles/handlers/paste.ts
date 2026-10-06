@@ -2,7 +2,9 @@ import type { ClientCatalogProps } from "@core/SitePresenter/SitePresenter";
 import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import FetchService from "@core-ui/ApiServices/FetchService";
 import type { ResourceServiceType } from "@core-ui/ContextServices/ResourceService/ResourceService";
+import type { ClipboardOrigin } from "@ext/markdown/elements/copyArticles/handlers/clipboardOrigin";
 import type { GramaxClipboardData } from "@ext/markdown/elements/copyArticles/handlers/copy";
+import fetchSourceResource from "@ext/markdown/elements/copyArticles/handlers/paste/fetchSourceResource";
 import {
 	PastedComments,
 	processMarks,
@@ -24,6 +26,7 @@ interface CreateProps {
 	apiUrlCreator: ApiUrlCreator;
 	catalogProps: ClientCatalogProps;
 	resourceService: ResourceServiceType;
+	origin: ClipboardOrigin;
 	tr: Transaction;
 }
 interface FilterProps {
@@ -35,6 +38,7 @@ interface FilterProps {
 	apiUrlCreator: ApiUrlCreator;
 	resourceService: ResourceServiceType;
 	catalogProps: ClientCatalogProps;
+	origin: ClipboardOrigin;
 }
 
 interface PasteProps {
@@ -43,6 +47,8 @@ interface PasteProps {
 	apiUrlCreator: ApiUrlCreator;
 	resourceService: ResourceServiceType;
 	catalogProps: ClientCatalogProps;
+	/** Where the paste lands — a source is re-read only from the workspace it was copied in. */
+	origin: ClipboardOrigin;
 }
 
 interface HandleNodesProps extends Omit<FilterProps, "catalogProps"> {
@@ -52,7 +58,13 @@ interface HandleNodesProps extends Omit<FilterProps, "catalogProps"> {
 
 type ClipboardItems = Record<string, string>;
 
-const createResourceIfNeed = async (node: Node, apiUrlCreator: ApiUrlCreator, resourceService: ResourceServiceType) => {
+export const createResourceIfNeed = async (
+	node: Node,
+	apiUrlCreator: ApiUrlCreator,
+	resourceService: ResourceServiceType,
+	copyData?: GramaxClipboardData,
+	origin?: ClipboardOrigin,
+) => {
 	const attrs = { ...node.attrs };
 
 	if (node.type.name === "icon" && attrs.svg) {
@@ -61,9 +73,15 @@ const createResourceIfNeed = async (node: Node, apiUrlCreator: ApiUrlCreator, re
 		attrs.code = await res.json();
 	}
 
-	if (!attrs?.resource?.src) return { ...attrs, nodeName: node.type.name };
-	const name = attrs.resource.name ? attrs.resource.name : attrs.resource.name.slice(2);
-	const newName = await resourceService.setResource(name, Buffer.from(attrs.resource.src), attrs.resource.path);
+	if (!attrs?.resource) return { ...attrs, nodeName: node.type.name };
+	const name = attrs.resource.name;
+	// An image the user never scrolled to was copied without its bytes: take them from the source article.
+	const buffer = attrs.resource.src
+		? Buffer.from(attrs.resource.src)
+		: await fetchSourceResource(name, copyData?.source, apiUrlCreator, origin);
+	if (!buffer) return { ...attrs, nodeName: node.type.name };
+
+	const newName = await resourceService.setResource(name, buffer, attrs.resource.path);
 
 	if (!newName) return;
 	attrs.resource = null;
@@ -90,6 +108,7 @@ const handleNodes = async (props: HandleNodesProps): Promise<Node> => {
 		copyData,
 		isStorageConnected,
 		comments,
+		origin,
 	} = props;
 	const newChildren = [];
 
@@ -98,7 +117,7 @@ const handleNodes = async (props: HandleNodesProps): Promise<Node> => {
 		let newChild = child;
 
 		if (Object.keys(newChild.attrs).length > 0 && !child.isText) {
-			const newAttrs = await createResourceIfNeed(child, apiUrlCreator, resourceService);
+			const newAttrs = await createResourceIfNeed(child, apiUrlCreator, resourceService, copyData, origin);
 			newChild = child.type.create(newAttrs, child.content, child.marks);
 		}
 
@@ -234,14 +253,14 @@ const insertSlice = (tr: Transaction, view: EditorView, slice: Slice) => {
 };
 
 const createNodes = async (props: CreateProps) => {
-	const { event, view, node, apiUrlCreator, resourceService, copyData, catalogProps } = props;
+	const { event, view, node, apiUrlCreator, resourceService, copyData, catalogProps, origin } = props;
 
 	const clipboardData: ClipboardItems = {};
 	Array.from(event.clipboardData.items).forEach((item) => {
 		clipboardData[item.type] = event.clipboardData.getData(item.type);
 	});
 
-	const attrs = await createResourceIfNeed(node, apiUrlCreator, resourceService);
+	const attrs = await createResourceIfNeed(node, apiUrlCreator, resourceService, copyData, origin);
 	if (!attrs.nodeName) return;
 
 	const comments = new PastedComments();
@@ -256,6 +275,7 @@ const createNodes = async (props: CreateProps) => {
 		copyData,
 		catalogProps,
 		comments,
+		origin,
 	});
 
 	const { from, to } = view.state.selection;
@@ -282,7 +302,7 @@ const createNodes = async (props: CreateProps) => {
 };
 
 export const paste = (props: PasteProps) => {
-	const { view, event, apiUrlCreator, resourceService, catalogProps } = props;
+	const { view, event, apiUrlCreator, resourceService, catalogProps, origin } = props;
 	const { tr } = view.state;
 
 	const gramaxText = event.clipboardData.getData("text/gramax");
@@ -298,7 +318,17 @@ export const paste = (props: PasteProps) => {
 		}
 
 		const node = view.state.schema.nodes.doc.create(null, nodes);
-		void createNodes({ node, event, view, apiUrlCreator, tr, resourceService, catalogProps, copyData: data });
+		void createNodes({
+			node,
+			event,
+			view,
+			apiUrlCreator,
+			tr,
+			resourceService,
+			catalogProps,
+			origin,
+			copyData: data,
+		});
 		return true;
 	} catch {
 		return false;

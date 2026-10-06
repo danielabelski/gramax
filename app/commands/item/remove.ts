@@ -1,3 +1,4 @@
+import { CATEGORY_ROOT_FILENAME } from "@app/config/const";
 import { ResponseKind } from "@app/types/ResponseKind";
 import { AuthorizeMiddleware } from "@core/Api/middleware/AuthorizeMiddleware";
 import { DesktopModeMiddleware } from "@core/Api/middleware/DesktopModeMiddleware";
@@ -24,9 +25,11 @@ const remove: Command<{ ctx: Context; catalogName: string; path: Path; currentAr
 			const fp = workspace.getFileProvider();
 			const articleParser = new ArticleParser(ctx, parser, parserContextFactory);
 
+			const removedDir =
+				path.nameWithExtension === CATEGORY_ROOT_FILENAME ? path.parentDirectoryPath.value : path.value;
 			const isCurrentArticleAffected =
 				path.compare(currentArticlePath) ||
-				(path.value && currentArticlePath.value.startsWith(`${path.value}/`));
+				(removedDir && currentArticlePath.value.startsWith(`${removedDir}/`));
 
 			const redirectPath = isCurrentArticleAffected
 				? await getPrevSiblingPathname(catalog, path)

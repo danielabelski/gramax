@@ -40,10 +40,7 @@ fn a_change_made_behind_the_index_is_seen(sandbox: TempDir, #[with(&sandbox)] re
 /// origin. Everything Gramax writes goes into the index as it is written, so a change it made is
 /// never behind the index in the first place.
 #[rstest]
-fn a_marked_entry_hides_a_change_made_behind_the_index(
-	sandbox: TempDir,
-	#[with(&sandbox)] repo: Repo<TestCreds>,
-) -> Result {
+fn a_marked_entry_hides_a_change_made_behind_the_index(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "committed")?;
@@ -68,10 +65,7 @@ fn a_marked_entry_hides_a_change_made_behind_the_index(
 /// This is what makes the scheme safe rather than merely fast: `add_path` writes a fresh entry, and
 /// a fresh entry has no flags. Without it a marked file would stay invisible forever.
 #[rstest]
-fn staging_a_marked_file_makes_it_visible_again(
-	sandbox: TempDir,
-	#[with(&sandbox)] repo: Repo<TestCreds>,
-) -> Result {
+fn staging_a_marked_file_makes_it_visible_again(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "committed")?;
@@ -96,10 +90,7 @@ fn staging_a_marked_file_makes_it_visible_again(
 ///
 /// The bit tells git not to look at the working copy; it must not tell it to commit stale content.
 #[rstest]
-fn a_commit_after_marking_carries_what_was_staged(
-	sandbox: TempDir,
-	#[with(&sandbox)] repo: Repo<TestCreds>,
-) -> Result {
+fn a_commit_after_marking_carries_what_was_staged(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "first")?;
@@ -125,10 +116,7 @@ fn a_commit_after_marking_carries_what_was_staged(
 /// Marking says "the working copy holds what the index says"; it must not stop a checkout from
 /// writing something new over it, or a pull would silently do nothing.
 #[rstest]
-fn an_incoming_change_still_lands_on_a_marked_file(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn an_incoming_change_still_lands_on_a_marked_file(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "first")?;
@@ -161,10 +149,7 @@ fn an_incoming_change_still_lands_on_a_marked_file(
 /// The stash is built from the index, and staging clears the mark on what it touches — so the
 /// stashed path is unmarked by construction. This pins that the two do not interfere.
 #[rstest]
-fn a_marked_index_still_stashes_what_was_staged(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn a_marked_index_still_stashes_what_was_staged(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "committed")?;
@@ -219,10 +204,7 @@ fn the_mark_survives_reading_the_index_again(sandbox: TempDir, #[with(&sandbox)]
 /// invisible. It cannot happen through the app: a delete goes through `add`, which removes the entry
 /// with it.
 #[rstest]
-fn deleting_through_the_app_leaves_no_marked_entry(
-	sandbox: TempDir,
-	#[with(&sandbox)] repo: Repo<TestCreds>,
-) -> Result {
+fn deleting_through_the_app_leaves_no_marked_entry(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "committed")?;
@@ -467,7 +449,10 @@ fn a_soft_reset_takes_the_marks_off(sandbox: TempDir, #[with(&sandbox)] repo: Re
 	assert!(repo.assume_unchanged_all()? > 0);
 
 	let parent = repo.repo().head()?.peel_to_commit()?.parent(0)?.id();
-	repo.reset(ResetOptions { mode: ResetMode::Soft, head: Some(OidInfo(parent.to_string())) })?;
+	repo.reset(ResetOptions {
+		mode: ResetMode::Soft,
+		head: Some(OidInfo(parent.to_string())),
+	})?;
 
 	let status = repo.status(true)?.short_info()?;
 	assert_eq!(
@@ -491,10 +476,7 @@ fn a_soft_reset_takes_the_marks_off(sandbox: TempDir, #[with(&sandbox)] repo: Re
 /// session. See [`a_checkout_takes_the_mark_off_what_it_rewrote`] for why once per session is not
 /// enough.
 #[rstest]
-fn a_mark_with_nothing_to_do_does_not_rewrite_the_index(
-	sandbox: TempDir,
-	#[with(&sandbox)] repo: Repo<TestCreds>,
-) -> Result {
+fn a_mark_with_nothing_to_do_does_not_rewrite_the_index(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	for i in 0..20 {
@@ -526,10 +508,7 @@ fn a_mark_with_nothing_to_do_does_not_rewrite_the_index(
 /// entries as the sync brought files, and the next command would read every one of them off disk —
 /// the very cost the bit exists to remove.
 #[rstest]
-fn a_checkout_takes_the_mark_off_what_it_rewrote(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn a_checkout_takes_the_mark_off_what_it_rewrote(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	for i in 0..30 {

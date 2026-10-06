@@ -1,6 +1,8 @@
 import type { ClientArticleProps } from "@core/SitePresenter/SitePresenter";
 import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import type { ResourceServiceType } from "@core-ui/ContextServices/ResourceService/ResourceService";
+import { getClipboardOrigin } from "@ext/markdown/elements/copyArticles/handlers/clipboardOrigin";
+import type { ClipboardSource } from "@ext/markdown/elements/copyArticles/handlers/copy";
 import { handleCopy, handleCut } from "@ext/markdown/elements/copyArticles/plugins/copyCutHandlers";
 import { headingPaste } from "@ext/markdown/elements/copyArticles/plugins/headingPaste";
 import { pasteBetweenMark } from "@ext/markdown/elements/copyArticles/plugins/pasteBetweenMark";
@@ -10,7 +12,7 @@ import {
 	transformPastedHTML,
 	transformPastedText,
 } from "@ext/markdown/elements/copyArticles/plugins/transformPastedTypes";
-import { getEditorContext } from "@ext/markdown/elementsUtils/editorContext/EditorContext";
+import { type EditorContextValue, getEditorContext } from "@ext/markdown/elementsUtils/editorContext/EditorContext";
 import { type Editor, Extension } from "@tiptap/core";
 import { Plugin, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "prosemirror-view";
@@ -31,6 +33,21 @@ const selectNodes = (editor: Editor): boolean => {
 	});
 
 	return true;
+};
+
+/**
+ * Coordinates of the article the copy is taken from. Images are fetched only once they near the viewport, so
+ * the clipboard payload cannot always carry their bytes; paste re-reads the missing ones from here.
+ */
+const getClipboardSource = (context: EditorContextValue, resourceService: ResourceServiceType): ClipboardSource => {
+	const { apiUrlCreator, catalogProps, articleProps, pageDataContext } = context;
+	return {
+		catalogName: catalogProps?.name,
+		articlePath: apiUrlCreator?.articlePath ?? articleProps?.ref?.path,
+		itemId: resourceService?.id,
+		provider: resourceService?.provider,
+		origin: getClipboardOrigin(pageDataContext),
+	};
 };
 
 declare module "@tiptap/core" {
@@ -88,10 +105,9 @@ const CopyArticles = Extension.create<CopyArticlesOptions>({
 				props: {
 					handleDOMEvents: {
 						copy: (view: EditorView, event: ClipboardEvent) => {
-							const { articleProps, resourceService: contextResourceService } = getEditorContext(
-								this.editor,
-							);
-							const resourceService = contextResourceService ?? this.options.resourceService;
+							const context = getEditorContext(this.editor);
+							const { articleProps } = context;
+							const resourceService = context.resourceService ?? this.options.resourceService;
 							if (!articleProps || !resourceService) return false;
 
 							handleCopy(
@@ -100,14 +116,14 @@ const CopyArticles = Extension.create<CopyArticlesOptions>({
 								articleProps,
 								resourceService,
 								this.editor.storage.comment?.comments,
+								getClipboardSource(context, resourceService),
 							);
 							return true;
 						},
 						cut: (view: EditorView, event: ClipboardEvent) => {
-							const { articleProps, resourceService: contextResourceService } = getEditorContext(
-								this.editor,
-							);
-							const resourceService = contextResourceService ?? this.options.resourceService;
+							const context = getEditorContext(this.editor);
+							const { articleProps } = context;
+							const resourceService = context.resourceService ?? this.options.resourceService;
 							if (!articleProps || !resourceService) return false;
 
 							handleCut(
@@ -116,6 +132,7 @@ const CopyArticles = Extension.create<CopyArticlesOptions>({
 								articleProps,
 								resourceService,
 								this.editor.storage.comment?.comments,
+								getClipboardSource(context, resourceService),
 							);
 							return true;
 						},

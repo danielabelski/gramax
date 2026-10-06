@@ -91,6 +91,14 @@ describe("ImageRenderer", () => {
 		expect(container.querySelector(".skeleton")?.getAttribute("data-layout-reserved")).toBe("true");
 	});
 
+	it("keeps annotation z-indexes inside the image's own stacking context", () => {
+		// Annotations get z-index 1..N; without isolation they paint over sticky article UI
+		// (tab bar, sticky table column) that sits at z-index 1.
+		const { container } = render(createElement(ImageRenderer, { realSrc: "image.png" }));
+
+		expect(container.querySelector(".object-container")?.classList.contains("isolate")).toBe(true);
+	});
+
 	it("keeps the reserved aspect ratio when loading fails", async () => {
 		const { container } = render(
 			createElement(ImageRenderer, {

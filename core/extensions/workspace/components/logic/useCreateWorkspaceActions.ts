@@ -1,8 +1,8 @@
-import { uniqueName } from "@core/utils/uniqueName";
 import FetchService from "@core-ui/ApiServices/FetchService";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import WorkspaceService from "@core-ui/ContextServices/Workspace";
 import { clearData } from "@core-ui/utils/initGlobalFuncs";
+import { suggestWorkspacePath } from "@ext/workspace/utils/workspacePath";
 import type { ClientWorkspaceConfig } from "@ext/workspace/WorkspaceConfig";
 import { useCallback, useState } from "react";
 
@@ -14,8 +14,8 @@ export const useCreateWorkspaceActions = () => {
 
 	const [originalProps, setOriginalProps] = useState<ClientWorkspaceConfig>({
 		name: "",
-		path: uniqueName(
-			pathPlaceholder + "/workspace",
+		path: suggestWorkspacePath(
+			pathPlaceholder,
 			workspaces.map((w) => w.path),
 		),
 		icon: "",
@@ -26,8 +26,8 @@ export const useCreateWorkspaceActions = () => {
 			if (v) {
 				const props = {
 					name: "",
-					path: uniqueName(
-						pathPlaceholder + "/workspace",
+					path: suggestWorkspacePath(
+						pathPlaceholder,
 						workspaces.map((w) => w.path),
 					),
 					icon: "",

@@ -98,6 +98,55 @@ describe("applySessionsLimit via load", () => {
 	});
 });
 
+describe("interrupted session after reload", () => {
+	let sessions: AgentSessionStore;
+
+	beforeEach(async () => {
+		jest.clearAllMocks();
+		mockedMaxStoredSessions = 50;
+		fileStore.listDir = jest.fn().mockResolvedValue([]);
+		fileStore.writeJsonFile = jest.fn().mockResolvedValue(undefined);
+		fileStore.deletePath = jest.fn().mockResolvedValue(undefined);
+		sessions = new AgentSessionStore(fileStore);
+		await sessions.load();
+	});
+
+	test("load persists a processing session as cancelled", async () => {
+		const interrupted = { ...makeSession("busy", 1), processing: true };
+		fileStore.listDir = jest.fn().mockResolvedValue(["busy"]);
+		fileStore.readJsonFile = jest.fn().mockResolvedValue(interrupted);
+
+		await sessions.load();
+		const loaded = await sessions.list();
+
+		expect(loaded).toHaveLength(1);
+		expect(loaded[0].processing).toBe(false);
+		expect(loaded[0].events.at(-1)).toMatchObject({
+			type: "turn_finished",
+			turnId: "turn-busy",
+			status: "cancelled",
+		});
+		expect(fileStore.writeJsonFile).toHaveBeenCalledWith(
+			"sessions/busy/session.json",
+			expect.objectContaining({ processing: false }),
+		);
+	});
+
+	test("cancel stops a processing session without a live controller", async () => {
+		const session = await sessions.create();
+		session.processing = true;
+		session.events = [{ type: "user_message", turnId: "turn-1", ts: 1, content: "hi" }];
+
+		expect(await sessions.cancel(session.id)).toBe(true);
+		expect(session.processing).toBe(false);
+		expect(session.events.at(-1)).toMatchObject({
+			type: "turn_finished",
+			turnId: "turn-1",
+			status: "cancelled",
+		});
+	});
+});
+
 describe("rename", () => {
 	let sessions: AgentSessionStore;
 

@@ -22,10 +22,7 @@ fn modified_at(path: &std::path::Path) -> SystemTime {
 
 /// The file the branches disagree about is written; the one they agree about is not touched at all.
 #[rstest]
-fn switching_branches_writes_only_what_differs(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn switching_branches_writes_only_what_differs(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("shared"), "same on both branches")?;
@@ -87,10 +84,7 @@ fn switching_branches_adds_and_removes_files(sandbox: TempDir, #[with(&sandbox)]
 
 /// An untracked file is not a branch's business, and a switch leaves it where it is.
 #[rstest]
-fn switching_branches_keeps_an_untracked_file(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn switching_branches_keeps_an_untracked_file(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "committed")?;
@@ -109,10 +103,7 @@ fn switching_branches_keeps_an_untracked_file(
 
 /// A checkout that has to overwrite a local edit refuses, unless it was told to force.
 #[rstest]
-fn switching_branches_refuses_over_a_local_edit(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn switching_branches_refuses_over_a_local_edit(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "base")?;
@@ -143,10 +134,7 @@ fn switching_branches_refuses_over_a_local_edit(
 /// longer exists upstream. Narrowing by pathspec would keep `checkout_get_actions` off every path
 /// outside the tree diff, and a local edit in a file both trees share would ride along.
 #[rstest]
-fn a_forced_switch_discards_a_local_edit_anywhere(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn a_forced_switch_discards_a_local_edit_anywhere(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("shared"), "same on both branches")?;

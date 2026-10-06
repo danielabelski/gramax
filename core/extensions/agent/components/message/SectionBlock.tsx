@@ -158,6 +158,7 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 							cancelledDurationMs={cancelledDurationMs}
 							copyButtonMessageId={copyButtonMessageId}
 							footerAlwaysVisible={isLast}
+							isFinished={isFinished}
 							messages={preThinkingMessages}
 							missingSecretWarning={missingSecretWarning}
 							missingSecretWarningMessageId={missingSecretWarningMessageId}
@@ -181,7 +182,11 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 									isActive={showThinking}
 									startedAt={thinkingStartRef.current!}
 								>
-									<MessageGroup messages={insideMessages} streamingMessageId={null} />
+									<MessageGroup
+										isFinished={isFinished}
+										messages={insideMessages}
+										streamingMessageId={null}
+									/>
 								</ThinkingCollapsible>
 							)}
 
@@ -203,6 +208,7 @@ export const SectionBlock = memo(({ section, isLast, streamingMessageId, showThi
 							{belowToolMessages.length > 0 && (
 								<div className="group" data-gray="true">
 									<MessageGroup
+										isFinished={isFinished}
 										messages={belowToolMessages}
 										streamingMessageId={streamingMessageId}
 									/>

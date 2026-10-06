@@ -350,7 +350,10 @@ impl<C: Creds> History for Repo<'_, C> {
 		let mut range: Option<CommitRangeInfo> = None;
 
 		self.walk_matching(pathspecs, |commit| {
-			let point = CommitPointInfo { date: commit.time().seconds() * 1000, oid: commit.id().short_info()? };
+			let point = CommitPointInfo {
+				date: commit.time().seconds() * 1000,
+				oid: commit.id().short_info()?,
+			};
 
 			// the ends are the oldest and the newest commit by date, not by walk order: after a rebase
 			// or an import these are not the same commits
@@ -359,7 +362,10 @@ impl<C: Creds> History for Repo<'_, C> {
 					start: if point.date < range.start.date { point.clone() } else { range.start },
 					end: if point.date > range.end.date { point } else { range.end },
 				},
-				None => CommitRangeInfo { start: point.clone(), end: point },
+				None => CommitRangeInfo {
+					start: point.clone(),
+					end: point,
+				},
 			});
 
 			Ok(())
@@ -431,8 +437,7 @@ impl<C: Creds> History for Repo<'_, C> {
 			// one, so it is the older name that goes to `parent_path`
 			let name = std::mem::replace(&mut current_path, follower.paths().first().cloned().unwrap_or_default());
 
-			let Some(delta) = diff.deltas().find(|delta| delta.new_file().path().and_then(Path::to_str) == Some(&name))
-			else {
+			let Some(delta) = diff.deltas().find(|delta| delta.new_file().path().and_then(Path::to_str) == Some(&name)) else {
 				continue;
 			};
 

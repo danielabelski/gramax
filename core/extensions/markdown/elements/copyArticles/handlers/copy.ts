@@ -1,12 +1,14 @@
 import type { ClientArticleProps } from "@core/SitePresenter/SitePresenter";
 import type { ResourceServiceType } from "@core-ui/ContextServices/ResourceService/ResourceService";
 import { resolveFileKind } from "@core-ui/utils/resolveFileKind";
+import type { ArticleProviderType } from "@ext/articleProvider/logic/ArticleProvider";
 import {
 	type ClipboardComments,
 	type CommentBodies,
 	collectClipboardComments,
 } from "@ext/markdown/elements/comment/edit/logic/clipboardComments";
 import createPlainText from "@ext/markdown/elements/copyArticles/createPlainText";
+import type { ClipboardOrigin } from "@ext/markdown/elements/copyArticles/handlers/clipboardOrigin";
 import type { JSONContent } from "@tiptap/core";
 import { type Attrs, DOMSerializer, Fragment, type Node, type Schema } from "@tiptap/pm/model";
 import type { EditorView } from "@tiptap/pm/view";
@@ -17,8 +19,18 @@ interface CreatedFragment {
 	deleteRange?: { from: number; to: number };
 }
 
+/** Where the copied nodes came from — lets paste re-fetch resources the clipboard payload could not carry. */
+export interface ClipboardSource {
+	catalogName?: string;
+	articlePath?: string;
+	itemId?: string;
+	provider?: ArticleProviderType;
+	origin?: ClipboardOrigin;
+}
+
 export interface GramaxClipboardData {
 	copyPath: string;
+	source?: ClipboardSource;
 	range: { from: number; to: number };
 	data: JSONContent;
 	/** Bodies of the comments the copied nodes point at — the marks themselves only carry an id. */
@@ -28,9 +40,13 @@ export interface GramaxClipboardData {
 export interface CopyOptions {
 	cut?: boolean;
 	comments?: CommentBodies;
+	source?: ClipboardSource;
 }
 
-const IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"];
+// The async Clipboard API writes only image/png among raster images: a gif, jpeg or webp item makes
+// navigator.clipboard.write reject, and since the regular copy is skipped for a lone image, nothing
+// lands on the clipboard. Other formats go the regular way, carrying the file in text/gramax.
+const CLIPBOARD_IMAGE_MIME_TYPE = "image/png";
 
 const isTitle = (view: EditorView, fragment: Fragment): boolean => {
 	const firstNode = view.state.doc.firstChild;
@@ -51,17 +67,21 @@ const createTitleHTML = (view: EditorView, fragment: Fragment) => {
 };
 
 const getImageFromFragment = (fragment: Fragment, resourceService: ResourceServiceType): boolean => {
-	const firstImage =
-		fragment.firstChild?.type?.name === "image" || fragment.firstChild?.type?.name === "inlineImage"
+	// Only a lone image is handed off to the OS clipboard as a raw image. A wider selection that merely
+	// happens to start with one must keep flowing to the internal "text/gramax" payload, otherwise every
+	// node past the first image is silently dropped (e.g. pasting a multi-image article copies one image).
+	const singleImage =
+		fragment.childCount === 1 &&
+		(fragment.firstChild?.type?.name === "image" || fragment.firstChild?.type?.name === "inlineImage")
 			? fragment.firstChild
 			: null;
 
-	if (!firstImage) return false;
-	const buffer = resourceService.getBuffer(firstImage.attrs.src);
+	if (!singleImage) return false;
+	const buffer = resourceService.getBuffer(singleImage.attrs.src);
 	if (!buffer) return false;
 
 	const mimeType = resolveFileKind(buffer);
-	if (!mimeType || !IMAGE_MIME_TYPES.includes(mimeType) || mimeType === "image/svg+xml") return false;
+	if (mimeType !== CLIPBOARD_IMAGE_MIME_TYPE) return false;
 
 	void navigator.clipboard.write([
 		new ClipboardItem({
@@ -122,11 +142,13 @@ const createGramaxClipboardData = (
 	articleProps: ClientArticleProps,
 	resourceService: ResourceServiceType,
 	comments?: CommentBodies,
+	source?: ClipboardSource,
 ): GramaxClipboardData => {
 	const { $from, $to } = view.state.selection;
 
 	return {
 		copyPath: articleProps?.logicPath || "",
+		source,
 		range: { from: $from.pos, to: $to.pos },
 		data: createNodesJSON(view, fragment, resourceService.getBuffer),
 		comments: collectClipboardComments(fragment, comments),
@@ -236,6 +258,7 @@ const getNodesData = (
 	articleProps: ClientArticleProps,
 	resourceService: ResourceServiceType,
 	comments?: CommentBodies,
+	source?: ClipboardSource,
 ): { copyTypes: Record<string, string>; deleteRange: { from: number; to: number } } => {
 	const { fragment, plainText, deleteRange } = createFragment(view);
 	const imageData = getImageFromFragment(fragment, resourceService);
@@ -244,7 +267,7 @@ const getNodesData = (
 	return {
 		copyTypes: {
 			"text/gramax": JSON.stringify(
-				createGramaxClipboardData(view, fragment, articleProps, resourceService, comments),
+				createGramaxClipboardData(view, fragment, articleProps, resourceService, comments, source),
 			),
 			"text/plain": plainText,
 			"text/html": getSerializedHTML(view, fragment),
@@ -264,7 +287,7 @@ export const copy = (
 	const { tr } = view.state;
 	if (from === to) return;
 
-	const data = getNodesData(view, articleProps, resourceService, options?.comments);
+	const data = getNodesData(view, articleProps, resourceService, options?.comments, options?.source);
 	if (data) Object.entries(data.copyTypes).forEach(([type, data]) => event.clipboardData.setData(type, data));
 
 	if (options?.cut) {

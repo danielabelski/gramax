@@ -201,10 +201,7 @@ pub fn add_force_stages_deletions(sandbox: TempDir, #[with(&sandbox)] repo: Repo
 /// that half, a tracked file someone later covered with a `.gitignore` line would quietly stop
 /// being committed.
 #[rstest]
-pub fn add_force_stages_an_ignored_file_that_is_already_tracked(
-	sandbox: TempDir,
-	#[with(&sandbox)] repo: Repo<TestCreds>,
-) -> Result {
+pub fn add_force_stages_an_ignored_file_that_is_already_tracked(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	let root = sandbox.path();
 
 	fs::write(root.join("tracked"), "first")?;
@@ -234,10 +231,7 @@ pub fn add_force_stages_an_ignored_file_that_is_already_tracked(
 /// lying in the working copy.
 #[cfg(unix)]
 #[rstest]
-pub fn add_force_keeps_a_symlink_whose_target_is_missing(
-	sandbox: TempDir,
-	#[with(&sandbox)] repo: Repo<TestCreds>,
-) -> Result {
+pub fn add_force_keeps_a_symlink_whose_target_is_missing(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	let root = sandbox.path();
 
 	std::os::unix::fs::symlink(root.join("nowhere"), root.join("link"))?;

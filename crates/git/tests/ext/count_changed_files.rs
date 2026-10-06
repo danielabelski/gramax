@@ -95,6 +95,37 @@ fn with_pull_and_push_changes(_sandbox: TempDir, #[with(&_sandbox)] repos: Repos
 }
 
 #[rstest]
+fn with_pull_of_commit_without_changed_files(_sandbox: TempDir, #[with(&_sandbox)] repos: Repos) -> Result {
+	fs::create_dir(repos.local_path.join("tracked"))?;
+	fs::write(repos.local_path.join("tracked/file"), "tracked-file")?;
+
+	repos.local.add_all()?;
+	repos.local.commit_debug()?;
+	let commit = repos.local.repo().head()?.peel_to_commit()?;
+
+	repos.local.commit_debug()?;
+	repos.local.debug_push()?;
+
+	repos.local.repo().reset(commit.as_object(), git2::ResetType::Hard, None)?;
+
+	let diff = repos.local.count_changed_files("tracked")?;
+	assert_eq!(diff.push, 0);
+	assert_eq!(diff.pull, 1);
+	assert!(diff.has_changes);
+
+	fs::write(repos.local_path.join("tracked/file"), "local changes")?;
+	repos.local.add_all()?;
+	repos.local.commit_debug()?;
+
+	let diff = repos.local.count_changed_files("tracked")?;
+	assert_eq!(diff.push, 1);
+	assert_eq!(diff.pull, 1);
+	assert!(diff.has_changes);
+
+	Ok(())
+}
+
+#[rstest]
 fn with_local_changes(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	fs::write(sandbox.path().join("file1"), "hello1")?;
 	fs::write(sandbox.path().join("file2"), "hello2")?;

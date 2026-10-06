@@ -166,7 +166,11 @@ fn commit_excludes_ds_store(_sandbox: TempDir, #[with(&_sandbox)] repo: Repo<Tes
 	let oid = repo.commit(CommitOptions {
 		message: "publish everything including trash".to_string(),
 		parent_refs: None,
-		files: Some(vec![PathBuf::from("file1"), PathBuf::from(".DS_Store"), PathBuf::from("nested/.DS_Store")]),
+		files: Some(vec![
+			PathBuf::from("file1"),
+			PathBuf::from(".DS_Store"),
+			PathBuf::from("nested/.DS_Store"),
+		]),
 	})?;
 
 	let tree = repo.repo().find_commit(oid)?.tree()?;

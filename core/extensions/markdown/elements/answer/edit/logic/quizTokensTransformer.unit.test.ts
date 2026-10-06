@@ -53,3 +53,71 @@ describe("quizTokensTransformer", () => {
 		});
 	});
 });
+
+describe("quizTokensTransformer ids", () => {
+	const transform = (tokens: { type: string; attrs?: Record<string, string>; content?: string }[]) =>
+		tokens.map((token, id) => quizTokensTransformer({ token, tokens, id, transformer: {} as never }));
+
+	const answer = (attrs: Record<string, string>, text: string) => [
+		{ type: "questionAnswer_open", attrs },
+		{ type: "paragraph_open" },
+		{ type: "text", content: text },
+		{ type: "questionAnswer_close" },
+	];
+
+	test("gives copied answers their own ids", () => {
+		const tokens = [
+			{ type: "question_open", attrs: { id: "q", type: "one" } },
+			...answer({ answerId: "a", correct: "true" }, "First"),
+			...answer({ answerId: "a" }, "Second"),
+			...answer({ answerId: "a" }, "Third"),
+			...answer({ answerId: "a-1" }, "Fourth"),
+			{ type: "question_close" },
+		];
+
+		const answerIds = transform(tokens)
+			.filter((token) => token?.type === "questionAnswer_open")
+			.map((token) => token.attrs.answerId);
+
+		expect(answerIds[0]).toBe("a");
+		expect(answerIds[3]).toBe("a-1");
+		expect(new Set(answerIds).size).toBe(4);
+	});
+
+	test("gives answers without an id their own ids", () => {
+		const tokens = [
+			{ type: "question_open", attrs: { id: "q", type: "many" } },
+			...answer({}, "First"),
+			...answer({}, "Second"),
+			{ type: "question_close" },
+		];
+
+		const answerIds = transform(tokens)
+			.filter((token) => token?.type === "questionAnswer_open")
+			.map((token) => token.attrs.answerId);
+
+		expect(answerIds.every(Boolean)).toBe(true);
+		expect(new Set(answerIds).size).toBe(2);
+		expect(transform(tokens).find((t) => t?.type === "questionAnswer_open").attrs.answerId).toBe(answerIds[0]);
+	});
+
+	test("gives a copied question its own id and links its answers to it", () => {
+		const tokens = [
+			{ type: "question_open", attrs: { id: "q", type: "one" } },
+			...answer({ answerId: "a" }, "First"),
+			{ type: "question_close" },
+			{ type: "question_open", attrs: { id: "q", type: "one" } },
+			...answer({ answerId: "a" }, "First"),
+			{ type: "question_close" },
+		];
+
+		const result = transform(tokens);
+		const questionIds = [result[0].attrs.id, result[6].attrs.id];
+
+		expect(questionIds[0]).toBe("q");
+		expect(questionIds[1]).not.toBe("q");
+		expect(result[1].attrs.questionId).toBe("q");
+		expect(result[7].attrs.questionId).toBe(questionIds[1]);
+		expect(result[7].attrs.answerId).not.toBe(result[1].attrs.answerId);
+	});
+});

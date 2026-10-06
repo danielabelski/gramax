@@ -191,7 +191,10 @@ fn incoming_commit_over_untracked_file(sandbox: TempDir, #[with(&sandbox)] repo:
 
 	let merged = repo.merge(MergeOptions::theirs("other"));
 
-	assert!(merged.is_err(), "a merge that would overwrite an untracked file must refuse, like git does");
+	assert!(
+		merged.is_err(),
+		"a merge that would overwrite an untracked file must refuse, like git does"
+	);
 	assert_eq!(fs::read_to_string(&file)?, "my untracked work");
 	Ok(())
 }
@@ -217,7 +220,11 @@ fn incoming_commit_over_ignored_file(sandbox: TempDir, #[with(&sandbox)] repo: R
 
 	let merged = repo.merge(MergeOptions::theirs("other"));
 	if merged.is_ok() {
-		assert_eq!(fs::read_to_string(&file)?, "from server", "if the merge succeeds the file must hold the pulled content");
+		assert_eq!(
+			fs::read_to_string(&file)?,
+			"from server",
+			"if the merge succeeds the file must hold the pulled content"
+		);
 	}
 	Ok(())
 }
@@ -300,11 +307,7 @@ fn exec_bit_roundtrip(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCre
 #[case::spaces("my article.md")]
 #[case::both("моя статья 1.md")]
 #[case::hash("release #4.md")]
-fn odd_names_roundtrip(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-	#[case] name: &str,
-) -> Result {
+fn odd_names_roundtrip(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>, #[case] name: &str) -> Result {
 	let file = sandbox.path().join(name);
 
 	fs::write(&file, "committed")?;
@@ -487,7 +490,11 @@ fn two_stashes_are_both_kept_and_addressable(sandbox: TempDir, #[with(&sandbox)]
 	assert_eq!(fs::read_to_string(path.join("a"))?, "a2");
 	repo.stash_apply(second)?;
 	assert_eq!(fs::read_to_string(path.join("b"))?, "b2");
-	assert_eq!(fs::read_to_string(path.join("a"))?, "a2", "applying the second stash must not undo the first");
+	assert_eq!(
+		fs::read_to_string(path.join("a"))?,
+		"a2",
+		"applying the second stash must not undo the first"
+	);
 
 	repo.stash_delete(first)?;
 	let mut left = vec![];
@@ -520,7 +527,11 @@ fn apply_after_head_moved_far_ahead(sandbox: TempDir, #[with(&sandbox)] mut repo
 
 	repo.stash_apply(oid)?;
 	assert_eq!(fs::read_to_string(path.join("mine"))?, "my work");
-	assert_eq!(fs::read_to_string(path.join("theirs"))?, "server commit 24", "the newer history must stay");
+	assert_eq!(
+		fs::read_to_string(path.join("theirs"))?,
+		"server commit 24",
+		"the newer history must stay"
+	);
 	Ok(())
 }
 
@@ -548,7 +559,11 @@ fn git_cli_stash_with_untracked_applies(sandbox: TempDir, #[with(&sandbox)] mut 
 	repo.stash_apply(oid)?;
 
 	assert_eq!(fs::read_to_string(path.join("tracked"))?, "edited");
-	assert_eq!(fs::read_to_string(path.join("untracked"))?, "brand new", "the untracked file the stash carried must come back");
+	assert_eq!(
+		fs::read_to_string(path.join("untracked"))?,
+		"brand new",
+		"the untracked file the stash carried must come back"
+	);
 	Ok(())
 }
 
@@ -636,7 +651,10 @@ fn reset_hard_matches_git(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCre
 	fs::write(path.join("untracked"), "untracked")?;
 	fs::write(path.join("thing.log"), "ignored")?;
 
-	repo.reset(ResetOptions { mode: ResetMode::Hard, head: None })?;
+	repo.reset(ResetOptions {
+		mode: ResetMode::Hard,
+		head: None,
+	})?;
 
 	assert_eq!(fs::read_to_string(path.join("tracked"))?, "committed");
 	assert!(path.join("untracked").exists(), "git reset --hard keeps untracked files");

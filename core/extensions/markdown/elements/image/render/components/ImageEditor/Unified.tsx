@@ -12,6 +12,7 @@ interface UnifiedComponentProps extends ImageObject {
 	drawIndexes?: boolean;
 	style?: CSSProperties;
 	isPixels?: boolean;
+	handlesZIndex?: number;
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: it's ok

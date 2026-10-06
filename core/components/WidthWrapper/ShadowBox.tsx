@@ -2,6 +2,9 @@ import { cn } from "@core-ui/utils/cn";
 
 type Direction = "left" | "right";
 
+/** The same edge fade as `ScrollShadowContainer` (ics-ui-kit): a straight ramp from transparent to the full article background. */
+const fade = (direction: Direction) => `linear-gradient(to ${direction}, transparent, var(--color-article-bg))`;
+
 interface ScrollableShadowProps {
 	width?: number;
 	height?: number;
@@ -19,7 +22,7 @@ const ScrollableShadow = ({ width, height, direction, marginLeft, force }: Scrol
 				style={{
 					width: `${Math.min(width, 40)}px`,
 					height: `${height}px`,
-					background: `linear-gradient(to ${direction}, rgba(var(--color-article-bg-rgb),0) 0%, rgba(var(--color-article-bg-rgb),0.040) 13.5%, rgba(var(--color-article-bg-rgb),0.108) 24.6%, rgba(var(--color-article-bg-rgb),0.212) 36.6%, rgba(var(--color-article-bg-rgb),0.329) 46.7%, rgba(var(--color-article-bg-rgb),0.464) 56.9%, rgba(var(--color-article-bg-rgb),0.585) 65.7%, rgba(var(--color-article-bg-rgb),0.698) 75%, rgba(var(--color-article-bg-rgb),0.774) 82.7%, rgba(var(--color-article-bg-rgb),0.833) 89.7%, rgba(var(--color-article-bg-rgb),0.869) 95.7%, rgba(var(--color-article-bg-rgb),0.900) 100% )`,
+					background: fade(direction),
 					[direction]: 0,
 					...(marginLeft ? { marginLeft: `${marginLeft}px` } : {}),
 				}}

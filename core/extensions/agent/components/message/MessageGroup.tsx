@@ -36,6 +36,7 @@ type MessageGroupProps = {
 	footerAlwaysVisible?: boolean;
 	missingSecretWarning?: MissingSecretWarning | null;
 	missingSecretWarningMessageId?: string | null;
+	isFinished?: boolean;
 };
 
 export const MessageGroup = memo(
@@ -47,6 +48,7 @@ export const MessageGroup = memo(
 		footerAlwaysVisible,
 		missingSecretWarning,
 		missingSecretWarningMessageId,
+		isFinished,
 	}: MessageGroupProps) => {
 		const segments = useMemo(() => groupMessagesWithToolBundles(messages), [messages]);
 		return (
@@ -56,7 +58,7 @@ export const MessageGroup = memo(
 						const key = `tool-bundle-${seg.messages[0]?.id ?? "x"}`;
 						return (
 							<Fragment key={key}>
-								<ToolActivityBundle messages={seg.messages} />
+								<ToolActivityBundle isFinished={isFinished} messages={seg.messages} />
 							</Fragment>
 						);
 					}

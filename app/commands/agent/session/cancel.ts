@@ -10,7 +10,7 @@ const sessionCancel: Command<{ sessionId: string }, { ok: true; cancelled: boole
 	async do({ sessionId }) {
 		const session = this._app.agentManager.sessions.get(sessionId);
 		assert(session, "agent/session/cancel: session_not_found");
-		const cancelled = this._app.agentManager.sessions.cancel(sessionId);
+		const cancelled = await this._app.agentManager.sessions.cancel(sessionId);
 		return { ok: true as const, cancelled };
 	},
 

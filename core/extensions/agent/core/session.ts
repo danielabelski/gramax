@@ -61,6 +61,22 @@ export class AgentSession {
 		return Object.assign(new AgentSession(snapshot.id, snapshot.title), snapshot);
 	}
 
+	closeInterruptedTurn(): boolean {
+		if (!this.processing) return false;
+		this.processing = false;
+		this.activeRunController = null;
+		const last = this.events.at(-1);
+		if (last && last.type !== "turn_finished") {
+			this.events.push({
+				type: "turn_finished",
+				turnId: last.turnId,
+				ts: Date.now(),
+				status: "cancelled",
+			});
+		}
+		return true;
+	}
+
 	updateUsage(
 		prompt_tokens_usage: number,
 		total_tokens_usage: number,

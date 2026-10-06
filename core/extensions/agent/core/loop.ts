@@ -54,6 +54,7 @@ export async function runAgentTurn(options: {
 				push,
 				previewMax,
 				onLlmUsage,
+				signal,
 			});
 		}
 
@@ -106,6 +107,7 @@ export async function runAgentTurn(options: {
 					push,
 					previewMax,
 					onLlmUsage,
+					signal,
 				});
 			}
 			continue;
@@ -134,8 +136,9 @@ async function executeOneToolCall(options: {
 	push: (e: AgentEvent) => void;
 	previewMax: number;
 	onLlmUsage?: (usage: ChatCompletionUsage) => void;
+	signal?: AbortSignal;
 }): Promise<void> {
-	const { tc, turnId, app, ctx, commands, sessionId, llmClient, push, previewMax, onLlmUsage } = options;
+	const { tc, turnId, app, ctx, commands, sessionId, llmClient, push, previewMax, onLlmUsage, signal } = options;
 	const toolRegistry = app.agentManager.toolRegistry;
 	const name = tc.function.name;
 	const argumentsText = tc.function.arguments ?? "{}";
@@ -183,7 +186,36 @@ async function executeOneToolCall(options: {
 		return;
 	}
 
-	const toolResult = await toolRegistry.executeTool(name, args, app, ctx, commands, sessionId, llmClient, onLlmUsage);
+	let toolResult: Awaited<ReturnType<typeof toolRegistry.executeTool>>;
+	try {
+		toolResult = await toolRegistry.executeTool(
+			name,
+			args,
+			app,
+			ctx,
+			commands,
+			sessionId,
+			llmClient,
+			onLlmUsage,
+			signal,
+		);
+	} catch (e) {
+		if (e instanceof DOMException && e.name === "AbortError") {
+			const text = "cancelled by user; tool may have completed";
+			push({
+				type: "tool_result",
+				turnId,
+				ts: Date.now(),
+				toolCallId: tc.id,
+				name,
+				content: text,
+				contentPreview: text,
+				fullLength: text.length,
+				isError: true,
+			});
+		}
+		throw e;
+	}
 	let text: string;
 	if (toolResult.ok) {
 		text = JSON.stringify(toolResult.data ?? null, null, 2);

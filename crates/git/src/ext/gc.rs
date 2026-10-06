@@ -116,10 +116,7 @@ impl<C: Creds> Gc for Repo<'_, C> {
 
 		let reachable = self.collect_reachable_lfs_hashes()?;
 
-		let prunable: Vec<_> = all_lfs_files
-			.into_iter()
-			.filter(|(hash, _)| !reachable.contains(hash.as_str()))
-			.collect();
+		let prunable: Vec<_> = all_lfs_files.into_iter().filter(|(hash, _)| !reachable.contains(hash.as_str())).collect();
 
 		let count = prunable.len();
 		info!(target: TAG, "lfs prune: removing {count} unreachable LFS objects");

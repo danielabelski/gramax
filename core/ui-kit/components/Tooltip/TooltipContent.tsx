@@ -2,6 +2,7 @@ import { cn } from "@core-ui/utils/cn";
 import { TooltipArrow, TooltipContent as UiKitTooltipContent } from "ics-ui-kit/components/tooltip";
 import type { ExtractComponentGeneric } from "../../lib/extractComponentGeneric";
 import { VIEWPORT_PADDING } from "../../lib/floating";
+import { useIsTouchTooltip } from "./TooltipWithContextCheck";
 
 type UiKitTooltipContentProps = ExtractComponentGeneric<typeof UiKitTooltipContent>;
 
@@ -20,10 +21,11 @@ export const TooltipContent = (props: TooltipContentProps) => {
 		collisionPadding = VIEWPORT_PADDING,
 		...otherProps
 	} = props;
+	const isTouchTooltip = useIsTouchTooltip();
 	return (
 		<UiKitTooltipContent
 			{...otherProps}
-			className={cn(className, "hidden sm:block [@media(hover:none)]:hidden")}
+			className={cn(className, !isTouchTooltip && "hidden sm:block [@media(hover:none)]:hidden")}
 			collisionPadding={collisionPadding}
 			focus={focus === "high" ? "high" : undefined}
 			style={style}

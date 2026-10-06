@@ -3,6 +3,7 @@ import type { ArticleComponentProps } from "@components/Article/Article";
 import { ArticleParent } from "@components/Article/ArticleRenderer";
 import { useRouter } from "@core/Api/useRouter";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
+import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
 import ResourceService from "@core-ui/ContextServices/ResourceService/ResourceService";
 import { useArticleViewKey } from "@core-ui/ContextServices/views/articleView/ArticleViewKey";
 import Workspace from "@core-ui/ContextServices/Workspace";
@@ -61,7 +62,7 @@ export const ArticleEditRenderer = ({ data: { content } }: ArticleComponentProps
 
 	const editorUpdateContent = createOnUpdateCallback();
 	const updateTitle = useMemo(() => createUpdateTitleFunction(), []);
-	const editorHandlePaste = createHandlePasteCallback(resourceService);
+	const editorHandlePaste = createHandlePasteCallback(resourceService, PageDataContextService.value);
 
 	// Title the article had when it was opened. A placeholder file (untitled/new_article_*)
 	// is renamed to the title slug only after the user actually edits the title — cloned

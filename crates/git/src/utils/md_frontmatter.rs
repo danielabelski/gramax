@@ -19,7 +19,10 @@ impl MdFrontmatterParser {
 			let end = s.find("\n---")?;
 			Some(s[end + 4..].to_string())
 		});
-		Ok(ParsedMdFile { frontmatter, content: body.unwrap_or_default() })
+		Ok(ParsedMdFile {
+			frontmatter,
+			content: body.unwrap_or_default(),
+		})
 	}
 
 	pub fn parse_frontmatter(&self, content: &str) -> Result<MdFrontmatter> {

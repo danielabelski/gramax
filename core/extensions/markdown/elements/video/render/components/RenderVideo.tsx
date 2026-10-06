@@ -4,6 +4,7 @@ import { classNames } from "@components/libs/classNames";
 import type { HTMLAttributes } from "react";
 import getInstagramEmbedUrl from "../../logic/getInstagramEmbedUrl";
 import { getUrlFileExtension } from "../../logic/getUrlFileExtension";
+import getYoutubeEmbedUrl, { getYoutubeVideoId } from "../../logic/getYoutubeEmbedUrl";
 import previews from "./previews";
 
 export type RenderVideoProps = {
@@ -30,6 +31,8 @@ const rutubeUrlReplacer = (url: string): string => {
 	return url.replace("video", "play/embed");
 };
 
+const isYoutubeUrl = (url: string): boolean => url.includes("youtube.com") || url.includes("youtu.be");
+
 const supportedVideoFormats = ["mp4", "webm", "ogg"];
 
 const isVideoFormatSupported = (url: string): boolean => {
@@ -41,28 +44,8 @@ const isVideoFormatSupported = (url: string): boolean => {
 const SupportedVideoHostings: {
 	[key: string]: (url: string, onLoad: () => void, onError: () => void) => JSX.Element;
 } = {
-	"youtube.com": (url, onLoad, onError) => {
-		const id = url.match(/(?:[?&]v=|\/(?:embed|shorts|live)\/)([^?&#/]+)/)?.[1];
-		return isCredentiallessUnsupported ? (
-			<PreviewVideo onLoad={onLoad} previewUrl={`https://img.youtube.com/vi/${id}/maxresdefault.jpg`} url={url} />
-		) : (
-			<IFrameVideo onError={onError} onLoad={onLoad} url={`https://youtube.com/embed/${id}`} />
-		);
-	},
-	"youtu.be": (url, onLoad, onError) => {
-		const rel = url.match(/youtu\.be\/(.*)/)?.[1].replace("?t=", "?start=");
-		if (!rel) return null;
-		const videoId = rel.match(/(.*)\?/)?.[1];
-		return isCredentiallessUnsupported ? (
-			<PreviewVideo
-				onLoad={onLoad}
-				previewUrl={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
-				url={url}
-			/>
-		) : (
-			<IFrameVideo onError={onError} onLoad={onLoad} url={`https://youtube.com/embed/${rel}`} />
-		);
-	},
+	"youtube.com": (url, onLoad, onError) => <YoutubeVideo onError={onError} onLoad={onLoad} url={url} />,
+	"youtu.be": (url, onLoad, onError) => <YoutubeVideo onError={onError} onLoad={onLoad} url={url} />,
 	"drive.google.com": (url, onLoad, onError) => {
 		return isCredentiallessUnsupported ? (
 			<PreviewVideo onLoad={onLoad} previewUrl={previews.gdrive} url={url} />
@@ -101,6 +84,18 @@ const SupportedVideoHostings: {
 			<IFrameVideo onError={onError} onLoad={onLoad} url={getInstagramEmbedUrl(url)} />
 		),
 	// "sharepoint.com": (link) => <VideoTag link={link.replace(/\?e=.*?$/, "?download=1")} />,
+};
+
+const YoutubeVideo = ({ url, onLoad, onError }: RenderVideoProps) => {
+	const embedUrl = getYoutubeEmbedUrl(url, getExecutingEnvironment() === "tauri");
+	if (!embedUrl) return <IFrameVideo onError={onError} onLoad={onLoad} url={url} />;
+
+	if (isCredentiallessUnsupported) {
+		const previewUrl = `https://img.youtube.com/vi/${getYoutubeVideoId(url)}/maxresdefault.jpg`;
+		return <PreviewVideo onLoad={onLoad} previewUrl={previewUrl} url={url} />;
+	}
+
+	return <IFrameVideo onError={onError} onLoad={onLoad} url={embedUrl} />;
 };
 
 const PreviewVideo = ({ url, previewUrl, className, onLoad, ...props }: PreviewVideoProps) => {
@@ -166,7 +161,9 @@ const RenderVideo = ({ url, setIsError, setIsLoaded }: RenderVideoPropsWithoutLo
 
 	if (typeof url !== "string") return;
 
-	if (url.includes("embed")) return <IFrameVideo onError={onError} onLoad={onLoad} url={url} />;
+	// In desktop a YouTube embed link still has to go through the proxy page (error 153)
+	const isDesktopYoutube = getExecutingEnvironment() === "tauri" && isYoutubeUrl(url);
+	if (url.includes("embed") && !isDesktopYoutube) return <IFrameVideo onError={onError} onLoad={onLoad} url={url} />;
 
 	return (
 		Object.entries(SupportedVideoHostings).find(([name]) => url.includes(name))?.[1](url, onLoad, onError) ?? (

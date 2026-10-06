@@ -140,7 +140,8 @@ impl<C: Creds> Repo<'_, C> {
 const TRASH_NAMES: [&str; 1] = [".DS_Store"];
 
 fn is_trash<P: AsRef<Path>>(path: P) -> bool {
-	path.as_ref()
+	path
+		.as_ref()
 		.file_name()
 		.and_then(|name| name.to_str())
 		.map(|name| TRASH_NAMES.contains(&name))

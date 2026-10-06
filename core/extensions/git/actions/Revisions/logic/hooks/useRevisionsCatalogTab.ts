@@ -103,6 +103,11 @@ export const useRevisionsCatalogTab = ({ show, setShow }: UseRevisionsCatalogTab
 
 	const getRevisions = useCallback(
 		async (from?: string, depth = 51) => {
+			// Can fire with no resolvable catalog, e.g. opening the History panel on a page reached
+			// via history navigation whose catalog no longer exists ("Каталог не найден") — nothing
+			// to list, and the backend would otherwise be asked for a null catalogName.
+			if (!catalogName) return [];
+
 			const newFilters = { ...filters, pathspecs: filters?.articles?.map((a) => a.path) };
 			delete newFilters.articles;
 			if (!newFilters.pathspecs?.length) delete newFilters.pathspecs;
@@ -116,7 +121,7 @@ export const useRevisionsCatalogTab = ({ show, setShow }: UseRevisionsCatalogTab
 			setReachedFirstCommit(data.reachedFirstCommit);
 			return data.data;
 		},
-		[setReachedFirstCommit, filters],
+		[setReachedFirstCommit, filters, catalogName],
 	);
 
 	const requestMore = useCallback(
@@ -166,6 +171,8 @@ export const useRevisionsCatalogTab = ({ show, setShow }: UseRevisionsCatalogTab
 	);
 
 	const fetchHeadCommitOid = useCallback(async (): Promise<string | null> => {
+		if (!catalogName) return null;
+
 		const res = await FetchService.fetch<GitVersionDataSet>(
 			apiUrlCreatorRef.current.getVersionControlRevisionsUrl(undefined, 1),
 			JSON.stringify({}),
@@ -173,7 +180,7 @@ export const useRevisionsCatalogTab = ({ show, setShow }: UseRevisionsCatalogTab
 		if (!res.ok) return null;
 		const data = await res.json();
 		return data.data?.[0]?.oid ?? null;
-	}, []);
+	}, [catalogName]);
 
 	const loadRevisions = useCallback(
 		async (selectFirstRevision: boolean) => {

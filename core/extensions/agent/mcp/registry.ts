@@ -66,6 +66,7 @@ export class AgentToolRegistry {
 		sessionId?: string,
 		llmClient?: AgentLlmClient,
 		onUsage?: ToolExecutionContext["onUsage"],
+		signal?: AbortSignal,
 	): Promise<ToolExecutionResult> {
 		const session = sessionId ? app.agentManager.sessions.get(sessionId) : null;
 		const tool = this.tools.find((tool) => tool.name === name);
@@ -86,21 +87,63 @@ export class AgentToolRegistry {
 			}
 			toolInput = JSON.parse(resolved.text);
 		}
-		const result = await tool.execute({
-			input: toolInput,
-			app,
-			ctx,
-			commands,
-			sessionId,
-			openCatalogName: session?.openCatalogName ?? undefined,
-			openItemPath: session?.openItemPath ?? undefined,
-			llmClient,
-			onUsage,
-		});
+		const result = await this._executeToolWithAbort(
+			() =>
+				tool.execute({
+					input: toolInput,
+					app,
+					ctx,
+					commands,
+					sessionId,
+					openCatalogName: session?.openCatalogName ?? undefined,
+					openItemPath: session?.openItemPath ?? undefined,
+					llmClient,
+					onUsage,
+				}),
+			signal,
+		);
 		if (this._toolsWithSecretResolving.has(tool.name)) {
 			return JSON.parse(app.agentManager.secrets.unresolve(JSON.stringify(result)));
 		}
 		return result;
+	}
+
+	private _abortError() {
+		return new DOMException("The operation was aborted.", "AbortError");
+	}
+
+	private async _executeToolWithAbort<T>(work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+		if (signal?.aborted) throw this._abortError();
+		if (!signal) return work();
+
+		const pending = work();
+		return await new Promise<T>((resolve, reject) => {
+			const onAbort = () => {
+				cleanup();
+				void pending.catch(() => {});
+				reject(this._abortError());
+			};
+			const cleanup = () => signal.removeEventListener("abort", onAbort);
+			signal.addEventListener("abort", onAbort, { once: true });
+			pending.then(
+				(value) => {
+					cleanup();
+					if (signal.aborted) {
+						reject(this._abortError());
+						return;
+					}
+					resolve(value);
+				},
+				(error) => {
+					cleanup();
+					if (signal.aborted) {
+						reject(this._abortError());
+						return;
+					}
+					reject(error);
+				},
+			);
+		});
 	}
 
 	private _createTools(docs = getToolsDescriptions()): ToolDefinition[] {

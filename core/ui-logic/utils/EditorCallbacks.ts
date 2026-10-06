@@ -1,5 +1,6 @@
 import type { UpdateItemPropsResult } from "@app/commands/item/updateProps";
 import type { Router } from "@core/Api/Router";
+import type PageDataContext from "@core/Context/PageDataContext";
 import { uniqueName } from "@core/utils/uniqueName";
 import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import FetchService from "@core-ui/ApiServices/FetchService";
@@ -7,18 +8,29 @@ import MimeTypes from "@core-ui/ApiServices/Types/MimeTypes";
 import type { ResourceServiceType } from "@core-ui/ContextServices/ResourceService/ResourceService";
 import type { BaseEditorContext, EditorContext, EditorPasteHandler } from "@core-ui/stores/EditorStore";
 import { span } from "@ext/loggers/opentelemetry";
+import { getClipboardOrigin } from "@ext/markdown/elements/copyArticles/handlers/clipboardOrigin";
 import { paste } from "@ext/markdown/elements/copyArticles/handlers/paste";
 import imageHandlePaste from "@ext/markdown/elements/image/edit/logic/imageHandlePaste";
 import NavigationEvents, { type ItemRenamePatch } from "@ext/navigation/NavigationEvents";
 import { useCallback } from "react";
 
-export const createHandlePasteCallback = (resourceService: ResourceServiceType): EditorPasteHandler => {
+export const createHandlePasteCallback = (
+	resourceService: ResourceServiceType,
+	pageDataContext: PageDataContext,
+): EditorPasteHandler => {
 	return (view, event, _slice, apiUrlCreator, articleProps, catalogProps) => {
 		if (!event.clipboardData) return false;
 		if (event.clipboardData.files.length !== 0)
 			return imageHandlePaste(view, event, articleProps.fileName, resourceService);
 
-		return paste({ view, event, apiUrlCreator, resourceService, catalogProps });
+		return paste({
+			view,
+			event,
+			apiUrlCreator,
+			resourceService,
+			catalogProps,
+			origin: getClipboardOrigin(pageDataContext),
+		});
 	};
 };
 

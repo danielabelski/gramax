@@ -10,6 +10,14 @@ describe("normalizeServices", () => {
 		});
 	});
 
+	// A deploy that passes GIT_PROXY_SERVICE_URL=null gets the string "null" in env.js;
+	// the git worker and the server read it as "no proxy" (gramax-wasm post.ts, GitServerInfoProvider).
+	it.each(["null", "undefined"])("turns an endpoint stated as the string %p into an empty string", (endpoint) => {
+		expect(normalizeServices({ "git-proxy": { endpoint } })).toEqual({
+			"git-proxy": { endpoint: "" },
+		});
+	});
+
 	it("turns a missing endpoint into an empty string", () => {
 		expect(normalizeServices({ "git-proxy": {} })).toEqual({
 			"git-proxy": { endpoint: "" },

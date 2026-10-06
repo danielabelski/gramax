@@ -181,9 +181,7 @@
    content past it, which is what tells a reader the table can be scrolled at all. The attributes are written
    by tableScrollShadows.ts; without it the table still scrolls, it just says so less.
 
-   Mixed from `--color-article-bg` rather than copied from ShadowBox, which fades
-   `rgba(var(--color-article-bg-rgb), …)` — a variable this repository never defines, so that gradient is
-   invalid and paints nothing. Worth fixing there too; here the colour has to be one that exists. */
+   Mixed from `--color-article-bg`, the same colour ShadowBox fades to. */
 [data-theme] openapi-doc .openapi-table-scroll::before,
 [data-theme] openapi-doc .openapi-table-scroll::after {
 	position: absolute;

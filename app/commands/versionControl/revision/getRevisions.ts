@@ -4,7 +4,8 @@ import { AuthorizeMiddleware } from "@core/Api/middleware/AuthorizeMiddleware";
 import type { GitRevisionsFilter } from "@ext/git/actions/Revisions/model/GitRevisionsFilter";
 import type { GitVersionDataSet } from "@ext/git/core/GitVersionControl/GitVersionControl";
 import { GitVersion } from "@ext/git/core/model/GitVersion";
-import assert from "assert";
+
+const emptyRevisions: GitVersionDataSet = { data: [], reachedFirstCommit: true };
 
 const getRevisions: Command<
 	{ catalogName: string; from?: string; depth?: number; filters: GitRevisionsFilter },
@@ -20,8 +21,11 @@ const getRevisions: Command<
 		const { wm } = this._app;
 		const workspace = wm.current();
 
+		// catalogName can arrive null when the caller (e.g. a still-mounted revisions panel) fires
+		// this after navigating to a page whose catalog no longer resolves — return empty instead
+		// of asserting, matching `versionControl/diff/getDiffTree`'s convention for the same case.
 		const catalog = await workspace.getContextlessCatalog(catalogName);
-		assert(catalog?.repo?.gvc);
+		if (!catalog?.repo?.gvc) return emptyRevisions;
 
 		return await catalog.repo.gvc.getCommitInfo(from ? new GitVersion(from) : undefined, depth, filters);
 	},

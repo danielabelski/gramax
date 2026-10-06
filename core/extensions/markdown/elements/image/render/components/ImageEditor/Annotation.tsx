@@ -1,8 +1,9 @@
-import Tooltip from "@components/Atoms/Tooltip";
 import { classNames } from "@components/libs/classNames";
 import { cssMedia } from "@core-ui/utils/cssUtils";
+// biome-ignore lint/style/noRestrictedImports: existing emotion component; a Tailwind migration is out of scope for this fix
 import styled from "@emotion/styled";
 import { objectMove } from "@ext/markdown/elements/image/edit/logic/imageEditorMethods";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@ui-kit/Tooltip";
 import { type CSSProperties, type RefObject, useEffect, useRef, useState } from "react";
 import type { AnnotationObject } from "../../../edit/model/imageEditorTypes";
 
@@ -43,6 +44,7 @@ const Annotation = (props: AnnotationObjectProps) => {
 	const [position, setPosition] = useState<AnnotationVector>({ x: 0, y: 0 });
 	const unitType = isPixels ? "px" : "%";
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the container ref is stable; the position follows only the object data
 	useEffect(() => {
 		const imageContainer = parentRef.current;
 		const imageContainerRect = imageContainer.getBoundingClientRect();
@@ -69,22 +71,31 @@ const Annotation = (props: AnnotationObjectProps) => {
 		},
 	});
 
+	const body = (
+		<div
+			className={classNames(className, { selected }, ["annotation"])}
+			id={`object/${index}`}
+			onMouseDown={mainMouseDown}
+			ref={mainRef}
+			style={{
+				...style,
+				left: position.x + unitType,
+				top: position.y + unitType,
+			}}
+		>
+			{drawIndexes && <p>{index + 1}</p>}
+		</div>
+	);
+
+	if (!text) return body;
+
 	return (
-		<Tooltip content={text} disabled={isDraggable} hideInMobile={false} trigger="mouseenter focus">
-			<div
-				className={classNames(className, { selected }, ["annotation"])}
-				id={"object/" + index}
-				onMouseDown={mainMouseDown}
-				ref={mainRef}
-				style={{
-					...style,
-					left: position.x + unitType,
-					top: position.y + unitType,
-				}}
-			>
-				{drawIndexes && <p>{index + 1}</p>}
-			</div>
-		</Tooltip>
+		<TooltipProvider>
+			<Tooltip open={isDraggable ? false : undefined} showOnTouch>
+				<TooltipTrigger asChild>{body}</TooltipTrigger>
+				<TooltipContent>{text}</TooltipContent>
+			</Tooltip>
+		</TooltipProvider>
 	);
 };
 

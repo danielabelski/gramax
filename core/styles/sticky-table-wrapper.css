@@ -242,6 +242,8 @@
 	width: var(--sticky-side-padding) !important;
 	/* biome-ignore lint/complexity/noImportantStyles: override inline */
 	background-color: var(--sticky-bg-color) !important;
+	/* biome-ignore lint/complexity/noImportantStyles: override inline */
+	background-image: none !important;
 }
 
 .sticky-table-wrapper[data-sticky-col-active="true"]

@@ -266,7 +266,7 @@ fn gc_multiple_calls(_sandbox: TempDir, #[with(&_sandbox)] repo: Repo<TestCreds>
 
 		let gc_options = GcOptions {
 			loose_objects_limit: Some(1),
-				..Default::default()
+			..Default::default()
 		};
 		repo.gc(gc_options)?;
 
@@ -497,7 +497,9 @@ fn gc_keeps_index_objects_added_via_external_handle(_sandbox: TempDir, #[with(&_
 	})?;
 
 	let verify = git2::Repository::open(_sandbox.path()).unwrap();
-	verify.find_blob(staged_oid).expect("index-referenced object staged via another handle must survive gc");
+	verify
+		.find_blob(staged_oid)
+		.expect("index-referenced object staged via another handle must survive gc");
 
 	Ok(())
 }

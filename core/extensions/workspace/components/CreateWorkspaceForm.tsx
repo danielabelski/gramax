@@ -6,6 +6,7 @@ import ModalErrorHandler from "@ext/errorHandlers/client/components/ModalErrorHa
 import t from "@ext/localization/locale/translate";
 import { PopoverIconPicker } from "@ext/markdown/elements/icon/edit/components/IconPicker/PopoverIconPicker";
 import { useCreateWorkspaceActions } from "@ext/workspace/components/logic/useCreateWorkspaceActions";
+import { isWorkspacePathTaken } from "@ext/workspace/utils/workspacePath";
 import type { ClientWorkspaceConfig } from "@ext/workspace/WorkspaceConfig";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@ui-kit/Button";
@@ -28,7 +29,12 @@ const CreateWorkspaceForm = (props: WorkspaceSettingsModalProps) => {
 	const askPath = isTauri;
 
 	const isNameUnique = (name: string) => name.length > 0 && !workspaces.find((w) => w.name === name);
-	const isPathValid = (path: string) => path.length > 0 && !workspaces.find((w) => w.path === path);
+	const isPathValid = (path: string) =>
+		path.length > 0 &&
+		!isWorkspacePathTaken(
+			path,
+			workspaces.map((w) => w.path),
+		);
 
 	const formSchema = z.object({
 		name: z

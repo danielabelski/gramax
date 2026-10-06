@@ -27,14 +27,21 @@ const schemaDefaults = extractDefaults(AppSettings) as Record<string, unknown>;
 
 // A service GES states but deliberately leaves empty resolves to `endpoint: null`
 // (see resolveWorkspaceServices) — normalize it to "" so the field renders blank
-// instead of tripping the endpoint schema's URL check on submit.
+// instead of tripping the endpoint schema's URL check on submit. A deploy that sets
+// GIT_PROXY_SERVICE_URL=null hands over the string "null", which the git worker and
+// GitServerInfoProvider read as "no proxy" too — it renders blank the same way.
+const EMPTY_ENDPOINTS = new Set(["null", "undefined"]);
+
+const normalizeEndpoint = (endpoint: string | null | undefined): string =>
+	!endpoint || EMPTY_ENDPOINTS.has(endpoint) ? "" : endpoint;
+
 export const normalizeServices = (services: Record<string, unknown>): AppSettingsFormData["services"] =>
 	Object.fromEntries(
 		Object.entries(services).map(([key, service]) => [
 			key,
 			{
 				...(service as { endpoint?: string | null }),
-				endpoint: (service as { endpoint?: string | null })?.endpoint ?? "",
+				endpoint: normalizeEndpoint((service as { endpoint?: string | null })?.endpoint),
 			},
 		]),
 	) as AppSettingsFormData["services"];

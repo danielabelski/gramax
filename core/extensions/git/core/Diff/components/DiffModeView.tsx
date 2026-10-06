@@ -7,6 +7,7 @@ import type ApiUrlCreator from "@core-ui/ApiServices/ApiUrlCreator";
 import ApiUrlCreatorService from "@core-ui/ContextServices/ApiUrlCreator";
 import ArticlePropsService from "@core-ui/ContextServices/ArticleProps";
 import ButtonStateService from "@core-ui/ContextServices/ButtonStateService/ButtonStateService";
+import PageDataContextService from "@core-ui/ContextServices/PageDataContext";
 import ResourceService from "@core-ui/ContextServices/ResourceService/ResourceService";
 import Workspace from "@core-ui/ContextServices/Workspace";
 import { useDebounce } from "@core-ui/hooks/useDebounce";
@@ -30,6 +31,7 @@ import { useEditorExtensions } from "@ext/git/core/Diff/components/store/EditorE
 import useDiff from "@ext/git/core/Diff/logic/hooks/useDiff";
 import { useDiffExtensions } from "@ext/git/core/Diff/logic/hooks/useDiffExtensions";
 import matchesDiffArticle from "@ext/git/core/Diff/logic/matchesDiffArticle";
+import withoutInheritedTitleHandler from "@ext/git/core/Diff/logic/withoutInheritedTitleHandler";
 import type { TreeReadScope } from "@ext/git/core/GitCommands/model/GitCommandsModel";
 import { addEvent, Level, traced } from "@ext/loggers/opentelemetry";
 import ArticleMat from "@ext/markdown/core/edit/components/ArticleMat";
@@ -109,7 +111,7 @@ const DiffModeViewInternal = (props: DiffModeViewProps) => {
 	const resourceService = ResourceService.value;
 	const router = useRouter();
 
-	const handlePaste = createHandlePasteCallback(resourceService);
+	const handlePaste = createHandlePasteCallback(resourceService, PageDataContextService.value);
 	const editorOnUpdate = createOnUpdateCallback();
 	const editorTitleOnUpdate = createUpdateTitleFunction();
 	const editorTitleOnUpdateRef = useRef(editorTitleOnUpdate);
@@ -132,6 +134,24 @@ const DiffModeViewInternal = (props: DiffModeViewProps) => {
 	const isTemplateInstance = articleProps.template?.length > 0;
 
 	const contextArticlePath = Path.join(catalogProps?.name, articlePath);
+
+	// Read at call time: the handler lives in the editor's extensions, which outlive a render. Another
+	// article's title must not be sent to the article the diff was opened for.
+	const titleLoseFocusRef = useRef<
+		(args: { newTitle: string; articleProps: ClientArticleProps; apiUrlCreator: ApiUrlCreator }) => unknown
+	>(() => undefined);
+	titleLoseFocusRef.current = ({
+		newTitle,
+		articleProps: editorArticleProps,
+		apiUrlCreator: editorApiUrlCreator,
+	}) => {
+		if (!matchesDiffArticle(editorArticleProps?.ref?.path, contextArticlePath)) return;
+		return editorTitleOnUpdateRef.current(
+			{ apiUrlCreator: editorApiUrlCreator, articleProps: editorArticleProps, propertyService },
+			router,
+			newTitle,
+		);
+	};
 
 	const { start: onUpdateDebounce } = useDebounce((editor: Editor) => {
 		void traced("diff-editor-save", { level: Level.Commands, omitArgs: true, omitResult: true }, async () => {
@@ -200,8 +220,11 @@ const DiffModeViewInternal = (props: DiffModeViewProps) => {
 		() =>
 			extensions
 				? [
-						...extensions.filter((e) => !FILTER_MAIN_EXTENSIONS.includes(e.name)),
+						...withoutInheritedTitleHandler(extensions).filter(
+							(e) => !FILTER_MAIN_EXTENSIONS.includes(e.name),
+						),
 						...newDiffExtensions,
+						ArticleTitleHelpers.configure({ onTitleLoseFocus: (args) => titleLoseFocusRef.current(args) }),
 						OnDeleteNode.configure({ onDeleteNodes }),
 						OnAddMark.configure({ onAddMarks }),
 						OnDeleteMark.configure({ onDeleteMarks }),
@@ -228,14 +251,7 @@ const DiffModeViewInternal = (props: DiffModeViewProps) => {
 						}),
 						CopyArticles.configure({ resourceService }),
 						OnDeleteMark.configure({ onDeleteMarks }),
-						ArticleTitleHelpers.configure({
-							onTitleLoseFocus: ({ newTitle, articleProps, apiUrlCreator }) =>
-								editorTitleOnUpdateRef.current(
-									{ apiUrlCreator, articleProps, propertyService },
-									router,
-									newTitle,
-								),
-						}),
+						ArticleTitleHelpers.configure({ onTitleLoseFocus: (args) => titleLoseFocusRef.current(args) }),
 						...getTemplateExtensions(false),
 					],
 		[
@@ -249,7 +265,6 @@ const DiffModeViewInternal = (props: DiffModeViewProps) => {
 			onMarkAddedComment,
 			onMarkDeletedComment,
 			isGES,
-			router,
 		],
 	);
 

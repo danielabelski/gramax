@@ -79,18 +79,24 @@ export class AgentSessionStore {
 	async load(activeSessionId?: string | null): Promise<void> {
 		const sessionIds = await this._fileStore.listDir("sessions");
 		for (const session of this._sessions.values()) {
-			this.cancel(session.id);
+			await this.cancel(session.id);
 		}
 		this._sessions.clear();
+		const interruptedIds: string[] = [];
 		for (const id of sessionIds) {
 			const item = await this._fileStore.readJsonFile<ReturnType<AgentSession["toSnapshot"]> | null>(
 				this._getSessionFilePath(id),
 				null,
 			);
 			if (!item?.id) continue;
-			this._sessions.set(item.id, AgentSession.fromSnapshot(item));
+			const session = AgentSession.fromSnapshot(item);
+			if (session.closeInterruptedTurn()) interruptedIds.push(session.id);
+			this._sessions.set(session.id, session);
 		}
 		await this._applySessionsLimit(activeSessionId);
+		for (const id of interruptedIds) {
+			if (this._sessions.has(id)) await this._save(id);
+		}
 	}
 
 	async create(): Promise<AgentSession> {
@@ -109,14 +115,16 @@ export class AgentSessionStore {
 		return Array.from(this._sessions.values()).map((session) => session.toSnapshot());
 	}
 
-	cancel(id: string): boolean {
+	async cancel(id: string): Promise<boolean> {
 		const session = this._sessions.get(id);
-		const controller = session?.activeRunController;
-		if (!controller) return false;
-		controller.abort("cancelled_by_user");
-		if (session) {
-			session.activeRunController = null;
+		if (!session) return false;
+		const controller = session.activeRunController;
+		if (controller) {
+			controller.abort("cancelled_by_user");
+			return true;
 		}
+		if (!session.closeInterruptedTurn()) return false;
+		await this._save(id);
 		return true;
 	}
 
@@ -135,7 +143,7 @@ export class AgentSessionStore {
 	}
 
 	async delete(id: string): Promise<boolean> {
-		const cancelled = this.cancel(id);
+		const cancelled = await this.cancel(id);
 		this._sessions.delete(id);
 		await this._fileStore.deletePath(`sessions/${id}`);
 		return cancelled;

@@ -574,11 +574,7 @@ impl<C: Creds> Repo<C> {
 /// It says "N conflicts prevent checkout" and stops there. Which files it means is the only thing
 /// the user can act on, and it is cheap to answer: the candidates are the paths the checkout was
 /// given, and each is one status call. Without this a sync or a branch switch fails with a number.
-pub(crate) fn name_what_blocks(
-	repo: &Repository,
-	result: std::result::Result<(), git2::Error>,
-	paths: &[PathBuf],
-) -> Result<()> {
+pub(crate) fn name_what_blocks(repo: &Repository, result: std::result::Result<(), git2::Error>, paths: &[PathBuf]) -> Result<()> {
 	let Err(error) = result else { return Ok(()) };
 
 	if error.code() != ErrorCode::Conflict {

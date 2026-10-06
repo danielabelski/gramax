@@ -76,6 +76,14 @@ impl<C: Creds> Count for Repo<'_, C> {
 
 		let diff = self.0.diff_tree_to_tree(Some(&ancestor_tree), upstream_tree.as_ref(), Some(&mut opts))?;
 		upstream_count_files.pull = diff.stats()?.files_changed();
+
+		// upstream may be ahead by commits that change no files (e.g. an empty commit);
+		// pull must still be non-zero, otherwise sync never merges them and every push is rejected
+		let is_behind = head_commit.id() != upstream_commit.id() && !self.0.graph_descendant_of(head_commit.id(), upstream_commit.id())?;
+		if is_behind && upstream_count_files.pull == 0 {
+			upstream_count_files.pull = 1;
+		}
+
 		Ok(upstream_count_files)
 	}
 }

@@ -153,9 +153,9 @@ impl<C: ActualCreds> Merge for Repo<'_, C> {
 			.or_else(|_| self.branch_by_name(branch, Some(BranchType::Local)))?;
 
 		let theirs_commit = self.0.find_commit(theirs.last_commit.id())?;
-		let head_commit = self.0.find_commit(
-			self.0.head()?.target().ok_or_else(|| git2::Error::from_str("HEAD has no target"))?,
-		)?;
+		let head_commit = self
+			.0
+			.find_commit(self.0.head()?.target().ok_or_else(|| git2::Error::from_str("HEAD has no target"))?)?;
 
 		let ancestor_oid = self.0.merge_base(head_commit.id(), theirs_commit.id())?;
 		let ancestor_tree = self.0.find_commit(ancestor_oid)?.tree()?;
@@ -172,7 +172,9 @@ impl<C: ActualCreds> Merge for Repo<'_, C> {
 		let mut merge_opts = git2::MergeOptions::new();
 		merge_opts.find_renames(true);
 
-		let merged = self.0.merge_trees(&ancestor_tree, &ours_tree, &theirs_commit.tree()?, Some(&merge_opts))?;
+		let merged = self
+			.0
+			.merge_trees(&ancestor_tree, &ours_tree, &theirs_commit.tree()?, Some(&merge_opts))?;
 
 		let mut paths = Vec::new();
 		for conflict in merged.conflicts()? {

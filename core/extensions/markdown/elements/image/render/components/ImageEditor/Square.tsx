@@ -1,8 +1,10 @@
-import Tooltip from "@components/Atoms/Tooltip";
 import { classNames } from "@components/libs/classNames";
 import { cssMedia } from "@core-ui/utils/cssUtils";
+// biome-ignore lint/style/noRestrictedImports: existing emotion component; a Tailwind migration is out of scope for this fix
 import styled from "@emotion/styled";
 import { handleMove, objectMove } from "@ext/markdown/elements/image/edit/logic/imageEditorMethods";
+import useMirroredBox from "@ext/markdown/elements/image/render/hooks/useMirroredBox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@ui-kit/Tooltip";
 import { type CSSProperties, type ReactElement, type RefObject, useEffect, useRef, useState } from "react";
 import type { SquareObject } from "../../../edit/model/imageEditorTypes";
 
@@ -15,6 +17,7 @@ interface SquareObjectProps extends SquareObject {
 	drawIndexes?: boolean;
 	style?: CSSProperties;
 	isPixels?: boolean;
+	handlesZIndex?: number;
 }
 
 type SquareVector = {
@@ -42,12 +45,18 @@ const Square = (props: SquareObjectProps): ReactElement => {
 		className,
 		style,
 		isPixels,
+		handlesZIndex,
 	} = props;
 	const mainRef = useRef<HTMLDivElement>(null);
+	const handlesRef = useRef<HTMLDivElement>(null);
 	const [isDraggable, setDraggable] = useState<boolean>(false);
 	const [position, setPosition] = useState<SquareVector>({ x: 0, y: 0, w: 0, h: 0 });
 	const unitType = isPixels ? "px" : "%";
+	const showHandles = editable && selected;
 
+	useMirroredBox(mainRef, handlesRef, showHandles);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the image container ref is stable; the box is recomputed when the object's geometry changes
 	useEffect(() => {
 		const imageContainer = parentRef.current;
 		const imageContainerRect = imageContainer.getBoundingClientRect();
@@ -109,37 +118,55 @@ const Square = (props: SquareObjectProps): ReactElement => {
 		},
 	});
 
-	return (
-		<Tooltip content={text} disabled={isDraggable} hideInMobile={false} trigger="mouseenter focus">
-			<div
-				className={classNames(className, { selected })}
-				id={"object/" + index}
-				onMouseDown={mainMouseDown}
-				ref={mainRef}
-				style={{
-					...style,
-					left: position.x + unitType,
-					top: position.y + unitType,
-					width: position.w + unitType,
-					height: position.h + unitType,
-				}}
-			>
-				{drawIndexes && (
-					<div className={`annotation annotation-${direction}`}>
-						<p>{index + 1}</p>
-					</div>
-				)}
+	const box: CSSProperties = {
+		left: position.x + unitType,
+		top: position.y + unitType,
+		width: position.w + unitType,
+		height: position.h + unitType,
+	};
 
-				{editable && selected && (
-					<div>
-						<div className="handle top-left" id="top-left" onMouseDown={onMouseDown}></div>
-						<div className="handle top-right" id="top-right" onMouseDown={onMouseDown}></div>
-						<div className="handle bottom-right" id="bottom-right" onMouseDown={onMouseDown}></div>
-						<div className="handle bottom-left" id="bottom-left" onMouseDown={onMouseDown}></div>
-					</div>
-				)}
-			</div>
-		</Tooltip>
+	const body = (
+		<div
+			className={classNames(className, { selected })}
+			id={`object/${index}`}
+			onMouseDown={mainMouseDown}
+			ref={mainRef}
+			style={{ ...style, ...box }}
+		>
+			{drawIndexes && (
+				<div className={`annotation annotation-${direction}`}>
+					<p>{index + 1}</p>
+				</div>
+			)}
+		</div>
+	);
+
+	return (
+		<>
+			{text ? (
+				<TooltipProvider>
+					<Tooltip open={isDraggable ? false : undefined} showOnTouch>
+						<TooltipTrigger asChild>{body}</TooltipTrigger>
+						<TooltipContent>{text}</TooltipContent>
+					</Tooltip>
+				</TooltipProvider>
+			) : (
+				body
+			)}
+
+			{showHandles && (
+				<div
+					className={classNames(className, {}, ["handles-layer"])}
+					ref={handlesRef}
+					style={{ ...style, ...box, zIndex: handlesZIndex }}
+				>
+					<div className="handle top-left" id="top-left" onMouseDown={onMouseDown}></div>
+					<div className="handle top-right" id="top-right" onMouseDown={onMouseDown}></div>
+					<div className="handle bottom-right" id="bottom-right" onMouseDown={onMouseDown}></div>
+					<div className="handle bottom-left" id="bottom-left" onMouseDown={onMouseDown}></div>
+				</div>
+			)}
+		</>
 	);
 };
 
@@ -199,7 +226,13 @@ export default styled(Square)`
 		pointer-events: none;
 	}
 
+	&.handles-layer {
+		border-color: transparent;
+		pointer-events: none !important;
+	}
+
 	.handle {
+		pointer-events: auto;
 		position: absolute;
 		width: 50%;
 		height: 50%;

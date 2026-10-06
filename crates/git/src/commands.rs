@@ -372,7 +372,9 @@ pub fn format_merge_message(repo: &Path, creds: AccessTokenCreds, opts: MergeMes
 
 #[tracing::instrument(target = TAG, fields(repo = %repo.short()), ret)]
 pub fn has_merge_conflicts(repo: &Path, creds: AccessTokenCreds, branch: &str) -> Result<Vec<PathBuf>> {
-	Repo::run_write(repo, creds, "has_merge_conflicts", |repo| Ok(repo.has_merge_conflicts(branch).healthcheck_if_odb_error(&repo)?))
+	Repo::run_write(repo, creds, "has_merge_conflicts", |repo| {
+		Ok(repo.has_merge_conflicts(branch).healthcheck_if_odb_error(&repo)?)
+	})
 }
 
 #[tracing::instrument(target = TAG, fields(repo = %repo.short()), err)]

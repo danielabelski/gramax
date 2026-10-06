@@ -22,6 +22,11 @@ const buildToolLabels = (language: UiLanguage): Record<string, string> => ({
 	search_files: t("agent.tools.search_files", language),
 	read_catalog_item: t("agent.tools.read_catalog_item", language),
 	read_agent_skill: t("agent.tools.read_agent_skill", language),
+	read_agent_skill_planning: t("agent.tools.read_agent_skill_planning", language),
+	read_agent_skill_diagrams: t("agent.tools.read_agent_skill_diagrams", language),
+	read_agent_skill_calendar: t("agent.tools.read_agent_skill_calendar", language),
+	read_agent_skill_mail: t("agent.tools.read_agent_skill_mail", language),
+	read_agent_skill_skills: t("agent.tools.read_agent_skill_skills", language),
 	get_files_navigation: t("agent.tools.get_files_navigation", language),
 	read_file: t("agent.tools.read_file", language),
 	get_catalog_item_headings: t("agent.tools.get_catalog_item_headings", language),
@@ -83,9 +88,25 @@ const TOOL_ICONS: Record<string, IconCode> = {
 	compact_context: "package",
 };
 
+const SYSTEM_SKILL_LABEL_KEYS: Record<string, string> = {
+	planning: "read_agent_skill_planning",
+	diagrams: "read_agent_skill_diagrams",
+	calendar: "read_agent_skill_calendar",
+	mail: "read_agent_skill_mail",
+	skills: "read_agent_skill_skills",
+};
+
 const getToolLabelKey = (toolName: string, args: Record<string, unknown> | undefined): string => {
 	const itemPath = typeof args?.itemPath === "string" ? args.itemPath : undefined;
-	if (toolName === "read_catalog_item" && itemPath?.includes(agentConfig.skillPrefix)) return "read_agent_skill";
+	if (toolName === "read_catalog_item" && itemPath?.includes(agentConfig.skillPrefix)) {
+		const catalogName = typeof args?.catalogName === "string" ? args.catalogName : undefined;
+		if (catalogName === agentConfig.systemPrefix) {
+			const skillName = itemPath.split(`${agentConfig.skillPrefix}/`)[1]?.split("/")[0];
+			const systemKey = skillName ? SYSTEM_SKILL_LABEL_KEYS[skillName] : undefined;
+			if (systemKey) return systemKey;
+		}
+		return "read_agent_skill";
+	}
 	return toolName;
 };
 
@@ -93,7 +114,7 @@ const getToolLabel = (labels: Record<string, string>, toolName: string, args?: u
 	const argsObject = isPlainObject(args) ? args : undefined;
 	const labelKey = getToolLabelKey(toolName, argsObject);
 	const base = labels[labelKey] ?? toolName.replace(/_/g, " ");
-	if (itemTitle) return `${base} «${itemTitle}»`;
+	if (itemTitle && !labelKey.startsWith("read_agent_skill_")) return `${base} «${itemTitle}»`;
 	if (!argsObject) return base;
 	if (
 		(toolName === "search_catalogs" || toolName === "search_files") &&
@@ -108,7 +129,7 @@ const getToolLabel = (labels: Record<string, string>, toolName: string, args?: u
 const getToolIcon = (toolName: string, args?: unknown): IconCode => {
 	const argsObject = isPlainObject(args) ? args : undefined;
 	const iconKey = getToolLabelKey(toolName, argsObject);
-	return TOOL_ICONS[iconKey] ?? "wrench";
+	return TOOL_ICONS[iconKey] ?? TOOL_ICONS[toolName] ?? "wrench";
 };
 
 type ToolPair = {
@@ -140,11 +161,19 @@ const buildPairs = (messages: ChatMessage[]): ToolPair[] => {
 
 const SHOW_CHECK_DURATION = 3000;
 
-const ToolPairCard = ({ pair, labels }: { pair: ToolPair; labels: Record<string, string> }) => {
+const ToolPairCard = ({
+	pair,
+	labels,
+	isFinished,
+}: {
+	pair: ToolPair;
+	labels: Record<string, string>;
+	isFinished: boolean;
+}) => {
 	const [open, setOpen] = useState(false);
 	useAutoScrollGuard(open);
 	const { call, result } = pair;
-	const isPending = call.kind === "tool_call" && !result;
+	const isPending = call.kind === "tool_call" && !result && !isFinished;
 	const isError = result?.toolResultIsError === true;
 
 	const [showCheck, setShowCheck] = useState(false);
@@ -242,12 +271,20 @@ const ToolPairCard = ({ pair, labels }: { pair: ToolPair; labels: Record<string,
 	);
 };
 
-const ToolSegment = ({ pairs, labels }: { pairs: ToolPair[]; labels: Record<string, string> }) => {
+const ToolSegment = ({
+	pairs,
+	labels,
+	isFinished,
+}: {
+	pairs: ToolPair[];
+	labels: Record<string, string>;
+	isFinished: boolean;
+}) => {
 	const [open, setOpen] = useState(false);
 	useAutoScrollGuard(open);
 
 	if (pairs.length === 1) {
-		return <ToolPairCard labels={labels} pair={pairs[0]} />;
+		return <ToolPairCard isFinished={isFinished} labels={labels} pair={pairs[0]} />;
 	}
 
 	return (
@@ -262,7 +299,7 @@ const ToolSegment = ({ pairs, labels }: { pairs: ToolPair[]; labels: Record<stri
 			</CollapsibleTrigger>
 			<CollapsibleContent className="pt-1 space-y-2">
 				{pairs.map((pair) => (
-					<ToolPairCard key={pair.call.id} labels={labels} pair={pair} />
+					<ToolPairCard isFinished={isFinished} key={pair.call.id} labels={labels} pair={pair} />
 				))}
 			</CollapsibleContent>
 		</Collapsible>
@@ -271,16 +308,17 @@ const ToolSegment = ({ pairs, labels }: { pairs: ToolPair[]; labels: Record<stri
 
 type Props = {
 	messages: ChatMessage[];
+	isFinished?: boolean;
 };
 
-export const ToolActivityBundle = memo(({ messages }: Props) => {
+export const ToolActivityBundle = memo(({ messages, isFinished = false }: Props) => {
 	const pairs = useMemo(() => buildPairs(messages), [messages]);
 	const [language] = useSetting("general.language");
 	const labels = useMemo(() => buildToolLabels(language), [language]);
 
 	return (
 		<div className="w-full min-w-0 space-y-2">
-			<ToolSegment labels={labels} pairs={pairs} />
+			<ToolSegment isFinished={isFinished} labels={labels} pairs={pairs} />
 		</div>
 	);
 });

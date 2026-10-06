@@ -62,10 +62,7 @@ fn lfs_scoped_pointer_resolution_uses_commit_tree(sandbox: TempDir, #[with(&sand
 }
 
 #[rstest]
-fn lfs_scoped_pull_command_head_scope_keeps_exact_behavior(
-	sandbox: TempDir,
-	#[with(&sandbox)] repo: Repo<TestCreds>,
-) -> Result {
+fn lfs_scoped_pull_command_head_scope_keeps_exact_behavior(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	// HEAD scope resolves the pointer from the working copy, exactly as before
 	let pointer = pointer_text(NEW_OID, 9);
 	fs::write(sandbox.path().join("img.bin"), &pointer)?;

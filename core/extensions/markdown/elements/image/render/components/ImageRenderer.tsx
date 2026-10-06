@@ -84,7 +84,7 @@ const ImageR = forwardRef<HTMLImageElement, ImageRProps>((props, ref) => {
 				ref={ref}
 				src={src}
 			/>
-			<div className="object-container">
+			<div className="object-container isolate">
 				{isLoaded && (
 					<ObjectRenderer
 						editable={false}

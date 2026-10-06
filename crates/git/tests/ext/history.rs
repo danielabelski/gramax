@@ -184,14 +184,30 @@ fn get_commit_info(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) ->
 
 	// get commit info
 	let head = repo.repo().head()?.peel_to_commit()?;
-	let commit_info_only_head = repo.get_commit_info(head.id(), CommitInfoOpts { depth: 1, simplify: true, filters: None, include_changed_files: None })?;
+	let commit_info_only_head = repo.get_commit_info(
+		head.id(),
+		CommitInfoOpts {
+			depth: 1,
+			simplify: true,
+			filters: None,
+			include_changed_files: None,
+		},
+	)?;
 
 	assert_eq!(commit_info_only_head.len(), 1);
 	assert_eq!(commit_info_only_head.first().unwrap().oid, oids.first().unwrap().0.short_info()?);
 	assert_eq!(commit_info_only_head.first().unwrap().summary, oids.first().unwrap().1);
 
 	// get commit info with depth 10
-	let commit_info_10 = repo.get_commit_info(head.id(), CommitInfoOpts { depth: 10, simplify: true, filters: None, include_changed_files: None })?;
+	let commit_info_10 = repo.get_commit_info(
+		head.id(),
+		CommitInfoOpts {
+			depth: 10,
+			simplify: true,
+			filters: None,
+			include_changed_files: None,
+		},
+	)?;
 
 	commit_info_10.iter().zip(&oids).for_each(|(info, oid)| {
 		assert_eq!(
@@ -208,7 +224,15 @@ fn get_commit_info(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) ->
 	let depth = 2;
 	let oid = oids.get(index).unwrap().0;
 
-	let commit_info_2 = repo.get_commit_info(oid, CommitInfoOpts { depth, simplify: true, filters: None, include_changed_files: None })?;
+	let commit_info_2 = repo.get_commit_info(
+		oid,
+		CommitInfoOpts {
+			depth,
+			simplify: true,
+			filters: None,
+			include_changed_files: None,
+		},
+	)?;
 
 	commit_info_2.iter().zip(oids.iter().take(depth).skip(index)).for_each(|(info, oid)| {
 		assert_eq!(
@@ -235,7 +259,15 @@ fn get_commit_info_stat(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds
 	repo.commit_debug()?;
 
 	let head = repo.repo().head()?.peel_to_commit()?;
-	let commit_info = repo.get_commit_info(head.id(), CommitInfoOpts { depth: 3, simplify: true, filters: None, include_changed_files: None })?;
+	let commit_info = repo.get_commit_info(
+		head.id(),
+		CommitInfoOpts {
+			depth: 3,
+			simplify: true,
+			filters: None,
+			include_changed_files: None,
+		},
+	)?;
 
 	assert_eq!(commit_info.len(), 3);
 
@@ -297,7 +329,9 @@ fn get_commit_info_filter_by_author(sandbox: TempDir, #[with(&sandbox)] repo: Re
 		index.write()?;
 		let tree = repo.repo().find_tree(tree_oid)?;
 		let parent = repo.repo().head()?.peel_to_commit()?;
-		repo.repo().commit(Some("HEAD"), &other_sig, &other_sig, "other commit", &tree, &[&parent])?;
+		repo
+			.repo()
+			.commit(Some("HEAD"), &other_sig, &other_sig, "other commit", &tree, &[&parent])?;
 	}
 
 	let head = repo.repo().head()?.peel_to_commit()?;
@@ -317,8 +351,14 @@ fn get_commit_info_filter_by_author(sandbox: TempDir, #[with(&sandbox)] repo: Re
 		},
 	)?;
 
-	assert!(result.iter().all(|c| c.author.email == "test@email.com"), "should return only commits by test-user");
-	assert!(!result.iter().any(|c| c.author.email == "other@email.com"), "should not return other-user commits");
+	assert!(
+		result.iter().all(|c| c.author.email == "test@email.com"),
+		"should return only commits by test-user"
+	);
+	assert!(
+		!result.iter().any(|c| c.author.email == "other@email.com"),
+		"should not return other-user commits"
+	);
 
 	Ok(())
 }
@@ -453,8 +493,9 @@ fn get_commit_info_filter_by_pathspecs_looks_past_merges(sandbox: TempDir, #[wit
 	let tree = repo.repo().find_tree(index.write_tree()?)?;
 	index.write()?;
 	let parents = [repo.repo().find_commit(unrelated)?, repo.repo().find_commit(edit)?];
-	let merge =
-		repo.repo().commit(Some("HEAD"), &sig, &sig, "merge feature", &tree, &[&parents[0], &parents[1]])?;
+	let merge = repo
+		.repo()
+		.commit(Some("HEAD"), &sig, &sig, "merge feature", &tree, &[&parents[0], &parents[1]])?;
 
 	let result = repo.get_commit_info(
 		merge,
@@ -473,7 +514,10 @@ fn get_commit_info_filter_by_pathspecs_looks_past_merges(sandbox: TempDir, #[wit
 
 	let summaries: Vec<_> = result.iter().map(|c| c.summary.as_str()).collect();
 
-	assert!(summaries.contains(&edit_summary.as_str()), "the commit merged in is the one that edited alpha");
+	assert!(
+		summaries.contains(&edit_summary.as_str()),
+		"the commit merged in is the one that edited alpha"
+	);
 	assert!(!summaries.contains(&"merge feature"), "the merge itself changed nothing");
 
 	Ok(())
@@ -550,10 +594,16 @@ fn get_commit_range_of_pathspecs_follows_renames(sandbox: TempDir, #[with(&sandb
 	fs::remove_file(sandbox.path().join("alpha"))?;
 	let moved = commit_all_at(&repo, "move alpha", FEB_1)?;
 
-	let range = repo.get_commit_range(Some(vec!["moved/alpha".to_string()]))?.expect("the path has commits");
+	let range = repo
+		.get_commit_range(Some(vec!["moved/alpha".to_string()]))?
+		.expect("the path has commits");
 
 	assert_eq!(range.start.oid, created.short_info()?, "the range starts before the move");
-	assert_eq!(range.end.oid, moved.short_info()?, "the commit of an unrelated file stays out of the range");
+	assert_eq!(
+		range.end.oid,
+		moved.short_info()?,
+		"the commit of an unrelated file stays out of the range"
+	);
 
 	Ok(())
 }
@@ -570,10 +620,7 @@ fn get_commit_range_is_none_for_an_unknown_path(sandbox: TempDir, #[with(&sandbo
 }
 
 #[rstest]
-fn file_history_resolves_a_merge_into_the_commit_behind_it(
-	sandbox: TempDir,
-	#[with(&sandbox)] repo: Repo<TestCreds>,
-) -> Result {
+fn file_history_resolves_a_merge_into_the_commit_behind_it(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	fs::write(sandbox.path().join("alpha"), "line1\nline2\nv1\n")?;
 	repo.add_all()?;
 	repo.commit_debug()?;
@@ -596,13 +643,22 @@ fn file_history_resolves_a_merge_into_the_commit_behind_it(
 	let tree = repo.repo().find_tree(index.write_tree()?)?;
 	index.write()?;
 	let parents = [repo.repo().find_commit(unrelated)?, repo.repo().find_commit(edit)?];
-	repo.repo().commit(Some("HEAD"), &sig, &sig, "merge feature", &tree, &[&parents[0], &parents[1]])?;
+	repo
+		.repo()
+		.commit(Some("HEAD"), &sig, &sig, "merge feature", &tree, &[&parents[0], &parents[1]])?;
 
 	let history = repo.history("alpha", 0, 10)?;
 	let commits: Vec<_> = history.iter().map(|d| d.commit_oid()).collect();
 
-	assert!(commits.contains(&edit.to_string().as_str()), "the commit merged in is the one that edited alpha");
-	assert_eq!(history.len(), 2, "the merge itself changed nothing, so only the edit and the creation are left");
+	assert!(
+		commits.contains(&edit.to_string().as_str()),
+		"the commit merged in is the one that edited alpha"
+	);
+	assert_eq!(
+		history.len(),
+		2,
+		"the merge itself changed nothing, so only the edit and the creation are left"
+	);
 
 	Ok(())
 }
@@ -663,10 +719,7 @@ fn get_commit_info_filter_by_pathspecs_follows_renames(sandbox: TempDir, #[with(
 }
 
 #[rstest]
-fn get_commit_info_filter_by_pathspecs_empty_returns_all(
-	sandbox: TempDir,
-	#[with(&sandbox)] repo: Repo<TestCreds>,
-) -> Result {
+fn get_commit_info_filter_by_pathspecs_empty_returns_all(sandbox: TempDir, #[with(&sandbox)] repo: Repo<TestCreds>) -> Result {
 	for i in 1..=3 {
 		fs::write(sandbox.path().join(format!("file{i}")), "content")?;
 		repo.add_all()?;

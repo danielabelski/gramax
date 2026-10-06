@@ -84,10 +84,7 @@ fn a_restore_puts_the_stash_back(sandbox: TempDir, #[with(&sandbox)] mut repo: R
 /// index and not in `HEAD`. Merging against `HEAD` calls that text nothing and refuses to write over
 /// it; merging against the index makes it a side, and what comes back is a conflict to resolve.
 #[rstest]
-fn a_restore_over_a_later_edit_is_a_conflict(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn a_restore_over_a_later_edit_is_a_conflict(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "committed")?;
@@ -119,10 +116,7 @@ fn a_restore_over_a_later_edit_is_a_conflict(
 /// An edit made after the restart to a file the stash never touched is none of the restore's
 /// business, and a merge against the index leaves it exactly where it is.
 #[rstest]
-fn a_restore_leaves_an_unrelated_later_edit_alone(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn a_restore_leaves_an_unrelated_later_edit_alone(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("stashed"), "committed")?;
@@ -178,10 +172,7 @@ fn a_restore_lands_on_a_head_that_moved(sandbox: TempDir, #[with(&sandbox)] mut 
 /// while the restore ran. The write that follows is forced, so this refuses and names it rather than
 /// overwriting it.
 #[rstest]
-fn a_restore_refuses_over_a_file_the_index_never_saw(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn a_restore_refuses_over_a_file_the_index_never_saw(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "committed")?;
@@ -210,10 +201,7 @@ fn a_restore_refuses_over_a_file_the_index_never_saw(
 /// on, so a path the checkout may not touch is skipped rather than refused, and the apply reported
 /// success while the stash never reached the disk. The caller then drops the stash.
 #[rstest]
-fn an_apply_refuses_rather_than_reporting_a_success_it_did_not_have(
-	sandbox: TempDir,
-	#[with(&sandbox)] mut repo: Repo<TestCreds>,
-) -> Result {
+fn an_apply_refuses_rather_than_reporting_a_success_it_did_not_have(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<TestCreds>) -> Result {
 	let path = sandbox.path();
 
 	fs::write(path.join("file"), "committed")?;

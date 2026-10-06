@@ -344,7 +344,11 @@ fn dropping_the_newest_stash(sandbox: TempDir, #[with(&sandbox)] mut repo: Repo<
 	let second = repo.stash(None)?.expect("second");
 
 	repo.stash_delete(second)?;
-	assert_eq!(repo.repo().find_reference("refs/stash")?.target(), Some(first), "refs/stash must point at what is left");
+	assert_eq!(
+		repo.repo().find_reference("refs/stash")?.target(),
+		Some(first),
+		"refs/stash must point at what is left"
+	);
 
 	repo.stash_apply(first)?;
 	assert_eq!(fs::read_to_string(path.join("a"))?, "a2");
@@ -376,7 +380,10 @@ fn sync(repo: &mut Repo<TestCreds>, theirs: &str) -> Result<()> {
 			// would discard the working copy over a pull that never happened.
 			let after = repo.repo().head()?.peel_to_commit()?.id();
 			if after != before {
-				repo.reset(ResetOptions { mode: ResetMode::Hard, head: Some(OidInfo(before.to_string())) })?;
+				repo.reset(ResetOptions {
+					mode: ResetMode::Hard,
+					head: Some(OidInfo(before.to_string())),
+				})?;
 			}
 
 			if let Some(oid) = stash {

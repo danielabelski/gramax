@@ -17,6 +17,10 @@ const videoComponentStyles = tv({
 		"[&_iframe]:flex",
 		"[&_iframe]:h-full",
 		"[&_iframe]:w-full",
+		// The loading skeleton hides its children with display: none; an iframe hidden that way
+		// starts the YouTube player at zero size, and it picks the lowest quality.
+		"[&_.skeleton>iframe]:block",
+		"[&_.skeleton>iframe]:invisible",
 	],
 	variants: {
 		layout: {
